@@ -24,7 +24,7 @@ AUTH_MODE = os.getenv("AUTH_MODE", "").lower()
 DEV_AUTH_SECRET = os.getenv("DEV_AUTH_SECRET", "")
 DEV_USER_ID = os.getenv("DEV_USER_ID", "local-coach")
 DEV_USER_NAME = os.getenv("DEV_USER_NAME", "Local Coach")
-CONTENT_TYPES = ("playbooks", "plays", "slides", "exports", "gamePlans", "scoutPlays")
+CONTENT_TYPES = ("playbooks", "plays", "slides", "exports", "gamePlans", "scoutPlays", "scheduleEvents")
 STATUS_TYPES = {"playbooks", "gamePlans", "plays", "scoutPlays"}
 request_workspace = ContextVar("request_workspace", default=None)
 accounts.validate_environment(COSMOS_ENDPOINT)
@@ -322,6 +322,27 @@ def update_record(entity_type, item_id, payload):
     return response(storage.save(entity_type, record))
 
 
+def validate_schedule_event(payload, partial=False):
+    allowed_types = {"Practice", "Film Review", "Team Meeting", "Other"}
+    if not partial and not {"name", "eventType", "eventDate"}.issubset(payload):
+        return "name, eventType, and eventDate are required"
+    if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip()):
+        return "name must be a non-empty string"
+    if "eventType" in payload and payload["eventType"] not in allowed_types:
+        return "eventType must be Practice, Film Review, Team Meeting, or Other"
+    if "eventDate" in payload:
+        try:
+            parsed_date = datetime.strptime(payload["eventDate"], "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return "eventDate must be a valid date in YYYY-MM-DD format"
+        if parsed_date.isoformat() != payload["eventDate"]:
+            return "eventDate must be a valid date in YYYY-MM-DD format"
+    for key in ("startTime", "endTime", "location", "notes"):
+        if key in payload and not isinstance(payload[key], str):
+            return f"{key} must be a string"
+    return None
+
+
 @app.route(route="{*path}", methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
 def api(req: func.HttpRequest) -> func.HttpResponse:
     path = (req.route_params.get("path") or "").strip("/").split("/")
@@ -340,7 +361,7 @@ def api(req: func.HttpRequest) -> func.HttpResponse:
             with storage.guard("user:" + user["userId"] if global_route else workspace["id"]):
                 workspace, role = accounts.select_workspace(storage, user, None if global_route else req.headers.get("X-Workspace-Id"))
                 request_workspace.set(workspace)
-                if path[0] in {"playbooks", "game-plans", "search", "exports", "workspace"}:
+                if path[0] in {"playbooks", "game-plans", "schedule-events", "search", "exports", "workspace"}:
                     accounts.enter_workspace(storage, workspace)
                 return dispatch(req, user, workspace, role)
         finally:
@@ -378,6 +399,36 @@ def dispatch(req, user, workspace, role):
         query = (req.params.get("q") or "").lower()
         results = [p for p in storage.list("playbooks", owner_id=owner_id) if not query or query in p.get("name", "").lower()]
         return response({"items": results, "query": query})
+
+    if path == ["schedule-events"]:
+        if method == "GET":
+            records = storage.list("scheduleEvents", owner_id=owner_id)
+            return response({"items": records})
+        if method == "POST":
+            payload = body(req)
+            error = validate_schedule_event(payload)
+            if error:
+                return response({"error": {"code": "VALIDATION_ERROR", "message": error}}, 400)
+            return create_record("scheduleEvents", payload, owner_id)
+
+    if len(path) == 2 and path[0] == "schedule-events":
+        event_id = path[1]
+        event = storage.get("scheduleEvents", event_id)
+        if event is None:
+            return not_found("Schedule event", event_id)
+        if not accounts.belongs(event, workspace):
+            return forbidden()
+        if method == "GET":
+            return response(event)
+        if method == "PATCH":
+            payload = body(req)
+            error = validate_schedule_event(payload, partial=True)
+            if error:
+                return response({"error": {"code": "VALIDATION_ERROR", "message": error}}, 400)
+            return update_record("scheduleEvents", event_id, payload)
+        if method == "DELETE":
+            storage.delete("scheduleEvents", event_id)
+            return func.HttpResponse(status_code=204)
 
     if path == ["playbooks"]:
         if method == "GET":

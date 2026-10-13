@@ -5,7 +5,7 @@ import { getCategoryBadgeStyle } from './CategoryBadge'
 
 const PAGE_SIZE = 50
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, onReorder }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder }) {
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
@@ -109,7 +109,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
     setPage(0)
   }
 
-  const filteredRows = rows.filter((row) => (!selectedCategories.length || selectedCategories.includes(row.category))
+  const filteredRows = rows.filter((row) => (!filterRows || filterRows(row))
+    && (!selectedCategories.length || selectedCategories.includes(row.category))
     && (!statusFilter || selectedStatus === (row.recordStatus ?? 'Active')))
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)
@@ -276,7 +277,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
           )}
         </div>
       </div>}
-      {onRowDoubleClick && showOpenHint && pageRows.length > 0 && (
+      {onRowDoubleClick && showOpenHint && !suppressOpenHint && pageRows.length > 0 && (
         <div className="data-grid-open-hint" role="status">
           <Info size={16} aria-hidden="true" />
           <span className="data-grid-open-hint-desktop">Double-click a row to open it, or choose Open from its actions menu.</span>

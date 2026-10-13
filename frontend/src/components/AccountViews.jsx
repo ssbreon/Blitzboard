@@ -7,7 +7,7 @@ const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
 const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
 const TEAM_TABS = [{ id: 'workspace', label: 'Workspace' }, { id: 'staff', label: 'Staff' }, { id: 'invitations', label: 'Invitations' }]
-const LABELS = { playbooks: 'Playbooks', gamePlans: 'Game plans', plays: 'Plays', scoutPlays: 'Scouting plays' }
+const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
 const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 const date = (value, timeZone) => value ? new Date(value).toLocaleDateString(undefined, timeZone ? { timeZone } : undefined) : 'Not started'
 

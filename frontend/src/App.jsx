@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, FolderOpen, LoaderCircle, LogOut, Printer, Route, Save, ScanSearch, Settings, Trash2, UserRound, Users } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, FolderOpen, LoaderCircle, LogOut, MoreVertical, Plus, Printer, Route, Save, ScanSearch, Settings, Shield, Target, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -8,12 +8,14 @@ import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { COLLECTION_CATEGORIES, NewCollectionDialog } from './components/NewCollectionDialog'
 import { NewPlayDialog, playCategoriesForCollection } from './components/NewPlayDialog'
+import { PlayFieldView } from './components/PlayFieldView'
 import { PlayDesigner } from './components/PlayDesigner'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
+import { TeamSchedule } from './components/TeamSchedule'
 import { buildMarkersFromTemplate, PLAY_TEMPLATES } from './utils/formations'
 import { formatDate } from './utils/formatDate'
 import { themeLabel } from './utils/themes'
-import { defaultPlayPerspective } from './utils/playGeometry'
+import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
 import './App.css'
 
 const STATUS_COLUMN = { key: 'recordStatus', header: 'Status', render: (value) => value ?? 'Active' }
@@ -50,6 +52,175 @@ const PLAY_GRID_COLUMNS = [
   { key: 'ownerName', header: 'Owner' },
   STATUS_COLUMN,
 ]
+
+const GAME_UNIT_ICONS = { Defense: Shield, 'Special Teams': Target }
+const GAME_CARD_VIEWS = [
+  { id: 'offense-installs', unit: 'Offense', tab: 'installs', title: 'Offense - Installs', description: 'Offensive plays to install' },
+  { id: 'offense-scout', unit: 'Offense', tab: 'scout', title: 'Offense - Scout Defense', description: 'Practice script plays for our scout defense to run' },
+  { id: 'defense-installs', unit: 'Defense', tab: 'installs', title: 'Defense - Installs', description: 'Defensive plays to install' },
+  { id: 'defense-scout', unit: 'Defense', tab: 'scout', title: 'Defense - Scout Offense', description: 'Practice scripts for our scout offense to run' },
+  { id: 'special-teams-installs', unit: 'Special Teams', tab: 'installs', title: 'Special Teams - Installs', description: 'Special teams plays to install' },
+  { id: 'special-teams-scout', unit: 'Special Teams', tab: 'scout', title: 'Special Teams - Scout', description: 'Practice scripts for our scout special teams' },
+]
+const GAME_SCOUT_PLAY_COLUMNS = [
+  { key: 'name', header: 'Play Name' },
+  { key: 'template', header: 'Formation', render: (value) => PLAY_TEMPLATES.find((template) => template.id === value)?.label || value || '—' },
+  { key: 'category', header: 'Category' },
+  { key: 'preview', header: 'Plays', render: (_, play) => <div className="schedule-grid-play-preview" role="img" aria-label={`${play.name} play diagram`}><PlayFieldView play={play} /></div> },
+]
+
+function gameBreadcrumbLabel(game) {
+  const opponent = game.opponent || game.name
+  const date = game.gameDate
+    ? new Date(`${game.gameDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    : ''
+  return `Game vs. ${opponent}${date ? ` - ${date}` : ''}`
+}
+
+function gameCardItemDefaultName(game, card) {
+  const opponent = (game.opponent || game.name || '').replace(/^Game vs\.\s*/i, '').trim()
+  const label = card.tab === 'installs'
+    ? card.unit
+    : card.unit === 'Special Teams' ? 'Special Teams Scout' : card.title.split(' - ')[1]
+  return [opponent, label, game.year || new Date().getFullYear()].filter(Boolean).join(' ')
+}
+
+function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
+  const [name, setName] = useState(initialName)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!name.trim() || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      await onCreate(name.trim())
+    } catch (failure) {
+      setError(failure.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
+    <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
+      <h2><Plus size={22} aria-hidden="true" />Add {card.tab === 'installs' ? 'Install' : 'Practice Script'}</h2>
+      <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
+      {error && <p role="alert" className="data-grid-status data-grid-error">Unable to create item: {error}</p>}
+      <div className="dialog-actions">
+        <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
+        <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Creating...' : 'Create'}</button>
+      </div>
+    </form>
+  </div>
+}
+
+function GameCardItemActions({ item, canDuplicate, canDelete, busy, onAction }) {
+  const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState(null)
+  const triggerRef = useRef(null)
+  const menuRef = useRef(null)
+  const actions = [
+    { key: 'open', label: 'Open', icon: FolderOpen },
+    ...(canDuplicate ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy }] : []),
+    ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true }] : []),
+  ]
+
+  function closeMenu(returnFocus = false) {
+    setOpen(false)
+    if (returnFocus) triggerRef.current?.focus()
+  }
+
+  useEffect(() => {
+    if (!open) return undefined
+    function closeOutside(event) {
+      if (!menuRef.current?.contains(event.target) && !triggerRef.current?.contains(event.target)) setOpen(false)
+    }
+    function closeOnViewportChange() {
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', closeOutside)
+    window.addEventListener('scroll', closeOnViewportChange, true)
+    window.addEventListener('resize', closeOnViewportChange)
+    menuRef.current?.querySelector('button:not(:disabled)')?.focus({ preventScroll: true })
+    return () => {
+      document.removeEventListener('mousedown', closeOutside)
+      window.removeEventListener('scroll', closeOnViewportChange, true)
+      window.removeEventListener('resize', closeOnViewportChange)
+    }
+  }, [open])
+
+  function showMenu() {
+    const rect = triggerRef.current.getBoundingClientRect()
+    const menuHeight = actions.length * 40 + 12
+    const top = rect.bottom + 4 + menuHeight <= window.innerHeight
+      ? rect.bottom + 4
+      : Math.max(8, rect.top - menuHeight - 4)
+    setPosition({ top, right: Math.max(8, window.innerWidth - rect.right) })
+    setOpen(true)
+  }
+
+  function handleMenuKeyDown(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      closeMenu(true)
+    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault()
+      const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
+      const currentIndex = buttons.indexOf(document.activeElement)
+      const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+        : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+      buttons[nextIndex]?.focus()
+    } else if (event.key === 'Tab') {
+      closeMenu()
+    }
+  }
+
+  return <div className="row-actions">
+    <button
+      ref={triggerRef}
+      type="button"
+      className="row-actions-button"
+      disabled={busy}
+      title={`Actions for ${item.name}`}
+      aria-label={`Actions for ${item.name}`}
+      aria-haspopup="menu"
+      aria-expanded={open}
+      onClick={() => open ? closeMenu() : showMenu()}
+    ><MoreVertical size={18} aria-hidden="true" /></button>
+    {open && position && createPortal(<div
+      className="toolbar-dropdown row-actions-dropdown"
+      ref={menuRef}
+      role="menu"
+      tabIndex={-1}
+      style={{ position: 'fixed', top: position.top, right: position.right }}
+      onKeyDown={handleMenuKeyDown}
+    >{actions.map((action) => <button
+      key={action.key}
+      type="button"
+      role="menuitem"
+      disabled={busy}
+      className={action.destructive ? 'row-actions-destructive' : undefined}
+      onClick={() => {
+        closeMenu(true)
+        onAction(action.key, item)
+      }}
+    ><action.icon className="menu-item-icon" aria-hidden="true" />{action.label}</button>)}</div>, document.body)}
+  </div>
+}
+
+function playTags(play) {
+  const value = play.tags ?? play.tag
+  if (Array.isArray(value)) return value.map((tag) => String(tag).trim()).filter(Boolean)
+  return typeof value === 'string' ? value.split(/[;,]/).map((tag) => tag.trim()).filter(Boolean) : []
+}
+
+function formationLabel(play) {
+  const value = play.formation || play.template
+  return PLAY_TEMPLATES.find((template) => template.id === value)?.label || value || '—'
+}
 
 function timezoneColumns(columns, timezone) {
   return columns.map((column) => column.render === formatDate ? { ...column, render: (value) => formatDate(value, timezone) } : column)
@@ -106,11 +277,11 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
           Playbooks
         </a>
         <a
-          href="#game-plans"
-          className={`app-bar-link${activeView === 'gamePlans' ? ' active' : ''}`}
-          onClick={(event) => navigate(event, 'gamePlans')}
+          href="#team-schedule"
+          className={`app-bar-link${activeView === 'teamSchedule' ? ' active' : ''}`}
+          onClick={(event) => navigate(event, 'teamSchedule')}
         >
-          Game Plans
+          Team Schedule
         </a>
           </>
         )}
@@ -156,17 +327,114 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
             </div>
           </div>
         )}
+
       </div>}
     </header>
   )
 }
 
-function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget }) {
+function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
+  const [playbooks, setPlaybooks] = useState([])
+  const [playbookId, setPlaybookId] = useState('')
+  const [plays, setPlays] = useState([])
+  const [loadedPlaybookId, setLoadedPlaybookId] = useState('')
+  const [selectedIds, setSelectedIds] = useState([])
+  const [search, setSearch] = useState('')
+  const [loadingPlaybooks, setLoadingPlaybooks] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    api.listPlaybooks(category)
+      .then((result) => {
+        if (!active) return
+        const available = result.items.filter((book) => book.recordStatus !== 'Archived' && !book.gameCardId)
+        setPlaybooks(available)
+        setPlaybookId(available[0]?.id || '')
+      })
+      .catch((failure) => { if (active) setError(failure.message) })
+      .finally(() => { if (active) setLoadingPlaybooks(false) })
+    return () => { active = false }
+  }, [api, category])
+
+  useEffect(() => {
+    if (!playbookId) return undefined
+    let active = true
+    api.listPlays(playbookId)
+      .then((result) => { if (active) setPlays(result.items.filter((play) => play.recordStatus !== 'Archived')) })
+      .catch((failure) => { if (active) { setPlays([]); setError(failure.message) } })
+      .finally(() => { if (active) setLoadedPlaybookId(playbookId) })
+    return () => { active = false }
+  }, [api, playbookId])
+
+  const loadingPlays = Boolean(playbookId) && loadedPlaybookId !== playbookId
+  const installedIds = new Set(installedPlays.map((selection) => `${selection.playbookId}:${selection.playId}`))
+  const visiblePlays = plays.filter((play) => play.name.toLocaleLowerCase().includes(search.toLocaleLowerCase()))
+
+  async function submit(event) {
+    event.preventDefault()
+    if (submitting || !selectedIds.length) return
+    const selectedBook = playbooks.find((book) => book.id === playbookId)
+    const selections = plays.filter((play) => selectedIds.includes(play.id)).map((play) => ({
+      playbookId,
+      playId: play.id,
+      playbookName: selectedBook?.name || '',
+      playName: play.name,
+    }))
+    setSubmitting(true)
+    setError(null)
+    try {
+      await onAdd(selections)
+    } catch (failure) {
+      setError(failure.message)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onCancel() }}>
+    <form className="dialog-panel install-play-picker-dialog" onSubmit={submit} aria-busy={submitting}>
+      <h2><Plus size={22} aria-hidden="true" />Add Plays</h2>
+      <label className="dialog-field"><span>Playbook</span><select value={playbookId} onChange={(event) => { setPlaybookId(event.target.value); setSelectedIds([]); setError(null) }} disabled={loadingPlaybooks || !playbooks.length}>
+        {loadingPlaybooks && <option value="">Loading playbooks...</option>}
+        {!loadingPlaybooks && !playbooks.length && <option value="">No {category.toLowerCase()} playbooks available</option>}
+        {playbooks.map((book) => <option key={book.id} value={book.id}>{book.name}</option>)}
+      </select></label>
+      <label className="dialog-field"><span>Search plays</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name" /></label>
+      <div className="install-play-picker-list" aria-label="Available plays">
+        {loadingPlays ? <p className="schedule-muted">Loading plays...</p> : visiblePlays.map((play) => {
+          const key = `${playbookId}:${play.id}`
+          const alreadyAdded = installedIds.has(key)
+          return <label key={play.id} className="install-play-picker-item">
+            <input type="checkbox" checked={alreadyAdded || selectedIds.includes(play.id)} disabled={alreadyAdded || submitting} onChange={() => setSelectedIds((current) => current.includes(play.id) ? current.filter((id) => id !== play.id) : [...current, play.id])} />
+            <span>{play.name}</span>
+            {alreadyAdded && <small>Added</small>}
+          </label>
+        })}
+        {!loadingPlays && playbookId && !visiblePlays.length && <p className="schedule-muted">No matching plays.</p>}
+      </div>
+      {error && <p role="alert" className="data-grid-status data-grid-error">Unable to add plays: {error}</p>}
+      <div className="dialog-actions">
+        <button type="button" className="dialog-cancel" disabled={submitting} onClick={onCancel}>Cancel</button>
+        <button type="submit" className="dialog-create" disabled={submitting || !selectedIds.length}>{submitting ? 'Adding...' : 'Add Selected Plays'}</button>
+      </div>
+    </form>
+  </div>
+}
+
+function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget, gameCard, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+  const isGamePlan = parentRecord.kind === 'gamePlan'
+  const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
+  const selectedUnit = gameCard?.unit || 'Offense'
+  const gameTab = gameCard?.tab || 'scout'
   const [name, setName] = useState(parentRecord.name)
   const [category, setCategory] = useState(parentRecord.category || 'Defense')
   const [year, setYear] = useState(String(parentRecord.year || new Date().getFullYear()))
   const [opponent, setOpponent] = useState(parentRecord.opponent || '')
   const [gameDate, setGameDate] = useState(parentRecord.gameDate || '')
+  const [startTime, setStartTime] = useState(parentRecord.startTime || '')
+  const [gameSite, setGameSite] = useState(parentRecord.gameSite || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -175,24 +443,179 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   const [draftYear, setDraftYear] = useState(year)
   const [draftOpponent, setDraftOpponent] = useState(opponent)
   const [draftGameDate, setDraftGameDate] = useState(gameDate)
+  const [draftStartTime, setDraftStartTime] = useState(startTime)
+  const [draftGameSite, setDraftGameSite] = useState(gameSite)
+  const [playbooks, setPlaybooks] = useState([])
+  const [playbooksLoading, setPlaybooksLoading] = useState(isGamePlan || installMode)
+  const [playbooksError, setPlaybooksError] = useState(null)
+  const [playbookPlays, setPlaybookPlays] = useState({})
+  const [loadedPlaybookKey, setLoadedPlaybookKey] = useState('')
+  const [playbookPlaysError, setPlaybookPlaysError] = useState(null)
+  const [selectedPlaybookId, setSelectedPlaybookId] = useState('')
+  const [formationFilter, setFormationFilter] = useState('')
+  const [installCategoryFilter, setInstallCategoryFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
+  const [playSearchDraft, setPlaySearchDraft] = useState('')
+  const [playSearchTerm, setPlaySearchTerm] = useState('')
+  const [selectedInstallPlays, setSelectedInstallPlays] = useState(() => Array.isArray(parentRecord.installPlays) ? parentRecord.installPlays : [])
+  const [savedInstallSignature, setSavedInstallSignature] = useState(() => JSON.stringify(Array.isArray(parentRecord.installPlays) ? parentRecord.installPlays : []))
+  const [installSaving, setInstallSaving] = useState(false)
+  const [installError, setInstallError] = useState(null)
+  const [installPickerOpen, setInstallPickerOpen] = useState(false)
+  const [gameCardActionBusy, setGameCardActionBusy] = useState(false)
+  const [gameCardToast, setGameCardToast] = useState('')
+
+  useEffect(() => {
+    if (!isGamePlan && !installMode) return undefined
+    let active = true
+    api.listPlaybooks()
+      .then((result) => {
+        if (active) {
+          setPlaybooks(result.items.filter((item) => item.recordStatus !== 'Archived'))
+          setPlaybooksError(null)
+        }
+      })
+      .catch((failure) => {
+        if (active) setPlaybooksError(failure.message)
+      })
+      .finally(() => {
+        if (active) setPlaybooksLoading(false)
+      })
+    return () => { active = false }
+  }, [api, installMode, isGamePlan, reloadToken])
+  const unitPlaybooks = playbooks.filter((playbook) => playbook.category === selectedUnit)
+  const activePlaybookId = unitPlaybooks.some((playbook) => playbook.id === selectedPlaybookId)
+    ? selectedPlaybookId
+    : unitPlaybooks[0]?.id || ''
+  const selectedBookIds = [...new Set(selectedInstallPlays.map((selection) => selection.playbookId).filter(Boolean))]
+  const playbookKey = isGamePlan && gameCard?.tab === 'installs'
+    ? [...new Set([activePlaybookId, ...selectedBookIds].filter(Boolean))].join('|')
+    : installMode ? selectedBookIds.join('|') : ''
+
+  useEffect(() => {
+    if ((!isGamePlan && !installMode) || !playbookKey) return undefined
+    let active = true
+    const ids = playbookKey.split('|')
+    Promise.all(ids.map(async (id) => [id, (await api.listPlays(id)).items]))
+      .then((results) => {
+        if (!active) return
+        setPlaybookPlays((current) => ({ ...current, ...Object.fromEntries(results) }))
+        setPlaybookPlaysError(null)
+      })
+      .catch((failure) => {
+        if (active) setPlaybookPlaysError(failure.message)
+      })
+      .finally(() => {
+        if (active) setLoadedPlaybookKey(playbookKey)
+      })
+    return () => { active = false }
+  }, [api, installMode, isGamePlan, playbookKey])
+
+  const availablePlays = (playbookPlays[activePlaybookId] || []).filter((play) => play.recordStatus !== 'Archived')
+  const selectedInstallSignature = JSON.stringify(selectedInstallPlays)
+  const installDirty = selectedInstallSignature !== savedInstallSignature
+  const playbooksForInstall = playbooks.filter((playbook) => playbook.category === selectedUnit)
+  const playsLoading = Boolean(playbookKey) && loadedPlaybookKey !== playbookKey
+  const currentTags = [...new Set(availablePlays.flatMap(playTags))].sort((a, b) => a.localeCompare(b))
+  const currentFormations = [...new Set(availablePlays.map((play) => play.formation || play.template).filter(Boolean))]
+  const currentCategories = [...new Set(availablePlays.map((play) => play.category).filter(Boolean))].sort((a, b) => a.localeCompare(b))
+  const filteredInstallPlays = availablePlays.filter((play) =>
+    (!formationFilter || (play.formation || play.template) === formationFilter)
+    && (!installCategoryFilter || play.category === installCategoryFilter)
+    && (!tagFilter || playTags(play).includes(tagFilter))
+    && (!playSearchTerm || play.name.toLocaleLowerCase().includes(playSearchTerm.toLocaleLowerCase())))
+  const selectedInstallCards = selectedInstallPlays.map((selection) => ({
+    selection,
+    play: (playbookPlays[selection.playbookId] || []).find((play) => play.id === selection.playId),
+    playbook: playbooks.find((item) => item.id === selection.playbookId),
+  })).filter((item) => item.play && item.playbook?.category === (installMode ? parentRecord.category : selectedUnit))
+  const installGridItems = selectedInstallCards.map(({ selection, play, playbook }) => ({
+    ...play,
+    sourcePlaybookId: selection.playbookId,
+    sourcePlaybookName: playbook?.name || selection.playbookName || '',
+  }))
+
+  function toggleInstallPlay(play) {
+    const playbook = playbooks.find((item) => item.id === activePlaybookId)
+    const exists = selectedInstallPlays.some((item) => item.playbookId === activePlaybookId && item.playId === play.id)
+    setSelectedInstallPlays((current) => exists
+      ? current.filter((item) => item.playbookId !== activePlaybookId || item.playId !== play.id)
+      : [...current, { playbookId: activePlaybookId, playId: play.id, playbookName: playbook?.name || '', playName: play.name }])
+    setInstallError(null)
+  }
+
+  async function saveInstallSelection(nextPlays) {
+    if (readOnly || installSaving) return
+    setInstallSaving(true)
+    setInstallError(null)
+    try {
+      const updated = await updateParent(parentRecord.id, { installPlays: nextPlays })
+      onParentUpdated(updated)
+      const savedPlays = updated.installPlays || nextPlays
+      setSelectedInstallPlays(savedPlays)
+      setSavedInstallSignature(JSON.stringify(savedPlays))
+    } catch (failure) {
+      setInstallError(failure.message)
+      throw failure
+    } finally {
+      setInstallSaving(false)
+    }
+  }
+
+  async function saveInstall() {
+    if (readOnly || installSaving || !installDirty) return
+    try {
+      await saveInstallSelection(selectedInstallPlays)
+    } catch {
+      return
+    }
+  }
+
+  async function handleGameCardItemAction(action, card, item) {
+    if (action === 'open') {
+      onOpenGameCardItem(card, item)
+      return
+    }
+    setGameCardActionBusy(true)
+    try {
+      if (action === 'duplicate') {
+        await onDuplicateGameCardItem(item)
+        setGameCardToast(`Duplicated ${item.name}`)
+      } else {
+        await onDeleteGameCardItem(item)
+        setGameCardToast(`Deleted ${item.name}`)
+      }
+    } catch (failure) {
+      setGameCardToast(`Unable to ${action} ${item.name}: ${failure.message}`)
+    } finally {
+      setGameCardActionBusy(false)
+      window.setTimeout(() => setGameCardToast(''), 4000)
+    }
+  }
   async function handleSettingsSave(event) {
     event.preventDefault()
     if (!draftName.trim() || readOnly || saving || busy) return
     setSaving(true)
     setError(null)
     try {
-      const payload = { name: draftName.trim(), category: draftCategory, year: Number(draftYear) }
+      const payload = { name: draftName.trim(), year: Number(draftYear) }
       if (parentRecord.kind === 'gamePlan') {
         payload.opponent = draftOpponent.trim()
         payload.gameDate = draftGameDate
+        payload.startTime = draftStartTime
+        if (draftGameSite) payload.gameSite = draftGameSite
+      } else {
+        payload.category = draftCategory
       }
       const updated = await updateParent(parentRecord.id, payload)
       setName(updated.name)
-      setCategory(updated.category ?? draftCategory)
+      if (!isGamePlan) setCategory(updated.category ?? draftCategory)
       setYear(String(updated.year ?? draftYear))
       if (parentRecord.kind === 'gamePlan') {
         setOpponent(updated.opponent ?? payload.opponent)
         setGameDate(updated.gameDate ?? draftGameDate)
+        setStartTime(updated.startTime ?? draftStartTime)
+        setGameSite(updated.gameSite ?? gameSite)
       }
       onParentUpdated(updated)
       setSettingsOpen(false)
@@ -215,6 +638,8 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
     setDraftYear(year)
     setDraftOpponent(opponent)
     setDraftGameDate(gameDate)
+    setDraftStartTime(startTime)
+    setDraftGameSite(gameSite)
     setSettingsOpen(true)
   }
 
@@ -234,14 +659,14 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
               <span>{parentLabel} name</span>
               <input type="text" value={draftName} onChange={(event) => setDraftName(event.target.value)} required />
             </label>
-            <label className="dialog-field">
+            {!isGamePlan && <label className="dialog-field">
               <span>Category</span>
               <select value={draftCategory} onChange={(event) => setDraftCategory(event.target.value)}>
                 {COLLECTION_CATEGORIES.map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>
-            </label>
+            </label>}
             <label className="dialog-field">
               <span>Year</span>
               <input
@@ -256,14 +681,31 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
             </label>
             {parentRecord.kind === 'gamePlan' && (
               <>
-                <label className="dialog-field">
-                  <span>Opponent</span>
-                  <input type="text" value={draftOpponent} onChange={(event) => setDraftOpponent(event.target.value)} />
-                </label>
-                <label className="dialog-field">
-                  <span>Game Date</span>
-                  <input type="date" value={draftGameDate} onChange={(event) => setDraftGameDate(event.target.value)} />
-                </label>
+                <div className="dialog-field-row">
+                  <label className="dialog-field">
+                    <span>Opponent</span>
+                    <input type="text" value={draftOpponent} onChange={(event) => setDraftOpponent(event.target.value)} />
+                  </label>
+                  <label className="dialog-field">
+                    <span>Game Site</span>
+                    <select value={draftGameSite} onChange={(event) => setDraftGameSite(event.target.value)}>
+                      <option value="">Select game site</option>
+                      <option value="Home">Home</option>
+                      <option value="Away">Away</option>
+                      <option value="Neutral">Neutral</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="dialog-field-row">
+                  <label className="dialog-field">
+                    <span>Game Date</span>
+                    <input type="date" value={draftGameDate} onChange={(event) => setDraftGameDate(event.target.value)} />
+                  </label>
+                  <label className="dialog-field">
+                    <span>Start Time</span>
+                    <input type="time" value={draftStartTime} onChange={(event) => setDraftStartTime(event.target.value)} />
+                  </label>
+                </div>
               </>
             )}
             {error && <p className="data-grid-status data-grid-error" role="alert">Unable to save: {error}</p>}
@@ -278,24 +720,168 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
           </form>
         </div>
       )}
-      <DataGrid
-        title={title}
-        columns={timezoneColumns(PLAY_GRID_COLUMNS, timezone)}
-        rowIcon={rowIcon}
+      {isGamePlan && !gameCard ? <section className="schedule-game-matrix" aria-label="Game plan matrix">
+        <div className="schedule-game-matrix-column-header"><ClipboardList size={21} aria-hidden="true" /><span>Installs</span></div>
+        <div className="schedule-game-matrix-column-header"><ScanSearch size={21} aria-hidden="true" /><span>Scout</span></div>
+        {GAME_CARD_VIEWS.map((card) => {
+          const CardIcon = GAME_UNIT_ICONS[card.unit]
+          const ItemIcon = card.tab === 'installs' ? ClipboardList : ScanSearch
+          const items = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === card.id)
+          const addLabel = card.tab === 'installs' ? 'Install' : 'Practice Script'
+          const title = card.title
+          return <article key={card.id} className="schedule-game-card">
+            <header className="schedule-game-card-heading">
+              <span className="schedule-game-card-icon" aria-hidden="true">{CardIcon ? <CardIcon size={32} strokeWidth={2.2} /> : '🏈'}</span>
+              <h2>{title}</h2>
+              {onAddGameCardItem && <button type="button" className="schedule-game-card-add" disabled={!canAddGameCardItem || busy} onClick={() => onAddGameCardItem(card)}><Plus size={15} aria-hidden="true" /> Add {addLabel}</button>}
+            </header>
+            <ul className="schedule-game-card-list" aria-label={title}>
+              {items.map((item) => {
+                const playCount = card.tab === 'installs'
+                  ? item.installPlays?.length ?? 0
+                  : item.playCount ?? 0
+                return <li key={item.id}>
+                  <button type="button" className="schedule-game-card-item" onClick={() => onOpenGameCardItem(card, item)}>
+                    <ItemIcon className="schedule-game-card-item-icon" size={16} aria-hidden="true" />
+                    <span className="schedule-game-card-item-name">{item.name}</span>
+                    <span className="schedule-game-card-item-count">{playCount} {playCount === 1 ? 'play' : 'plays'}</span>
+                  </button>
+                  <GameCardItemActions
+                    item={item}
+                    canDuplicate={canDuplicateGameCardItem}
+                    canDelete={canDeleteGameCardItem}
+                    busy={busy || gameCardActionBusy}
+                    onAction={(action, record) => handleGameCardItemAction(action, card, record)}
+                  />
+                </li>
+              })}
+              {!items.length && <li className="schedule-game-card-empty">No {card.tab === 'installs' ? 'installs' : 'practice scripts'} yet.</li>}
+            </ul>
+          </article>
+        })}
+        {gameCardToast && <div className="schedule-game-card-toast" role="status">{gameCardToast}</div>}
+      </section> : <>
+      {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
+      {isGamePlan && gameTab === 'installs' ? <section className="schedule-install-page">
+        <header><h2>{gameCard?.title || `${selectedUnit} - Installs`}</h2><p>Select plays from your <strong>Playbooks</strong> to install for this game.</p></header>
+        {playbooksError && <p className="schedule-error" role="alert">Unable to load playbooks: {playbooksError}</p>}
+        {playbookPlaysError && <p className="schedule-error" role="alert">Unable to load plays: {playbookPlaysError}</p>}
+        <form className="schedule-install-filters" onSubmit={(event) => { event.preventDefault(); setPlaySearchTerm(playSearchDraft.trim()) }}>
+          <label><span className="sr-only">Playbook</span><select aria-label="Playbook" value={activePlaybookId} onChange={(event) => setSelectedPlaybookId(event.target.value)} disabled={playbooksLoading || !playbooksForInstall.length}>
+            {playbooksLoading && <option value="">Loading playbooks...</option>}
+            {!playbooksLoading && !playbooksForInstall.length && <option value="">No {selectedUnit.toLowerCase()} playbooks</option>}
+            {playbooksForInstall.map((playbook) => <option key={playbook.id} value={playbook.id}>{playbook.name}</option>)}
+          </select></label>
+          <label><span className="sr-only">Formation</span><select aria-label="Formation" value={formationFilter} onChange={(event) => setFormationFilter(event.target.value)} disabled={!availablePlays.length}>
+            <option value="">Formation: All</option>
+            {currentFormations.map((formation) => <option key={formation} value={formation}>Formation: {PLAY_TEMPLATES.find((template) => template.id === formation)?.label || formation}</option>)}
+          </select></label>
+          <label><span className="sr-only">Category</span><select aria-label="Category" value={installCategoryFilter} onChange={(event) => setInstallCategoryFilter(event.target.value)} disabled={!availablePlays.length}>
+            <option value="">Category: All</option>
+            {currentCategories.map((option) => <option key={option} value={option}>Category: {option}</option>)}
+          </select></label>
+          <label><span className="sr-only">Tag</span><select aria-label="Tag" value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
+            <option value="">Tag: All</option>
+            {currentTags.map((tag) => <option key={tag} value={tag}>Tag: {tag}</option>)}
+          </select></label>
+          <label className="schedule-install-search"><span className="sr-only">Search plays</span><input type="search" aria-label="Search plays" placeholder="Search plays" value={playSearchDraft} onChange={(event) => setPlaySearchDraft(event.target.value)} /></label>
+          <button type="submit" className="schedule-install-search-button" disabled={!activePlaybookId}>Search Plays</button>
+        </form>
+        {playbooksLoading ? <p className="schedule-muted">Loading playbooks...</p>
+          : !playbooksForInstall.length ? <p className="schedule-muted">No {selectedUnit.toLowerCase()} playbooks available.</p>
+            : playsLoading ? <p className="schedule-muted">Loading plays...</p>
+              : <DataGrid
+                key={`install-grid-${activePlaybookId}`}
+                title={`${selectedUnit} install plays`}
+                columns={[
+                  { key: 'name', header: 'Play Name' },
+                  { key: 'formation', header: 'Formation', render: (_, play) => formationLabel(play) },
+                  { key: 'category', header: 'Category' },
+                  { key: 'tags', header: 'Tags', render: (_, play) => playTags(play).join(', ') || '—' },
+                  { key: 'install', header: 'Add to Install', render: (_, play) => {
+                    const selected = selectedInstallPlays.some((item) => item.playbookId === activePlaybookId && item.playId === play.id)
+                    return <button type="button" className={`schedule-install-add${selected ? ' is-selected' : ''}`} aria-label={`${selected ? 'Remove' : 'Add'} ${play.name} ${selected ? 'from' : 'to'} install`} aria-pressed={selected} onDoubleClick={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); toggleInstallPlay(play) }}><span className="schedule-install-add-preview"><PlayFieldView play={play} /></span><span className="schedule-install-add-state">{selected ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}</span></button>
+                  } },
+                ]}
+                items={filteredInstallPlays}
+                compact
+                suppressOpenHint
+                statusFilter
+                onRowDoubleClick={onOpenPlay}
+              />}
+        <section className="schedule-selected-installs" aria-label="Selected plays">
+          <h3>Selected Plays</h3>
+          <div className="schedule-selected-install-list">
+            {selectedInstallCards.map(({ selection, play }) => <button key={`${selection.playbookId}-${selection.playId}`} type="button" className="schedule-selected-install" aria-label={`Remove ${play.name} from selected plays`} onClick={() => setSelectedInstallPlays((current) => current.filter((item) => item.playbookId !== selection.playbookId || item.playId !== selection.playId))}>
+              <span className="schedule-selected-install-preview"><PlayFieldView play={play} /></span><span>{play.name}<X size={14} aria-hidden="true" /></span>
+            </button>)}
+            {!selectedInstallCards.length && <p className="schedule-muted">No plays selected.</p>}
+          </div>
+          <button type="button" className="schedule-primary-button" disabled={readOnly || installSaving || !installDirty} onClick={saveInstall}>{installSaving ? 'Saving...' : 'Save Install'}</button>
+        </section>
+        {installError && <p className="schedule-error" role="alert">{installError}</p>}
+      </section> : installMode ? <section className="schedule-install-library">
+        {playbooksError && <p className="schedule-error" role="alert">Unable to load playbooks: {playbooksError}</p>}
+        {playbookPlaysError && <p className="schedule-error" role="alert">Unable to load selected plays: {playbookPlaysError}</p>}
+        {installError && <p className="schedule-error" role="alert">Unable to update install: {installError}</p>}
+        {playbooksLoading || playsLoading ? <p className="schedule-muted" role="status">Loading installed plays...</p> : <DataGrid
+          key={`install-library-${parentRecord.id}`}
+          title={`${parentRecord.name} plays`}
+          columns={[
+            { key: 'name', header: 'Play Name' },
+            { key: 'sourcePlaybookName', header: 'Playbook' },
+            { key: 'formation', header: 'Formation', render: (_, play) => formationLabel(play) },
+            { key: 'category', header: 'Category' },
+            { key: 'theme', header: 'Theme', render: (value) => themeLabel(value) },
+          ]}
+          items={installGridItems}
+          onNew={() => setInstallPickerOpen(true)}
+          newLabel="Add Plays"
+          busy={busy || installSaving}
+          rowActions={(row) => [
+            { key: 'open', label: 'View Play', icon: FolderOpen, onClick: onOpenPlay },
+            { key: 'remove', label: 'Remove from Install', icon: Trash2, destructive: true, onClick: async () => {
+              try {
+                await saveInstallSelection(selectedInstallPlays.filter((selection) => selection.playId !== row.id || selection.playbookId !== row.sourcePlaybookId))
+              } catch {
+                return
+              }
+            } },
+          ]}
+          onRowDoubleClick={onOpenPlay}
+        />}
+        {installPickerOpen && <AddPlaysDialog
+          api={api}
+          category={parentRecord.category}
+          installedPlays={selectedInstallPlays}
+          onCancel={() => setInstallPickerOpen(false)}
+          onAdd={async (additions) => {
+            const known = new Set(selectedInstallPlays.map((selection) => `${selection.playbookId}:${selection.playId}`))
+            await saveInstallSelection([...selectedInstallPlays, ...additions.filter((selection) => !known.has(`${selection.playbookId}:${selection.playId}`))])
+            setInstallPickerOpen(false)
+          }}
+        />}
+      </section> : <DataGrid
+        key={isGamePlan ? `game-${parentRecord.id}-${selectedUnit}` : `collection-${parentRecord.id}`}
+        title={isGamePlan ? gameCard?.title || `${selectedUnit} Scout Plays` : title}
+        columns={isGamePlan ? GAME_SCOUT_PLAY_COLUMNS : timezoneColumns(PLAY_GRID_COLUMNS, timezone)}
+        rowIcon={isGamePlan ? undefined : rowIcon}
         rowType={rowType}
-        categoryOptions={playCategoriesForCollection(parentRecord.category)}
+        categoryOptions={isGamePlan ? undefined : playCategoriesForCollection(parentRecord.category)}
+        filterRows={isGamePlan ? (row) => (row.unit || parentRecord.category || selectedUnit) === selectedUnit : undefined}
         statusFilter
         reloadToken={reloadToken}
         busy={busy}
         fetchRows={fetchRows}
-        showPage
+        showPage={!isGamePlan}
         onReorder={readOnly ? undefined : onReorder}
-        onNew={onNew}
-        newLabel={newLabel}
+        onNew={isGamePlan && onNew ? () => onNew(selectedUnit) : onNew}
+        newLabel={isGamePlan ? 'Add Play' : newLabel}
         menuItems={[{ label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll }]}
         onRowDoubleClick={onOpenPlay}
         rowActions={rowActions}
-      />
+      />}
+      </>}
     </main>
   )
 }
@@ -305,6 +891,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [view, setView] = useState('playbooks')
   const [accountDialog, setAccountDialog] = useState(null)
   const [parent, setParent] = useState(null)
+  const [gameCard, setGameCard] = useState(null)
+  const [cardPlaybook, setCardPlaybook] = useState(null)
   const [designer, setDesigner] = useState(null)
   const [newDialog, setNewDialog] = useState(null)
   const [newCollection, setNewCollection] = useState(null)
@@ -324,6 +912,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const parentId = parent?.id
   const fetchPlays = useCallback(({ namePrefix }) => api.listPlays(parentId, undefined, namePrefix).then((result) => result.items), [api, parentId])
   const fetchScoutPlays = useCallback(({ namePrefix }) => api.listScoutPlays(parentId, undefined, namePrefix).then((result) => result.items), [api, parentId])
+  const cardPlaybookId = cardPlaybook?.id
+  const fetchCardPlaybookPlays = useCallback(({ namePrefix }) => api.listPlays(cardPlaybookId, undefined, namePrefix).then((result) => result.items), [api, cardPlaybookId])
 
   async function handleCreateCollection(payload) {
     if (newCollection === 'playbook') {
@@ -334,6 +924,70 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       setGamePlansReloadToken((t) => t + 1)
     }
     setNewCollection(null)
+    onWorkspaceUpdated(await api.workspace())
+  }
+
+  async function handleCreateScheduleGame(payload) {
+    const game = await api.createGamePlan(payload)
+    setGamePlansReloadToken((token) => token + 1)
+    return game
+  }
+
+  async function handleCreateGameCardItem(name) {
+    const card = newDialog.card
+    await api.createPlaybook({
+      name,
+      category: card.unit,
+      year: Number(parent.year || new Date().getFullYear()),
+      gamePlanId: parent.id,
+      gameCardId: card.id,
+    })
+    setPlaybooksReloadToken((token) => token + 1)
+    setNewDialog(null)
+    onWorkspaceUpdated(await api.workspace())
+  }
+
+  async function handleDeleteGameCardItem(item) {
+    await api.deletePlaybook(item.id)
+    setPlaybooksReloadToken((token) => token + 1)
+    onWorkspaceUpdated(await api.workspace())
+  }
+
+  async function handleDuplicateGameCardItem(item) {
+    const duplicate = await api.createPlaybook({
+      name: `${item.name} (Copy)`,
+      category: item.category,
+      year: item.year,
+      gamePlanId: item.gamePlanId,
+      gameCardId: item.gameCardId,
+      ...(Array.isArray(item.installPlays) && { installPlays: item.installPlays }),
+    })
+    try {
+      const card = GAME_CARD_VIEWS.find((viewItem) => viewItem.id === item.gameCardId)
+      if (card?.tab === 'scout') {
+        const { items: plays } = await api.listPlays(item.id)
+        for (const play of plays.filter((record) => record.recordStatus !== 'Archived')) {
+          await api.createPlay(duplicate.id, {
+            name: play.name,
+            template: play.template,
+            theme: play.theme,
+            category: play.category,
+            fieldDecoration: play.fieldDecoration,
+            fieldOrientation: play.fieldOrientation,
+            fieldZone: play.fieldZone,
+            perspective: play.perspective || defaultPlayPerspective(item.category),
+            markers: play.markers,
+            drawings: play.drawings,
+            textAnnotations: play.textAnnotations,
+            zones: play.zones,
+          })
+        }
+      }
+    } catch (failure) {
+      await api.deletePlaybook(duplicate.id).catch(() => {})
+      throw failure
+    }
+    setPlaybooksReloadToken((token) => token + 1)
     onWorkspaceUpdated(await api.workspace())
   }
 
@@ -402,8 +1056,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
   function collectionRowActions(kind) {
     return (row) => [
-      { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => setParent({ ...item, kind }) },
-      ...(writable ? [{ key: 'copy', label: 'Copy', icon: Copy, onClick: (item) => handleCopyCollection(kind, item) }] : []),
+      { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => { setGameCard(null); setParent({ ...item, kind }) } },
+      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (item) => handleCopyCollection(kind, item) }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: (item) => handlePrintCollection(kind, item) },
       ...(writable ? [recordStatusAction(kind, row)] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeleteCollection(kind, item) }] : []),
@@ -411,11 +1065,16 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function handleCreatePlay(name, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone) {
-    const { target, parentId } = newDialog
+    const { target, parentId, unit } = newDialog
     setNewDialog(null)
-    const perspective = defaultPlayPerspective(parent?.category)
+    const collectionCategory = newDialog.category || parent?.category
+    const perspective = defaultPlayPerspective(target === 'scoutPlay' || newDialog.practiceScript ? 'Offense' : collectionCategory)
+    const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
+    const designerParentCategory = target === 'scoutPlay' ? playUnit : collectionCategory
     const template = PLAY_TEMPLATES.find((t) => t.id === templateId) || PLAY_TEMPLATES[0]
-    const initialMarkers = buildMarkersFromTemplate(template)
+    const initialMarkers = buildMarkersFromTemplate(template).map((marker) =>
+      perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
+    )
     const record =
       target === 'play'
         ? await api.createPlay(parentId, {
@@ -438,6 +1097,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             fieldOrientation,
             fieldZone,
             perspective,
+            unit: playUnit,
           })
     setDesigner({
       kind: target,
@@ -451,7 +1111,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       initialTheme: record.theme,
       template: record.template,
       category: record.category,
-      parentCategory: parent?.category,
+      parentCategory: designerParentCategory,
       fieldDecoration: record.fieldDecoration,
       fieldOrientation: record.fieldOrientation,
       fieldZone: record.fieldZone,
@@ -459,13 +1119,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     })
   }
 
-  function openDesignerForRow(kind, parentId, row) {
+  function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
     const template = PLAY_TEMPLATES.find((t) => t.id === row.template) || PLAY_TEMPLATES[0]
     setDesigner({
       kind,
       parentId,
       id: row.id,
       name: row.name,
+      readOnly,
       initialMarkers: row.markers || buildMarkersFromTemplate(template),
       initialDrawings: row.drawings,
       initialTextAnnotations: row.textAnnotations,
@@ -473,11 +1134,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       initialTheme: row.theme,
       template: row.template,
       category: row.category,
-      parentCategory: parent?.category,
+      parentCategory: collection?.kind === 'gamePlan' ? row.unit || collection.category : collection?.category,
       fieldDecoration: row.fieldDecoration,
       fieldOrientation: row.fieldOrientation,
       fieldZone: row.fieldZone,
-        perspective: row.perspective || defaultPlayPerspective(parent?.category),
+        perspective: row.perspective || defaultPlayPerspective(collection?.category),
     })
   }
 
@@ -517,10 +1178,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   function playRowActions(kind, parentId) {
+    const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent
     return (row) => [
-      { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r) },
-      ...(writable ? [{ key: 'copy', label: 'Copy', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
-      { key: 'print', label: 'Print...', icon: Printer, onClick: (r) => setPrintPlay({ ...r, perspective: r.perspective || defaultPlayPerspective(parent?.category) }) },
+      { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r, collection) },
+      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
+      { key: 'print', label: 'Print...', icon: Printer, onClick: (r) => setPrintPlay({ ...r, perspective: r.perspective || defaultPlayPerspective(collection?.category) }) },
       ...(writable ? [recordStatusAction(kind, row, parentId)] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (r) => handleDeletePlay(kind, parentId, r) }] : []),
     ]
@@ -540,12 +1202,16 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           if (['settings', 'profile', 'billing', 'team'].includes(nextView)) {
             setDesigner(null)
             setParent(null)
+            setGameCard(null)
+            setCardPlaybook(null)
             if (['profile', 'team', 'billing'].includes(view)) setView('playbooks')
             setAccountDialog(nextView)
           } else {
             setAccountDialog(null)
             setDesigner(null)
             setParent(null)
+            setGameCard(null)
+            setCardPlaybook(null)
             setView(nextView)
           }
         }, ['settings', 'profile', 'billing'].includes(nextView) ? `Open ${nextView}` : 'Leave this view')}
@@ -561,24 +1227,40 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                 onClick={() => requestLeave(() => {
                   setDesigner(null)
                   setParent(null)
-                  setView(parent.kind === 'playbook' ? 'playbooks' : 'gamePlans')
-                }, parent.kind === 'playbook' ? 'Leave playbook' : 'Leave game plan')}
+                  setGameCard(null)
+                  setCardPlaybook(null)
+                  setView(parent.kind === 'playbook' ? 'playbooks' : 'teamSchedule')
+                }, parent.kind === 'playbook' ? 'Leave playbook' : 'Leave game')}
               >
-                {parent.kind === 'playbook' ? 'Playbooks' : 'Game Plans'}
+                {parent.kind === 'playbook' ? 'Playbooks' : 'Team Schedule'}
               </button>
             ) : (
-              <span aria-current="page">{view === 'gamePlans' ? 'Game Plans' : 'Playbooks'}</span>
+              <span aria-current="page">{view === 'teamSchedule' ? 'Team Schedule' : view === 'gamePlans' ? 'Game Plans' : 'Playbooks'}</span>
             )}
           </li>
           {parent && <li>
             <ChevronRight size={16} aria-hidden="true" />
-            {designer ? (
+            {parent.kind === 'gamePlan' && gameCard ? (
+              <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
+                {gameBreadcrumbLabel(parent)}
+              </button>
+            ) : designer ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}>
-                {parent.name}
+                {parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}
               </button>
             ) : (
-              <span aria-current="page">{parent.name}</span>
+              <span aria-current="page">{parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}</span>
             )}
+          </li>}
+          {parent?.kind === 'gamePlan' && gameCard && <li>
+            <ChevronRight size={16} aria-hidden="true" />
+            <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
+              {gameCard.title}
+            </button>
+          </li>}
+          {cardPlaybook && <li>
+            <ChevronRight size={16} aria-hidden="true" />
+            {designer ? <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}>{cardPlaybook.name}</button> : <span aria-current="page">{cardPlaybook.name}</span>}
           </li>}
           {designer && <li>
             <ChevronRight size={16} aria-hidden="true" />
@@ -592,16 +1274,17 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {statusError && <p className="data-grid-status data-grid-error" role="alert">{statusError}</p>}
 
       <NewPlayDialog
-        key={`${workspace.id}:${parent?.category}:${defaults.theme}:${defaults.fieldOrientation}`}
-        open={newDialog !== null}
-        titleLabel={newDialog?.target === 'scoutPlay' ? 'New Scout Play' : 'New Play'}
+        key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${defaults.theme}:${defaults.fieldOrientation}`}
+        open={newDialog?.target === 'play' || newDialog?.target === 'scoutPlay'}
+        titleLabel={newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
         titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : Route}
         onCancel={() => setNewDialog(null)}
         onCreate={handleCreatePlay}
         defaultTheme={defaults.theme}
         defaultFieldOrientation={defaults.fieldOrientation}
-        categoryOptions={playCategoriesForCollection(parent?.category)}
+        categoryOptions={playCategoriesForCollection(newDialog?.unit || newDialog?.category || parent?.category)}
       />
+      {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
       {newCollection && (
         <NewCollectionDialog
           title={newCollection === 'playbook' ? 'Add New Playbook' : 'Add New Game Plan'}
@@ -625,11 +1308,37 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           key={`${designer.kind}-${designer.id}`}
           record={designer}
           api={api}
-          readOnly={!writable}
+          readOnly={!writable || designer.readOnly}
           canDelete={workspace.capabilities.delete}
           breadcrumbActionsTarget={breadcrumbActionsTarget}
           onGuardChange={onGuardChange}
           onNameSaved={(name) => setDesigner((current) => current ? { ...current, name } : current)}
+        />
+      ) : cardPlaybook ? (
+        <PlaysDrillthroughView
+          key={`card-playbook-${cardPlaybook.id}`}
+          reloadToken={playsReloadToken}
+          busy={statusSaving}
+          parentRecord={cardPlaybook}
+          parentLabel={gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'}
+          gameCard={gameCard}
+          breadcrumbActionsTarget={breadcrumbActionsTarget}
+          onParentUpdated={(updated) => setCardPlaybook((current) => ({ ...current, ...updated, kind: 'playbook' }))}
+          readOnly={!writable}
+          timezone={authUser.preferences?.timezone}
+          onGuardChange={onGuardChange}
+          updateParent={api.updatePlaybook}
+          api={api}
+          title="Plays"
+          rowIcon={Route}
+          rowType="Play"
+          fetchRows={fetchCardPlaybookPlays}
+          onReorder={(ids) => api.reorderPlays(cardPlaybook.id, ids)}
+          onNew={writable && gameCard?.tab === 'scout' ? () => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true }) : undefined}
+          newLabel="Add Scout Play"
+          onOpenPlay={(row) => requestLeave(() => openDesignerForRow('play', row.sourcePlaybookId || cardPlaybook.id, row, cardPlaybook, gameCard?.tab === 'installs'), gameCard?.tab === 'installs' ? 'View installed play' : 'Open scout play')}
+          onPrintAll={() => handlePrintCollection('playbook', cardPlaybook)}
+          rowActions={playRowActions('play', cardPlaybook.id)}
         />
       ) : parent?.kind === 'playbook' ? (
         <PlaysDrillthroughView
@@ -658,29 +1367,51 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       ) : parent?.kind === 'gamePlan' ? (
         <PlaysDrillthroughView
           key={`scoutPlays-${parent.id}`}
-          reloadToken={scoutPlaysReloadToken}
           busy={statusSaving}
           parentRecord={parent}
-          parentLabel="Game Plan"
+          parentLabel="Game"
+          gameCard={gameCard}
           breadcrumbActionsTarget={breadcrumbActionsTarget}
           onParentUpdated={(updated) => setParent((current) => ({ ...current, ...updated, kind: 'gamePlan' }))}
           readOnly={!writable}
           timezone={authUser.preferences?.timezone}
           onGuardChange={onGuardChange}
           updateParent={api.updateGamePlan}
+          api={api}
           title="Scout Plays"
           rowIcon={ScanSearch}
           rowType="Scout Play"
           fetchRows={fetchScoutPlays}
           onReorder={(ids) => api.reorderScoutPlays(parent.id, ids)}
-          onNew={writable ? () => setNewDialog({ target: 'scoutPlay', parentId: parent.id }) : undefined}
-          newLabel="New Scout Play"
+          onNew={writable ? (unit) => setNewDialog({ target: 'scoutPlay', parentId: parent.id, unit }) : undefined}
+          newLabel="Add Play"
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('scoutPlay', parent.id, row), 'Open scouting play')}
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}
           rowActions={playRowActions('scoutPlay', parent.id)}
+          reloadToken={scoutPlaysReloadToken + playbooksReloadToken}
+          onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card) => setNewDialog({ target: 'gameCardItem', card }) : undefined}
+          onOpenGameCardItem={(card, item) => { setGameCard(card); setCardPlaybook({ ...item, kind: 'playbook' }) }}
+          onDuplicateGameCardItem={handleDuplicateGameCardItem}
+          onDeleteGameCardItem={handleDeleteGameCardItem}
+          canAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
+          canDuplicateGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
+          canDeleteGameCardItem={workspace.capabilities.delete}
         />
       ) : (
         <>
+      {view === 'teamSchedule' && (
+        <TeamSchedule
+          key="teamSchedule"
+          api={api}
+          canEdit={writable}
+          canDelete={workspace.capabilities.delete}
+          canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
+          onCreateGame={handleCreateScheduleGame}
+          onOpenGame={(game) => { setGameCard(null); setParent({ ...game, kind: 'gamePlan' }) }}
+          onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}
+        />
+      )}
+
       {view === 'playbooks' && (
         <DataGrid
           key="playbooks"
@@ -691,12 +1422,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowIcon={BookOpen}
           rowType="Playbook"
           categoryOptions={COLLECTION_CATEGORIES}
+          filterRows={(row) => !row.gameCardId}
           statusFilter
           fetchRows={fetchPlaybooks}
           onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setNewCollection('playbook') : undefined}
           newLabel="New Playbook"
           rowActions={collectionRowActions('playbook')}
-          onRowDoubleClick={(row) => setParent({ ...row, kind: 'playbook' })}
+          onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'playbook' }) }}
         />
       )}
 
@@ -715,7 +1447,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onNew={writable && workspace.usage.gamePlans < workspace.limits.gamePlans ? () => setNewCollection('gamePlan') : undefined}
           newLabel="New Game Plan"
           rowActions={collectionRowActions('gamePlan')}
-          onRowDoubleClick={(row) => setParent({ ...row, kind: 'gamePlan' })}
+          onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'gamePlan' }) }}
         />
       )}
 

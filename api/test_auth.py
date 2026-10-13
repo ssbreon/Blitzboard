@@ -49,6 +49,21 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_schedule_events_are_validated_and_workspace_scoped(self):
+        team = self.team_fixture()
+        payload = {"name": "Tuesday Practice", "eventType": "Practice", "eventDate": "2026-10-13", "startTime": "16:00"}
+        created = call_api("POST", "schedule-events", "local-coach", payload, team["id"])
+        self.assertEqual(created.status_code, 201)
+        event = response_json(created)
+        self.assertEqual(event["workspaceId"], team["id"])
+        self.assertEqual(response_json(call_api("GET", "schedule-events", "local-coach", workspace_id=team["id"]))["items"], [event])
+        self.assertEqual(response_json(call_api("GET", "schedule-events", "local-coach"))["items"], [])
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "coach-b", {"name": "Team Practice"}, team["id"]).status_code, 200)
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "outsider", {"name": "No access"}, team["id"]).status_code, 403)
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "eventDate": "not-a-date"}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "eventType": "Game"}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("DELETE", f"schedule-events/{event['id']}", "local-coach", workspace_id=team["id"]).status_code, 204)
+
     def test_content_limits_load_from_app_settings(self):
         defaults = {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}
         self.assertEqual(function_app.accounts.load_limits({}), defaults)

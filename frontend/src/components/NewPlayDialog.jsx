@@ -5,8 +5,11 @@ import { DEFAULT_FIELD_ZONE, FIELD_ZONES } from '../utils/playGeometry'
 
 export const OFFENSE_PLAY_CATEGORIES = ['Run', 'Pass', 'Play-Action Pass', 'RPO', 'Gadget', 'Generic']
 export const PLAY_CATEGORIES = ['Front', 'Stunt', 'Blitz', 'Coverage', 'Play Call']
+export const SPECIAL_TEAMS_PLAY_CATEGORIES = ['Kickoff', 'Kick Return', 'Punt', 'Punt Return', 'Field Goal', 'Extra Point', 'Generic']
 export function playCategoriesForCollection(category) {
-  return category === 'Offense' ? OFFENSE_PLAY_CATEGORIES : PLAY_CATEGORIES
+  if (category === 'Offense') return OFFENSE_PLAY_CATEGORIES
+  if (category === 'Special Teams') return SPECIAL_TEAMS_PLAY_CATEGORIES
+  return PLAY_CATEGORIES
 }
 export const FIELD_DECORATIONS = ['None', 'Hash Marks', 'Hash Marks and Numbers']
 export const FIELD_ORIENTATIONS = ['High School', 'NCAA', 'NFL']
