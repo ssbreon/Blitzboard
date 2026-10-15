@@ -4,7 +4,11 @@
   --text: #4a5568;
   --text-h: #0A192F;
   --bg: #858b94;
-  --form-bg: #c0c0c0;
+  --form-bg: #dadada;
+  --left-pane-bg: #e9ecef;
+  --left-pane-border: #c7cdd3;
+  --column-header-bg: #c0c0c0;
+  --column-header-border: #a6a6a6;
   --input-bg: #fff;
   --border: #e2e5ea;
   --code-bg: #e5e7eb;
@@ -12,7 +16,8 @@
   --context-menu-border: #c0c0c0;
   --accent: #D63B00;
   --primary-button: #D63B00;
-  --secondary-button: #b3b3b3;
+  --primary-button-border: #b33300;
+  --secondary-button: #eaeaea;
   --secondary-button-border: #a6a6a6;
   --primary-tab: var(--navy-light);
   --accent-bg: rgba(214, 59, 0, 0.1);

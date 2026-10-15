@@ -103,7 +103,7 @@ function adjustmentDesign(slide, fallback) {
   }
 }
 
-export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbActionsTarget }) {
+export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbActionsTarget, breadcrumbSettingsTarget }) {
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplateId = record.template || PLAY_TEMPLATES[0].id
@@ -1246,11 +1246,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   return (
     <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
+      {breadcrumbSettingsTarget && createPortal(
+        <button type="button" className="breadcrumb-settings" onClick={openSettings} disabled={readOnly || saving} title="Edit Play Settings" aria-label="Edit Play Settings">
+          <Pencil size={18} aria-hidden="true" />
+          <span>Edit</span>
+        </button>,
+        breadcrumbSettingsTarget,
+      )}
       {breadcrumbActionsTarget && createPortal(<>
-        <button type="button" className="breadcrumb-settings" onClick={openSettings} disabled={readOnly || saving} title="Edit Play Settings">
-          <Settings size={18} aria-hidden="true" />
-          <span>Edit Play Settings</span>
-        </button>
         <button type="button" className="play-designer-cancel" onClick={handleCancel} disabled={saving || !isDirty}>
           Cancel
         </button>

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, Check, ChevronRight, ClipboardList, Copy, CreditCard, FolderOpen, LoaderCircle, LogOut, MoreVertical, Plus, Printer, Route, Save, ScanSearch, Settings, Shield, Target, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, Copy, CreditCard, Folder, FolderOpen, LoaderCircle, LogOut, Pencil, Plus, Printer, Route, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -53,14 +53,25 @@ const PLAY_GRID_COLUMNS = [
   STATUS_COLUMN,
 ]
 
-const GAME_UNIT_ICONS = { Defense: Shield, 'Special Teams': Target }
 const GAME_CARD_VIEWS = [
   { id: 'offense-installs', unit: 'Offense', tab: 'installs', title: 'Offense - Installs', description: 'Offensive plays to install' },
-  { id: 'offense-scout', unit: 'Offense', tab: 'scout', title: 'Offense - Scout Defense', description: 'Practice script plays for our scout defense to run' },
+  { id: 'offense-scout', unit: 'Offense', tab: 'scout', title: 'Offense - Practice Scripts', description: 'Practice script plays for our scout defense to run' },
   { id: 'defense-installs', unit: 'Defense', tab: 'installs', title: 'Defense - Installs', description: 'Defensive plays to install' },
-  { id: 'defense-scout', unit: 'Defense', tab: 'scout', title: 'Defense - Scout Offense', description: 'Practice scripts for our scout offense to run' },
+  { id: 'defense-scout', unit: 'Defense', tab: 'scout', title: 'Defense - Practice Scripts', description: 'Practice scripts for our scout offense to run' },
   { id: 'special-teams-installs', unit: 'Special Teams', tab: 'installs', title: 'Special Teams - Installs', description: 'Special teams plays to install' },
-  { id: 'special-teams-scout', unit: 'Special Teams', tab: 'scout', title: 'Special Teams - Scout', description: 'Practice scripts for our scout special teams' },
+  { id: 'special-teams-scout', unit: 'Special Teams', tab: 'scout', title: 'Special Teams - Practice Scripts', description: 'Practice scripts for our scout special teams' },
+]
+const GAME_PLAN_UNITS = ['Offense', 'Defense', 'Special Teams']
+const GAME_PLAN_TABS = [
+  { id: 'installs', label: 'Installs' },
+  { id: 'practiceScripts', label: 'Practice Scripts' },
+  { id: 'scoutingReports', label: 'Scouting Reports' },
+]
+const GAME_PLAN_ITEM_COLUMNS = [
+  { key: 'name', header: 'Name' },
+  { key: 'playCount', header: 'Plays', render: (_, item) => item.gameCardId?.endsWith('-installs') ? item.installPlays?.length ?? 0 : item.playCount ?? 0 },
+  { key: 'year', header: 'Year' },
+  { key: 'updatedAt', header: 'Date Modified', render: formatDate },
 ]
 const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
@@ -75,6 +86,10 @@ function gameBreadcrumbLabel(game) {
     ? new Date(`${game.gameDate}T00:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
     : ''
   return `Game vs. ${opponent}${date ? ` - ${date}` : ''}`
+}
+
+function BreadcrumbLabel({ icon: Icon, children }) {
+  return <><Icon size={17} strokeWidth={1.8} aria-hidden="true" /><span className="breadcrumb-label-text">{children}</span></>
 }
 
 function gameCardItemDefaultName(game, card) {
@@ -114,100 +129,6 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
         <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Creating...' : 'Create'}</button>
       </div>
     </form>
-  </div>
-}
-
-function GameCardItemActions({ item, canDuplicate, canDelete, busy, onAction }) {
-  const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState(null)
-  const triggerRef = useRef(null)
-  const menuRef = useRef(null)
-  const actions = [
-    { key: 'open', label: 'Open', icon: FolderOpen },
-    ...(canDuplicate ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy }] : []),
-    ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true }] : []),
-  ]
-
-  function closeMenu(returnFocus = false) {
-    setOpen(false)
-    if (returnFocus) triggerRef.current?.focus()
-  }
-
-  useEffect(() => {
-    if (!open) return undefined
-    function closeOutside(event) {
-      if (!menuRef.current?.contains(event.target) && !triggerRef.current?.contains(event.target)) setOpen(false)
-    }
-    function closeOnViewportChange() {
-      setOpen(false)
-    }
-    document.addEventListener('mousedown', closeOutside)
-    window.addEventListener('scroll', closeOnViewportChange, true)
-    window.addEventListener('resize', closeOnViewportChange)
-    menuRef.current?.querySelector('button:not(:disabled)')?.focus({ preventScroll: true })
-    return () => {
-      document.removeEventListener('mousedown', closeOutside)
-      window.removeEventListener('scroll', closeOnViewportChange, true)
-      window.removeEventListener('resize', closeOnViewportChange)
-    }
-  }, [open])
-
-  function showMenu() {
-    const rect = triggerRef.current.getBoundingClientRect()
-    const menuHeight = actions.length * 40 + 12
-    const top = rect.bottom + 4 + menuHeight <= window.innerHeight
-      ? rect.bottom + 4
-      : Math.max(8, rect.top - menuHeight - 4)
-    setPosition({ top, right: Math.max(8, window.innerWidth - rect.right) })
-    setOpen(true)
-  }
-
-  function handleMenuKeyDown(event) {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      closeMenu(true)
-    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
-      event.preventDefault()
-      const buttons = [...event.currentTarget.querySelectorAll('button:not(:disabled)')]
-      const currentIndex = buttons.indexOf(document.activeElement)
-      const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
-        : (currentIndex + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
-      buttons[nextIndex]?.focus()
-    } else if (event.key === 'Tab') {
-      closeMenu()
-    }
-  }
-
-  return <div className="row-actions">
-    <button
-      ref={triggerRef}
-      type="button"
-      className="row-actions-button"
-      disabled={busy}
-      title={`Actions for ${item.name}`}
-      aria-label={`Actions for ${item.name}`}
-      aria-haspopup="menu"
-      aria-expanded={open}
-      onClick={() => open ? closeMenu() : showMenu()}
-    ><MoreVertical size={18} aria-hidden="true" /></button>
-    {open && position && createPortal(<div
-      className="toolbar-dropdown row-actions-dropdown"
-      ref={menuRef}
-      role="menu"
-      tabIndex={-1}
-      style={{ position: 'fixed', top: position.top, right: position.right }}
-      onKeyDown={handleMenuKeyDown}
-    >{actions.map((action) => <button
-      key={action.key}
-      type="button"
-      role="menuitem"
-      disabled={busy}
-      className={action.destructive ? 'row-actions-destructive' : undefined}
-      onClick={() => {
-        closeMenu(true)
-        onAction(action.key, item)
-      }}
-    ><action.icon className="menu-item-icon" aria-hidden="true" />{action.label}</button>)}</div>, document.body)}
   </div>
 }
 
@@ -423,11 +344,12 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget, gameCard, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget, breadcrumbSettingsTarget, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
-  const selectedUnit = gameCard?.unit || 'Offense'
-  const gameTab = gameCard?.tab || 'scout'
+  const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
+  const gameTab = isGamePlan ? gamePlanTab : gameCard?.tab || 'scout'
+  const selectedGameCard = GAME_CARD_VIEWS.find((card) => card.unit === selectedUnit && card.tab === (gameTab === 'installs' ? 'installs' : 'scout'))
   const [name, setName] = useState(parentRecord.name)
   const [category, setCategory] = useState(parentRecord.category || 'Defense')
   const [year, setYear] = useState(String(parentRecord.year || new Date().getFullYear()))
@@ -464,6 +386,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   const [installPickerOpen, setInstallPickerOpen] = useState(false)
   const [gameCardActionBusy, setGameCardActionBusy] = useState(false)
   const [gameCardToast, setGameCardToast] = useState('')
+  const selectedGameCardItems = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === selectedGameCard?.id)
 
   useEffect(() => {
     if (!isGamePlan && !installMode) return undefined
@@ -645,12 +568,13 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
 
   return (
     <main className="plays-drillthrough-view">
-      {breadcrumbActionsTarget && createPortal(<>
-          <button type="button" className="breadcrumb-settings" onClick={openSettings} disabled={readOnly || saving || busy} title={`Edit ${parentLabel} Settings`}>
-            <Settings size={18} aria-hidden="true" />
-            <span>Edit {parentLabel} Settings</span>
-          </button>
-      </>, breadcrumbActionsTarget)}
+      {breadcrumbSettingsTarget && createPortal(
+        <button type="button" className="breadcrumb-settings" onClick={openSettings} disabled={readOnly || saving || busy} title={`Edit ${parentLabel} Settings`} aria-label={`Edit ${parentLabel} Settings`}>
+          <Pencil size={18} aria-hidden="true" />
+          <span>Edit</span>
+        </button>,
+        breadcrumbSettingsTarget,
+      )}
       {settingsOpen && (
         <div className="dialog-overlay" onClick={() => { if (!saving) setSettingsOpen(false) }}>
           <form className="dialog-panel" aria-busy={saving} onClick={(event) => event.stopPropagation()} onSubmit={handleSettingsSave}>
@@ -720,46 +644,58 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
           </form>
         </div>
       )}
-      {isGamePlan && !gameCard ? <section className="schedule-game-matrix" aria-label="Game plan matrix">
-        <div className="schedule-game-matrix-column-header"><ClipboardList size={21} aria-hidden="true" /><span>Installs</span></div>
-        <div className="schedule-game-matrix-column-header"><ScanSearch size={21} aria-hidden="true" /><span>Scout</span></div>
-        {GAME_CARD_VIEWS.map((card) => {
-          const CardIcon = GAME_UNIT_ICONS[card.unit]
-          const ItemIcon = card.tab === 'installs' ? ClipboardList : ScanSearch
-          const items = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === card.id)
-          const addLabel = card.tab === 'installs' ? 'Install' : 'Practice Script'
-          const title = card.title
-          return <article key={card.id} className="schedule-game-card">
-            <header className="schedule-game-card-heading">
-              <span className="schedule-game-card-icon" aria-hidden="true">{CardIcon ? <CardIcon size={32} strokeWidth={2.2} /> : '🏈'}</span>
-              <h2>{title}</h2>
-              {onAddGameCardItem && <button type="button" className="schedule-game-card-add" disabled={!canAddGameCardItem || busy} onClick={() => onAddGameCardItem(card)}><Plus size={15} aria-hidden="true" /> Add {addLabel}</button>}
-            </header>
-            <ul className="schedule-game-card-list" aria-label={title}>
-              {items.map((item) => {
-                const playCount = card.tab === 'installs'
-                  ? item.installPlays?.length ?? 0
-                  : item.playCount ?? 0
-                return <li key={item.id}>
-                  <button type="button" className="schedule-game-card-item" onClick={() => onOpenGameCardItem(card, item)}>
-                    <ItemIcon className="schedule-game-card-item-icon" size={16} aria-hidden="true" />
-                    <span className="schedule-game-card-item-name">{item.name}</span>
-                    <span className="schedule-game-card-item-count">{playCount} {playCount === 1 ? 'play' : 'plays'}</span>
+      {isGamePlan && !gameCard ? <section className="game-plan-workspace" aria-label="Game plan">
+        <nav className="game-plan-folder-tree" aria-label="Game plan folders">
+          {GAME_PLAN_TABS.map((tab) => <section className="game-plan-folder-group" key={tab.id}>
+            <h3><FolderOpen size={19} aria-hidden="true" />{tab.label}</h3>
+            <ul>
+              {GAME_PLAN_UNITS.map((unit) => {
+                const selected = gameTab === tab.id && selectedUnit === unit
+                const FolderIcon = selected ? FolderOpen : Folder
+                return <li key={unit}>
+                  <button type="button" className={selected ? 'is-selected' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => onGamePlanSelectionChange(unit, tab.id)}>
+                    <FolderIcon size={19} aria-hidden="true" />{unit}
                   </button>
-                  <GameCardItemActions
-                    item={item}
-                    canDuplicate={canDuplicateGameCardItem}
-                    canDelete={canDeleteGameCardItem}
-                    busy={busy || gameCardActionBusy}
-                    onAction={(action, record) => handleGameCardItemAction(action, card, record)}
-                  />
                 </li>
               })}
-              {!items.length && <li className="schedule-game-card-empty">No {card.tab === 'installs' ? 'installs' : 'practice scripts'} yet.</li>}
             </ul>
-          </article>
-        })}
-        {gameCardToast && <div className="schedule-game-card-toast" role="status">{gameCardToast}</div>}
+          </section>)}
+        </nav>
+        <div className="game-plan-content">
+          <header className="game-plan-content-heading">
+            <h2>{GAME_PLAN_TABS.find((tab) => tab.id === gameTab)?.label}<ChevronRight size={18} aria-hidden="true" />{selectedUnit}</h2>
+          </header>
+          {playbooksError && gameTab !== 'scoutingReports' && <p className="schedule-error" role="alert">Unable to load game plan items: {playbooksError}</p>}
+          {gameTab === 'scoutingReports' ? <DataGrid
+            key={`game-reports-${parentRecord.id}-${selectedUnit}`}
+            title={`${selectedUnit} Scouting Reports`}
+            columns={GAME_SCOUT_PLAY_COLUMNS}
+            filterRows={(row) => (row.unit || parentRecord.category || selectedUnit) === selectedUnit}
+            statusFilter
+            reloadToken={reloadToken}
+            busy={busy}
+            fetchRows={fetchRows}
+            onNew={onNew ? () => onNew(selectedUnit, 'scoutingReports') : undefined}
+            newLabel="Add Scouting Report"
+            onRowDoubleClick={onOpenPlay}
+            rowActions={rowActions}
+          /> : playbooksLoading ? <p className="schedule-muted" role="status">Loading {gameTab === 'installs' ? 'installs' : 'practice scripts'}...</p> : <DataGrid
+            key={`game-items-${parentRecord.id}-${selectedUnit}-${gameTab}`}
+            title={`${selectedUnit} ${gameTab === 'installs' ? 'Installs' : 'Practice Scripts'}`}
+            columns={GAME_PLAN_ITEM_COLUMNS}
+            items={selectedGameCardItems}
+            busy={busy || gameCardActionBusy}
+            onNew={onAddGameCardItem && canAddGameCardItem ? () => onAddGameCardItem(selectedGameCard) : undefined}
+            newLabel={gameTab === 'installs' ? 'Add Install' : 'Add Practice Script'}
+            onRowDoubleClick={(item) => onOpenGameCardItem(selectedGameCard, item)}
+            rowActions={() => [
+              { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => handleGameCardItemAction('open', selectedGameCard, item) },
+              ...(canDuplicateGameCardItem ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy, onClick: (item) => handleGameCardItemAction('duplicate', selectedGameCard, item) }] : []),
+              ...(canDeleteGameCardItem ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleGameCardItemAction('delete', selectedGameCard, item) }] : []),
+            ]}
+          />}
+          {gameCardToast && <div className="schedule-game-card-toast" role="status">{gameCardToast}</div>}
+        </div>
       </section> : <>
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
       {isGamePlan && gameTab === 'installs' ? <section className="schedule-install-page">
@@ -888,10 +824,13 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
 
 function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdated, onWorkspaceUpdated, onGuardChange, onSignOut, requestLeave, busy, switchingSubscription }) {
   const [breadcrumbActionsTarget, setBreadcrumbActionsTarget] = useState(null)
+  const [breadcrumbSettingsTarget, setBreadcrumbSettingsTarget] = useState(null)
   const [view, setView] = useState('playbooks')
   const [accountDialog, setAccountDialog] = useState(null)
   const [parent, setParent] = useState(null)
   const [gameCard, setGameCard] = useState(null)
+  const [gamePlanUnit, setGamePlanUnit] = useState('Offense')
+  const [gamePlanTab, setGamePlanTab] = useState('practiceScripts')
   const [cardPlaybook, setCardPlaybook] = useState(null)
   const [designer, setDesigner] = useState(null)
   const [newDialog, setNewDialog] = useState(null)
@@ -1232,39 +1171,47 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                   setView(parent.kind === 'playbook' ? 'playbooks' : 'teamSchedule')
                 }, parent.kind === 'playbook' ? 'Leave playbook' : 'Leave game')}
               >
-                {parent.kind === 'playbook' ? 'Playbooks' : 'Team Schedule'}
+                <BreadcrumbLabel icon={parent.kind === 'playbook' ? BookOpen : CalendarDays}>
+                  {parent.kind === 'playbook' ? 'Playbooks' : 'Team Schedule'}
+                </BreadcrumbLabel>
               </button>
             ) : (
-              <span aria-current="page">{view === 'teamSchedule' ? 'Team Schedule' : view === 'gamePlans' ? 'Game Plans' : 'Playbooks'}</span>
+              <span aria-current="page">
+                <BreadcrumbLabel icon={view === 'teamSchedule' ? CalendarDays : view === 'gamePlans' ? ClipboardList : BookOpen}>
+                  {view === 'teamSchedule' ? 'Team Schedule' : view === 'gamePlans' ? 'Game Plans' : 'Playbooks'}
+                </BreadcrumbLabel>
+              </span>
             )}
           </li>
           {parent && <li>
-            <ChevronRight size={16} aria-hidden="true" />
             {parent.kind === 'gamePlan' && gameCard ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
-                {gameBreadcrumbLabel(parent)}
+                <BreadcrumbLabel icon={CalendarDays}>{gameBreadcrumbLabel(parent)}</BreadcrumbLabel>
               </button>
             ) : designer ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}>
-                {parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}
+                <BreadcrumbLabel icon={parent.kind === 'gamePlan' ? CalendarDays : BookOpen}>
+                  {parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}
+                </BreadcrumbLabel>
               </button>
             ) : (
-              <span aria-current="page">{parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}</span>
+              <span aria-current="page">
+                <BreadcrumbLabel icon={parent.kind === 'gamePlan' ? CalendarDays : BookOpen}>
+                  {parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}
+                </BreadcrumbLabel>
+              </span>
             )}
-          </li>}
-          {parent?.kind === 'gamePlan' && gameCard && <li>
-            <ChevronRight size={16} aria-hidden="true" />
-            <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
-              {gameCard.title}
-            </button>
+            {!cardPlaybook && !designer && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
           </li>}
           {cardPlaybook && <li>
-            <ChevronRight size={16} aria-hidden="true" />
-            {designer ? <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}>{cardPlaybook.name}</button> : <span aria-current="page">{cardPlaybook.name}</span>}
+            {designer
+              ? <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></button>
+              : <span aria-current="page"><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></span>}
+            {!designer && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
           </li>}
           {designer && <li>
-            <ChevronRight size={16} aria-hidden="true" />
-            <span aria-current="page">{designer.name}</span>
+            <span aria-current="page"><BreadcrumbLabel icon={designer.kind === 'scoutPlay' ? ScanSearch : Route}>{designer.name}</BreadcrumbLabel></span>
+            <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />
           </li>}
         </ol>
         <div className="breadcrumb-actions" ref={setBreadcrumbActionsTarget} />
@@ -1276,7 +1223,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       <NewPlayDialog
         key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${defaults.theme}:${defaults.fieldOrientation}`}
         open={newDialog?.target === 'play' || newDialog?.target === 'scoutPlay'}
-        titleLabel={newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
+        titleLabel={newDialog?.scoutingReport ? 'New Scouting Report' : newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
         titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : Route}
         onCancel={() => setNewDialog(null)}
         onCreate={handleCreatePlay}
@@ -1311,6 +1258,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           readOnly={!writable || designer.readOnly}
           canDelete={workspace.capabilities.delete}
           breadcrumbActionsTarget={breadcrumbActionsTarget}
+          breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           onGuardChange={onGuardChange}
           onNameSaved={(name) => setDesigner((current) => current ? { ...current, name } : current)}
         />
@@ -1323,6 +1271,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentLabel={gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'}
           gameCard={gameCard}
           breadcrumbActionsTarget={breadcrumbActionsTarget}
+          breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           onParentUpdated={(updated) => setCardPlaybook((current) => ({ ...current, ...updated, kind: 'playbook' }))}
           readOnly={!writable}
           timezone={authUser.preferences?.timezone}
@@ -1348,6 +1297,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentRecord={parent}
           parentLabel="Playbook"
           breadcrumbActionsTarget={breadcrumbActionsTarget}
+          breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           onParentUpdated={(updated) => setParent((current) => ({ ...current, ...updated, kind: 'playbook' }))}
           readOnly={!writable}
           timezone={authUser.preferences?.timezone}
@@ -1371,7 +1321,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentRecord={parent}
           parentLabel="Game"
           gameCard={gameCard}
+          gamePlanUnit={gamePlanUnit}
+          gamePlanTab={gamePlanTab}
+          onGamePlanSelectionChange={(unit, tab) => { setGamePlanUnit(unit); setGamePlanTab(tab) }}
           breadcrumbActionsTarget={breadcrumbActionsTarget}
+          breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           onParentUpdated={(updated) => setParent((current) => ({ ...current, ...updated, kind: 'gamePlan' }))}
           readOnly={!writable}
           timezone={authUser.preferences?.timezone}
@@ -1383,14 +1337,19 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowType="Scout Play"
           fetchRows={fetchScoutPlays}
           onReorder={(ids) => api.reorderScoutPlays(parent.id, ids)}
-          onNew={writable ? (unit) => setNewDialog({ target: 'scoutPlay', parentId: parent.id, unit }) : undefined}
+          onNew={writable ? (unit, tab) => setNewDialog({ target: 'scoutPlay', parentId: parent.id, unit, scoutingReport: tab === 'scoutingReports' }) : undefined}
           newLabel="Add Play"
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('scoutPlay', parent.id, row), 'Open scouting play')}
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}
           rowActions={playRowActions('scoutPlay', parent.id)}
           reloadToken={scoutPlaysReloadToken + playbooksReloadToken}
           onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card) => setNewDialog({ target: 'gameCardItem', card }) : undefined}
-          onOpenGameCardItem={(card, item) => { setGameCard(card); setCardPlaybook({ ...item, kind: 'playbook' }) }}
+          onOpenGameCardItem={(card, item) => {
+            setGamePlanUnit(card.unit)
+            setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
+            setGameCard(card)
+            setCardPlaybook({ ...item, kind: 'playbook' })
+          }}
           onDuplicateGameCardItem={handleDuplicateGameCardItem}
           onDeleteGameCardItem={handleDeleteGameCardItem}
           canAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
