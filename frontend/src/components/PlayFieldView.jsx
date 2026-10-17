@@ -133,18 +133,18 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
         </div>
       ))}
       {textAnnotations.map((annotation) => (
-        <span
+        <div
           key={annotation.id}
-          className={`play-designer-text-annotation${annotation.box ? ' boxed' : ''}`}
-          style={{
-            left: `${annotation.x}%`,
-            top: `${annotation.y}%`,
-            width: `${textAnnotationWidth(annotation, fieldRef.current)}px`,
-            ...textAnnotationStyle(annotation),
-          }}
+          className="play-designer-text-annotation-wrap"
+          style={{ left: `${annotation.x}%`, top: `${annotation.y}%` }}
         >
-          {annotation.text}
-        </span>
+          <span
+            className={`play-designer-text-annotation${annotation.box ? ' boxed' : ''}`}
+            style={{ width: `${textAnnotationWidth(annotation, fieldRef.current)}px`, ...textAnnotationStyle(annotation) }}
+          >
+            {annotation.text}
+          </span>
+        </div>
       ))}
       <svg className="play-designer-routes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         {flattenDrawings(drawings).map((drawing) => {
@@ -203,7 +203,7 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
         <span
           key={marker.id}
           className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.color ? ' color-override' : ''}${themeClass}`}
-          style={markerStyleVars(marker)}
+          style={markerStyleVars(marker, theme.id)}
         >
           {marker.label}
         </span>

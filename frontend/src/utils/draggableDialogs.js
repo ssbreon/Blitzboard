@@ -1,4 +1,4 @@
-const HANDLE_SELECTOR = '.dialog-panel > h2, .print-dialog-header'
+const HANDLE_SELECTOR = '.dialog-panel > h2, .print-dialog-header, .schedule-dialog-header'
 
 function getOffset(panel) {
   return { x: Number(panel.dataset.dragX) || 0, y: Number(panel.dataset.dragY) || 0 }
@@ -24,8 +24,8 @@ function movePanel(panel, startRect, startOffset, dx, dy) {
 function handlePointerDown(event) {
   if (event.button !== 0) return
   const handle = event.target.closest(HANDLE_SELECTOR)
-  if (!handle) return
-  const panel = handle.parentElement
+  if (!handle || event.target.closest('button')) return
+  const panel = handle.closest('.schedule-dialog') || handle.parentElement
 
   event.preventDefault()
   const startX = event.clientX
@@ -59,7 +59,7 @@ function handlePointerDown(event) {
 }
 
 function handleResize() {
-  document.querySelectorAll('.dialog-panel[data-drag-x]').forEach((panel) => {
+  document.querySelectorAll('.dialog-panel[data-drag-x], .schedule-dialog[data-drag-x]').forEach((panel) => {
     movePanel(panel, panel.getBoundingClientRect(), getOffset(panel), 0, 0)
   })
 }

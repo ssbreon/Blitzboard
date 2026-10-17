@@ -392,8 +392,9 @@ export function textAnnotationWidth(annotation, fieldEl) {
   const style = window.getComputedStyle(fieldEl)
   const fontSize = annotation.fontSize ? `${annotation.fontSize}px` : style.fontSize
   context.font = `${annotation.italic ? 'italic ' : ''}${annotation.bold ? '700 ' : ''}${fontSize} ${style.fontFamily}`
-  const lineWidths = (annotation.text || 'Enter text').split('\n').map((line) => context.measureText(line).width)
-  return Math.max(134, Math.ceil(Math.max(...lineWidths)))
+  if (!annotation.text) return 134
+  const lineWidths = annotation.text.split('\n').map((line) => context.measureText(line).width)
+  return Math.ceil(Math.max(...lineWidths))
 }
 
 // White and charcoal are handled as special guideline colors (white maps its decoration to
@@ -423,25 +424,34 @@ function decorationColors(color) {
   }
 }
 
-export function markerStyleVars(marker) {
+export function markerStyleVars(marker, themeId) {
   const color = marker.color
   const { decorationColor, lightColor } = decorationColors(color)
+  const usePrinterFriendlyNeutralColors = themeId === 'printerFriendly'
+    && (marker.team || 'offense') === 'offense'
+    && SPECIAL_GUIDELINE_COLORS.has(color?.toLowerCase())
   return {
     left: `${marker.x}%`,
     top: `${marker.y}%`,
     '--marker-color': color,
-    '--marker-decoration-color': decorationColor,
+    '--marker-decoration-color': usePrinterFriendlyNeutralColors ? '#374151' : decorationColor,
     '--marker-override-text': color?.toLowerCase() === '#ffffff' ? '#111' : '#fff',
-    ...(lightColor ? { '--marker-decoration-light-color': lightColor } : {}),
+    ...(usePrinterFriendlyNeutralColors
+      ? { '--marker-decoration-light-color': '#fff' }
+      : lightColor ? { '--marker-decoration-light-color': lightColor } : {}),
   }
 }
 
 // Style vars for the small decoration-option preview buttons, so they reflect the same
 // solid/light color pairing a player's marker would render with.
-export function decorationPreviewVars(color) {
+export function decorationPreviewVars(color, themeId) {
   const { decorationColor, lightColor } = decorationColors(color)
+  const usePrinterFriendlyNeutralColors = themeId === 'printerFriendly'
+    && SPECIAL_GUIDELINE_COLORS.has(color?.toLowerCase())
   return {
-    '--preview-color': decorationColor,
-    ...(lightColor ? { '--preview-light-color': lightColor } : {}),
+    '--preview-color': usePrinterFriendlyNeutralColors ? '#374151' : decorationColor,
+    ...(usePrinterFriendlyNeutralColors
+      ? { '--preview-light-color': '#fff' }
+      : lightColor ? { '--preview-light-color': lightColor } : {}),
   }
 }

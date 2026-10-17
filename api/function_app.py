@@ -24,7 +24,7 @@ AUTH_MODE = os.getenv("AUTH_MODE", "").lower()
 DEV_AUTH_SECRET = os.getenv("DEV_AUTH_SECRET", "")
 DEV_USER_ID = os.getenv("DEV_USER_ID", "local-coach")
 DEV_USER_NAME = os.getenv("DEV_USER_NAME", "Local Coach")
-CONTENT_TYPES = ("playbooks", "plays", "slides", "exports", "gamePlans", "scoutPlays", "scheduleEvents")
+CONTENT_TYPES = ("playbooks", "plays", "playGroupings", "slides", "exports", "gamePlans", "scoutPlays", "scheduleEvents")
 STATUS_TYPES = {"playbooks", "gamePlans", "plays", "scoutPlays"}
 request_workspace = ContextVar("request_workspace", default=None)
 accounts.validate_environment(COSMOS_ENDPOINT)
@@ -257,11 +257,16 @@ def with_owner_name(record):
     return {**record, "ownerName": profile.get("name") or record.get("ownerId", "")}
 
 
-PAGED_TYPES = {"plays", "scoutPlays"}
+PAGED_TYPES = {"plays", "playGroupings", "scoutPlays"}
 
 
 def paged_siblings(entity_type, parent_id):
-    records = storage.list(entity_type, parent_id, workspace_id=request_workspace.get()["id"])
+    workspace_id = request_workspace.get()["id"]
+    if entity_type in {"plays", "playGroupings"}:
+        records = storage.list("plays", parent_id, workspace_id=workspace_id)
+        records.extend(storage.list("playGroupings", parent_id, workspace_id=workspace_id))
+    else:
+        records = storage.list(entity_type, parent_id, workspace_id=workspace_id)
     records.sort(key=lambda record: (not isinstance(record.get("page"), int), record.get("page") or 0, record.get("createdAt") or ""))
     return records
 
@@ -270,15 +275,22 @@ def renumber_pages(entity_type, records):
     for index, record in enumerate(records, start=1):
         if record.get("page") != index:
             record["page"] = index
-            storage.save(entity_type, record)
+            storage.save(record.get("entityType", entity_type), record)
     return records
 
 
 def list_paged(entity_type, parent_id, category, name_prefix):
     records = renumber_pages(entity_type, paged_siblings(entity_type, parent_id))
-    return [with_owner_name(record) for record in records
+    return [with_owner_name(record) for record in records if record.get("entityType") == entity_type
             if (category is None or record.get("category") == category)
             and (not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold()))]
+
+
+def list_playbook_rows(parent_id, name_prefix):
+    records = renumber_pages("plays", paged_siblings("plays", parent_id))
+    return [with_owner_name({**record, **({"rowType": "grouping"} if record.get("entityType") == "playGroupings" else {})})
+            for record in records
+            if not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold())]
 
 
 def reorder_pages(entity_type, parent_id, payload):
@@ -503,6 +515,32 @@ def dispatch(req, user, workspace, role):
                 return update_record("playbooks", playbook_id, body(req))
             if method == "DELETE":
                 storage.delete_tree("playbooks", playbook_id)
+                return func.HttpResponse(status_code=204)
+
+        if len(path) == 3 and path[2] == "rows" and method == "GET":
+            return response({"items": list_playbook_rows(playbook_id, req.params.get("namePrefix"))})
+
+        if len(path) == 3 and path[2] == "groupings" and method == "POST":
+            payload = body(req)
+            name = payload.get("name")
+            if not isinstance(name, str) or not name.strip():
+                return response({"error": {"code": "VALIDATION_ERROR", "message": "name is required"}}, 400)
+            return create_record("playGroupings", {"name": name.strip()}, owner_id, playbook_id)
+
+        if len(path) == 4 and path[2] == "groupings":
+            grouping_id = path[3]
+            grouping = storage.get("playGroupings", grouping_id)
+            if grouping is None or grouping.get("parentId") != playbook_id or not accounts.belongs(grouping, workspace):
+                return not_found("Grouping", grouping_id)
+            if method == "PATCH":
+                payload = body(req)
+                name = payload.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    return response({"error": {"code": "VALIDATION_ERROR", "message": "name is required"}}, 400)
+                return update_record("playGroupings", grouping_id, {"name": name.strip()})
+            if method == "DELETE":
+                storage.delete("playGroupings", grouping_id)
+                renumber_pages("plays", paged_siblings("plays", playbook_id))
                 return func.HttpResponse(status_code=204)
 
         if len(path) >= 3 and path[2] == "plays":

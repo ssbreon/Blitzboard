@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArrowDown, ArrowUp, Check, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, X } from 'lucide-react'
+import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, GripVertical, Info, LoaderCircle, MoreVertical, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { getCategoryBadgeStyle } from './CategoryBadge'
 
 const PAGE_SIZE = 50
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder }) {
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
@@ -15,6 +15,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   const [page, setPage] = useState(0)
   const [selectedCategories, setSelectedCategories] = useState([])
   const [selectedStatus, setSelectedStatus] = useState('Active')
+  const [collapsedGroupingIds, setCollapsedGroupingIds] = useState(() => new Set())
   const [searchName, setSearchName] = useState('')
   const [namePrefix, setNamePrefix] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -109,12 +110,31 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
     setPage(0)
   }
 
+  function toggleGrouping(groupingId) {
+    setCollapsedGroupingIds((current) => {
+      const next = new Set(current)
+      if (next.has(groupingId)) next.delete(groupingId)
+      else next.add(groupingId)
+      return next
+    })
+  }
+
   const filteredRows = rows.filter((row) => (!filterRows || filterRows(row))
-    && (!selectedCategories.length || selectedCategories.includes(row.category))
+    && (!selectedCategories.length || !row.category || selectedCategories.includes(row.category))
     && (!statusFilter || selectedStatus === (row.recordStatus ?? 'Active')))
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const visibleRows = []
+  let followingCollapsedGroup = false
+  for (const row of filteredRows) {
+    if (row.rowType === 'grouping') {
+      visibleRows.push(row)
+      followingCollapsedGroup = collapsedGroupingIds.has(row.id)
+    } else if (!followingCollapsedGroup) {
+      visibleRows.push(row)
+    }
+  }
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)
-  const pageRows = filteredRows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
+  const pageRows = visibleRows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
   const canReorder = Boolean(onReorder) && items === undefined && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
   const leadingColumns = (showPage ? 1 : 0) + (RowIcon ? 1 : 0)
@@ -162,8 +182,23 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
       { key: 'move-down', label: 'Move Down', icon: ArrowDown, disabled: !canReorder || index >= rows.length - 1, onClick: () => moveRow(row.id, index + 1) },
     ]
     const destructiveIndex = actions.findIndex((item) => item.destructive)
-    const insertAt = destructiveIndex < 0 ? actions.length : destructiveIndex
+    const insertAt = row.rowType === 'grouping' || destructiveIndex < 0 ? actions.length : destructiveIndex
     return [...actions.slice(0, insertAt), ...moves, ...actions.slice(insertAt)]
+  }
+
+  function openRowMenu(row, trigger, point) {
+    if (!trigger || trigger.disabled) return false
+    const items = rowMenuItems(row)
+    if (!items.length) return false
+    const rect = point ? { top: point.y, bottom: point.y, right: point.x } : trigger.getBoundingClientRect()
+    const menuHeight = items.length * 44 + 12
+    const top = rect.bottom + 4 + menuHeight <= window.innerHeight
+      ? rect.bottom + 4 : Math.max(8, rect.top - menuHeight - 4)
+    rowMenuTriggerRef.current = trigger
+    rowMenuPortalTargetRef.current = trigger.closest('[role="dialog"]') || document.body
+    setRowMenuPosition({ top, right: Math.max(8, window.innerWidth - rect.right) })
+    setOpenRowMenuId(row.id)
+    return true
   }
 
   const dropdownItems = [{ label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((t) => t + 1) }, ...menuItems]
@@ -192,6 +227,10 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
             </svg>
             {newLabel}
           </button>
+          {onSecondaryNew && <button type="button" className="toolbar-new-button" onClick={onSecondaryNew}>
+            <Plus className="toolbar-icon" aria-hidden="true" />
+            {secondaryNewLabel}
+          </button>}
           <label className="data-grid-name-filter">
             <Search size={17} aria-hidden="true" />
             <input
@@ -277,7 +316,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
           )}
         </div>
       </div>}
-      {onRowDoubleClick && showOpenHint && !suppressOpenHint && pageRows.length > 0 && (
+      {onRowDoubleClick && showOpenHint && !suppressOpenHint && pageRows.some((row) => row.rowType !== 'grouping') && (
         <div className="data-grid-open-hint" role="status">
           <Info size={16} aria-hidden="true" />
           <span className="data-grid-open-hint-desktop">Double-click a row to open it, or choose Open from its actions menu.</span>
@@ -315,12 +354,25 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                 {pageRows.map((row) => (
                   <tr
                     key={row.id}
-                    onDoubleClick={onRowDoubleClick ? () => {
+                    aria-expanded={row.rowType === 'grouping' ? !collapsedGroupingIds.has(row.id) : undefined}
+                    tabIndex={row.rowType === 'grouping' ? 0 : undefined}
+                    onDoubleClick={row.rowType === 'grouping' ? () => toggleGrouping(row.id) : onRowDoubleClick ? () => {
                       onRowDoubleClick(row)
                       dismissOpenHint()
                     } : undefined}
-                    style={onRowDoubleClick ? { cursor: 'pointer' } : undefined}
+                    onKeyDown={row.rowType === 'grouping' ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        toggleGrouping(row.id)
+                      }
+                    } : undefined}
+                    onContextMenu={rowActions ? (event) => {
+                      const trigger = event.currentTarget.querySelector('.row-actions-button')
+                      if (openRowMenu(row, trigger, { x: event.clientX, y: event.clientY })) event.preventDefault()
+                    } : undefined}
+                    style={row.rowType === 'grouping' || onRowDoubleClick ? { cursor: 'pointer' } : undefined}
                     className={[
+                      row.rowType === 'grouping' && 'is-grouping-row',
                       dragId === row.id && 'is-dragging',
                       dropTarget?.id === row.id && (dropTarget.after ? 'drop-after' : 'drop-before'),
                     ].filter(Boolean).join(' ') || undefined}
@@ -357,16 +409,27 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                         {row.page}
                       </td>
                     )}
-                    {RowIcon && (
-                      <td className="data-grid-type-cell" aria-label={rowType} title={rowType}>
-                        <RowIcon size={17} strokeWidth={2} aria-hidden="true" />
+                    {row.rowType === 'grouping' ? (
+                      <td className="data-grid-grouping-cell" colSpan={columns.length + (RowIcon ? 1 : 0)}>
+                        <span className="data-grid-grouping-label">
+                          {collapsedGroupingIds.has(row.id)
+                            ? <Folder className="data-grid-grouping-icon" size={18} aria-hidden="true" />
+                            : <FolderOpen className="data-grid-grouping-icon" size={18} aria-hidden="true" />}
+                          {row.name}
+                        </span>
                       </td>
-                    )}
-                    {columns.map((column) => (
-                      <td key={column.key} className={column.key === 'name' ? 'data-grid-name-cell' : undefined}>
-                        {column.render ? column.render(row[column.key], row) : row[column.key]}
-                      </td>
-                    ))}
+                    ) : <>
+                      {RowIcon && (
+                        <td className="data-grid-type-cell" aria-label={rowType} title={rowType}>
+                          <RowIcon size={17} strokeWidth={2} aria-hidden="true" />
+                        </td>
+                      )}
+                      {columns.map((column) => (
+                        <td key={column.key} className={column.key === 'name' ? 'data-grid-name-cell' : undefined}>
+                          {column.render ? column.render(row[column.key], row) : row[column.key]}
+                        </td>
+                      ))}
+                    </>}
                     {rowActions && (
                       <td className="data-grid-actions-cell">
                         <div className="row-actions">
@@ -384,14 +447,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                                 closeRowMenu()
                                 return
                               }
-                              const rect = event.currentTarget.getBoundingClientRect()
-                              rowMenuTriggerRef.current = event.currentTarget
-                              rowMenuPortalTargetRef.current = event.currentTarget.closest('[role="dialog"]') || document.body
-                              const menuHeight = rowMenuItems(row).length * 44 + 12
-                              const top = rect.bottom + 4 + menuHeight <= window.innerHeight
-                                ? rect.bottom + 4 : Math.max(8, rect.top - menuHeight - 4)
-                              setRowMenuPosition({ top, right: Math.max(8, window.innerWidth - rect.right) })
-                              setOpenRowMenuId(row.id)
+                              openRowMenu(row, event.currentTarget)
                             }}
                           >
                             <MoreVertical size={18} aria-hidden="true" />

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, FlipHorizontal2, FlipVertical2, Pencil, Play, Plus, Printer, RotateCcw, Settings, Undo2, X } from 'lucide-react'
+import { Check, ChevronDown, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Settings, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
 import { PrintPreviewDialog } from './PrintPreviewDialog'
@@ -103,7 +103,7 @@ function adjustmentDesign(slide, fallback) {
   }
 }
 
-export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbActionsTarget, breadcrumbSettingsTarget }) {
+export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbSettingsTarget }) {
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplateId = record.template || PLAY_TEMPLATES[0].id
@@ -148,17 +148,13 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [redoHistory, setRedoHistory] = useState([])
   const [editingTextId, setEditingTextId] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [layoutOpen, setLayoutOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftName, setDraftName] = useState(name)
   const [printOpen, setPrintOpen] = useState(false)
   const [printFieldAspectRatio, setPrintFieldAspectRatio] = useState(2.25)
   const [draftTemplateId, setDraftTemplateId] = useState(initialTemplateId)
   const [draftCategory, setDraftCategory] = useState(initialCategory)
-  const [draftFieldDecoration, setDraftFieldDecoration] = useState(initialFieldDecoration)
-  const [draftFieldOrientation, setDraftFieldOrientation] = useState(initialFieldOrientation)
-  const [draftFieldZone, setDraftFieldZone] = useState(initialFieldZone)
-  const [draftPerspective, setDraftPerspective] = useState(initialPerspective)
-  const [draftTheme, setDraftTheme] = useState(initialTheme)
   const [savedName, setSavedName] = useState(record.name)
   const [savedMarkers, setSavedMarkers] = useState(record.initialMarkers || [])
   const [savedDrawings, setSavedDrawings] = useState(normalizeDrawings(record.initialDrawings))
@@ -243,6 +239,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false)
+        setLayoutOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -614,12 +611,26 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setDraftName(name)
     setDraftTemplateId(templateId)
     setDraftCategory(category)
-    setDraftFieldDecoration(fieldDecoration)
-    setDraftFieldOrientation(fieldOrientation)
-    setDraftFieldZone(fieldZone)
-    setDraftPerspective(perspective)
-    setDraftTheme(theme)
     setSettingsOpen(true)
+  }
+
+  function applyTemplate(nextTemplateId) {
+    if (nextTemplateId === templateId) return
+    const template = PLAY_TEMPLATES.find((item) => item.id === nextTemplateId) || PLAY_TEMPLATES[0]
+    setTemplateId(template.id)
+    setMarkers(buildMarkersFromTemplate(template))
+    setDrawings(normalizeDrawings())
+    setTextAnnotations([])
+    setZones([])
+    setSelectedZoneId(null)
+    setSelectedTextId(null)
+    setEditingTextId(null)
+    setSelectedId(null)
+    setSelectedDrawing(null)
+    setActiveChain(null)
+    setCursorPos(null)
+    setDrawHistory([])
+    setRedoHistory([])
   }
 
   function handleSettingsSave(event) {
@@ -627,28 +638,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     if (!draftName.trim()) return
     if (!activeSlideId) setName(draftName.trim())
     setCategory(draftCategory)
-    setFieldDecoration(draftFieldDecoration)
-    setFieldOrientation(draftFieldOrientation)
-    setFieldZone(draftFieldZone)
-    setPerspective(draftPerspective)
-    setTheme(draftTheme)
-    if (draftTemplateId !== templateId) {
-      const template = PLAY_TEMPLATES.find((t) => t.id === draftTemplateId) || PLAY_TEMPLATES[0]
-      setTemplateId(draftTemplateId)
-      setMarkers(buildMarkersFromTemplate(template))
-      setDrawings(normalizeDrawings())
-        setTextAnnotations([])
-        setZones([])
-        setSelectedZoneId(null)
-        setSelectedTextId(null)
-        setEditingTextId(null)
-      setSelectedId(null)
-      setSelectedDrawing(null)
-      setActiveChain(null)
-      setCursorPos(null)
-      setDrawHistory([])
-      setRedoHistory([])
-    }
+    applyTemplate(draftTemplateId)
     setSettingsOpen(false)
   }
 
@@ -1244,6 +1234,30 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     )
   }
 
+  function layoutColumn(title, options, selectedValue, onSelect) {
+    return (
+      <div className="play-layout-column" role="group" aria-label={title} key={title}>
+        <h3>{title}</h3>
+        {options.map(({ value, label }) => {
+          const selected = value === selectedValue
+          return (
+            <button
+              key={value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={selected}
+              disabled={readOnly || saving}
+              onClick={() => onSelect(value)}
+            >
+              {selected ? <Check size={15} aria-hidden="true" /> : <span className="play-layout-check-spacer" aria-hidden="true" />}
+              <span>{label}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
       {breadcrumbSettingsTarget && createPortal(
@@ -1253,14 +1267,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </button>,
         breadcrumbSettingsTarget,
       )}
-      {breadcrumbActionsTarget && createPortal(<>
-        <button type="button" className="play-designer-cancel" onClick={handleCancel} disabled={saving || !isDirty}>
-          Cancel
-        </button>
-        <button type="button" className="play-designer-save" onClick={handleSave} disabled={readOnly || saving || !isDirty}>
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-      </>, breadcrumbActionsTarget)}
       {error && <p className="data-grid-status data-grid-error">{error}</p>}
       {printOpen && (
         <PrintPreviewDialog
@@ -1299,61 +1305,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </select>
             </label>
             <label className="dialog-field">
-              <span>Field Decoration</span>
-              <select value={draftFieldDecoration} onChange={(event) => setDraftFieldDecoration(event.target.value)}>
-                {FIELD_DECORATIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="dialog-field">
-              <span>Field Zone</span>
-              <select value={draftFieldZone} onChange={(event) => setDraftFieldZone(event.target.value)}>
-                {FIELD_ZONES.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="dialog-field">
-              <span>Perspective</span>
-              <select value={draftPerspective} onChange={(event) => setDraftPerspective(event.target.value)}>
-                {PLAY_PERSPECTIVES.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="dialog-field">
-              <span>Field Orientation</span>
-              <select value={draftFieldOrientation} onChange={(event) => setDraftFieldOrientation(event.target.value)}>
-                {FIELD_ORIENTATIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="dialog-field">
               <span>Template</span>
               <select value={draftTemplateId} onChange={(event) => setDraftTemplateId(event.target.value)}>
-                {PLAY_TEMPLATES.map((tpl) => (
-                  <option key={tpl.id} value={tpl.id}>
-                    {tpl.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="dialog-field">
-              <span>Theme</span>
-              <select value={draftTheme} onChange={(event) => setDraftTheme(event.target.value)}>
-                {PLAY_THEMES.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
+                {PLAY_TEMPLATES.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}
                   </option>
                 ))}
               </select>
@@ -1363,7 +1319,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 Cancel
               </button>
               <button type="submit" className="dialog-create">
-                OK
+                Apply
               </button>
             </div>
           </form>
@@ -1442,16 +1398,42 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         <div className="toolbar-menu" ref={menuRef}>
           <button
             type="button"
+            className="play-layout-button"
+            aria-haspopup="menu"
+            aria-expanded={layoutOpen}
+            onClick={() => {
+              setMenuOpen(false)
+              setLayoutOpen((open) => !open)
+            }}
+          >
+            <LayoutGrid size={16} aria-hidden="true" />
+            <span>Layout</span>
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
             className="hamburger-button"
             aria-haspopup="true"
             aria-expanded={menuOpen}
             aria-label="More play actions"
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => {
+              setLayoutOpen(false)
+              setMenuOpen((open) => !open)
+            }}
           >
             <svg className="hamburger-icon" viewBox="0 0 24 24" role="presentation" aria-hidden="true">
               <path fill="currentColor" d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z" />
             </svg>
           </button>
+          {layoutOpen && (
+            <div className="toolbar-dropdown play-layout-dropdown" role="menu" aria-label="Field layout">
+              {layoutColumn('Field Decoration', FIELD_DECORATIONS.map((value) => ({ value, label: value })), fieldDecoration, setFieldDecoration)}
+              {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: value })), fieldZone, setFieldZone)}
+              {layoutColumn('Perspective', PLAY_PERSPECTIVES.map((value) => ({ value, label: value })), perspective, setPerspective)}
+              {layoutColumn('Field Orientation', FIELD_ORIENTATIONS.map((value) => ({ value, label: value })), fieldOrientation, setFieldOrientation)}
+              {layoutColumn('Theme', PLAY_THEMES.map(({ id, label }) => ({ value: id, label })), theme, setTheme)}
+            </div>
+          )}
           {menuOpen && (
             <div className="toolbar-dropdown" role="menu">
               <button type="button" role="menuitem" onClick={() => flipPlay('horizontal')}>
@@ -1490,6 +1472,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </button>
             </div>
           )}
+        </div>
+        <div className="play-designer-toolbar-actions">
+          <button type="button" className="play-designer-cancel" onClick={handleCancel} disabled={saving || !isDirty}>
+            Cancel
+          </button>
+          <button type="button" className="play-designer-save" onClick={handleSave} disabled={readOnly || saving || !isDirty}>
+            {saving ? 'Saving...' : 'Save'}
+          </button>
         </div>
       </div>
       {pathAppearanceVisible ? (
@@ -1719,13 +1709,17 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         <div className="player-appearance-group" role="group" aria-label="Player decoration">
           {PLAYER_DECORATIONS.map((decoration) => {
             const isActive = appearanceEnabled && (selectedMarker.decoration || 'solid') === decoration.id
-            const previewColor = selectedMarker?.color || (selectedMarker?.team === 'defense' ? '#b91c1c' : '#1d4ed8')
+            const previewColor = selectedMarker?.color || (
+              activeTheme.id === 'printerFriendly'
+                ? '#374151'
+                : selectedMarker?.team === 'defense' ? '#b91c1c' : '#1d4ed8'
+            )
             return (
               <button
                 key={decoration.id}
                 type="button"
                 className={`player-decoration-option ${decoration.id}${isActive ? ' active' : ''}`}
-                style={decorationPreviewVars(previewColor)}
+                style={decorationPreviewVars(previewColor, activeTheme.id)}
                 onClick={() => updateMarkerAppearance(selectedMarker.id, { decoration: decoration.id })}
                 aria-label={decoration.label}
                 aria-pressed={isActive}
@@ -2125,7 +2119,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               key={marker.id}
               type="button"
               className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.color ? ' color-override' : ''}${marker.id === selectedId || multiSelectedIds.includes(marker.id) ? ' selected' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}${themeClass}`}
-              style={markerStyleVars(displayMarker)}
+              style={markerStyleVars(displayMarker, activeTheme.id)}
               draggable={false}
               onDragStart={(event) => event.preventDefault()}
               onPointerDown={(event) => handleMarkerPointerDown(event, marker.id)}

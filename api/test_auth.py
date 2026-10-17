@@ -480,6 +480,29 @@ class AuthenticationTests(unittest.TestCase):
             call_api("DELETE", f"{path}/{ids[2]}", "coach-a")
             self.assertEqual(pages(), [("A", 1), ("B", 2)])
 
+    def test_playbook_groupings_share_play_order_without_becoming_plays(self):
+        playbook = response_json(call_api("POST", "playbooks", "coach-a", {"name": "Book"}))
+        base_path = f"playbooks/{playbook['id']}"
+        first_play = response_json(call_api("POST", f"{base_path}/plays", "coach-a", {"name": "First"}))
+        grouping_response = call_api("POST", f"{base_path}/groupings", "coach-a", {"name": "Openers"})
+        grouping = response_json(grouping_response)
+        second_play = response_json(call_api("POST", f"{base_path}/plays", "coach-a", {"name": "Second"}))
+
+        self.assertEqual(grouping_response.status_code, 201)
+        rows = response_json(call_api("GET", f"{base_path}/rows", "coach-a"))["items"]
+        self.assertEqual([(row["name"], row["page"]) for row in rows], [("First", 1), ("Openers", 2), ("Second", 3)])
+        self.assertEqual(rows[1]["rowType"], "grouping")
+        self.assertEqual([row["name"] for row in response_json(call_api("GET", f"{base_path}/plays", "coach-a"))["items"]], ["First", "Second"])
+
+        reorder = call_api("POST", f"{base_path}/plays/reorder", "coach-a", {"ids": [second_play["id"], grouping["id"], first_play["id"]]})
+        self.assertEqual(reorder.status_code, 200)
+        renamed = response_json(call_api("PATCH", f"{base_path}/groupings/{grouping['id']}", "coach-a", {"name": "Finishers"}))
+        self.assertEqual(renamed["name"], "Finishers")
+        self.assertEqual([(row["name"], row["page"]) for row in response_json(call_api("GET", f"{base_path}/rows", "coach-a"))["items"]], [("Second", 1), ("Finishers", 2), ("First", 3)])
+
+        self.assertEqual(call_api("DELETE", f"{base_path}/groupings/{grouping['id']}", "coach-a").status_code, 204)
+        self.assertEqual([(row["name"], row["page"]) for row in response_json(call_api("GET", f"{base_path}/rows", "coach-a"))["items"]], [("Second", 1), ("First", 2)])
+
     def test_slides_are_scoped_to_their_play(self):
         playbook = response_json(call_api("POST", "playbooks", "coach-a", {"name": "Defense"}))
         first_play = response_json(

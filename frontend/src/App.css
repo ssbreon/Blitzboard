@@ -32,7 +32,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
   gap: 24px;
   padding: 10px 32px;
   background: var(--navy);
-  border-bottom: 1px solid black;
 
   @media (max-width: 1024px) {
     padding: 12px 20px;
@@ -44,7 +43,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  padding: 2px 2px 2px 2px;
+  padding: 0px 2px 2px 2px;
   background: var(--primary-tab);
 
   @media (max-width: 1024px) {
@@ -152,6 +151,19 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-height: 0;
 }
 
+#root:has(> .data-grid),
+#root:has(> .plays-drillthrough-view) {
+  height: 100svh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.data-grid-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
 .collection-details {
   padding: 10px 16px;
   background: var(--primary-tab);
@@ -232,8 +244,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
   position: relative;
   flex-grow: 1;
   min-height: 420px;
-  border: 1px solid var(--border);
-  margin-top: 10px;
+  border-top:2px solid var(--navy);
+  border-bottom:1px solid var(--navy);
   background:
     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 0, rgba(255, 255, 255, 0.8) 1px, transparent 1px, transparent 12.5%),
     repeating-linear-gradient(
@@ -619,18 +631,23 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
 .play-designer-toolbar {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   padding: 6px 20px 6px 10px;
   margin-top: 0px;
-  border: 1px solid var(--border);
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
   background: var(--form-bg);
 
   > .toolbar-menu {
-    margin-left: auto;
+    margin-left: 0;
   }
+}
+
+.play-designer-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
 }
 
 .play-designer-drawing-tools {
@@ -674,8 +691,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
   justify-content: flex-start;
   gap: 16px;
   padding: 2px 10px;
-  border: 1px solid var(--border);
-  border-radius: 0 0 6px 6px;
   background: var(--left-pane-bg);
   color: var(--text-h);
   font-size: 13px;
@@ -1036,16 +1051,16 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
   &.printer-friendly.offense:not(.color-override) {
     --team-color: #fff;
-    --decoration-color: #1d4ed8;
-    --marker-decoration-light-color: #b0c1f1;
+    --decoration-color: #374151;
+    --marker-decoration-light-color: #fff;
     --marker-text-color: #000;
     --marker-border-color: #000;
   }
 
   &.printer-friendly.defense:not(.color-override) {
     --team-color: #fff;
-    --decoration-color: #b91c1c;
-    --marker-decoration-light-color: #f1b0b0;
+    --decoration-color: #374151;
+    --marker-decoration-light-color: #fff;
     --marker-text-color: #000;
     --marker-border-color: #000;
   }
@@ -1497,6 +1512,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  background: var(--form-bg);
 }
 
 .dialog-cancel {
@@ -1563,6 +1579,9 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .app-bar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--app-bar-foreground);
   font-size: 16px;
   text-decoration: none;
@@ -2247,6 +2266,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   .account-menu a,
   .account-menu button[role^='menuitem'] { padding: 8px; font-size: 13px; }
   .account-menu-section-label { padding: 6px 8px; }
+  .play-layout-dropdown { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(620px, calc(100vw - 24px)); }
   .account-view { padding: 22px 16px 40px; }
   .account-view h1 { font-size: 22px; }
   .account-invite-form { grid-template-columns: minmax(0, 1fr) 110px; }
@@ -2370,6 +2390,121 @@ button:active:not(:disabled):not([role^='menuitem']) {
   cursor: default;
 }
 
+.game-plan-banner {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(16px, 2vw, 28px);
+  /* min-height: 100px; */
+  padding: 8px clamp(16px, 2.5vw, 32px);
+  border-bottom: 1px solid rgba(255, 255, 255, .18);
+  color: #fff;
+  background: linear-gradient(90deg, rgba(4, 16, 32, .88), rgba(4, 16, 32, .7)), url('/friday_night_lights_banner_v2.png') center top / cover no-repeat;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+}
+
+.playbook-banner {
+  /* background: linear-gradient(90deg, rgba(4, 16, 32, .62), rgba(4, 16, 32, .4)), url('/coach_chalkboard_banner.png') center 50% / cover no-repeat; */
+  background: var(--navy-light);
+}
+
+.playbooks-banner {
+  grid-template-columns: minmax(0, 1fr);
+  /* background: url('/coaches_desk_banner.png') center 50% / cover no-repeat; */
+  background: var(--navy-light);
+}
+
+.game-plan-banner-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.game-plan-banner-details > div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 14px;
+}
+
+.game-plan-banner-details > div + div {
+  border-left: 1px solid rgba(255, 255, 255, .35);
+}
+
+.game-plan-banner-details dt {
+  margin: 0;
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.game-plan-banner-details dt::after {
+  content: ':';
+}
+
+.game-plan-banner-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.game-plan-banner-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--primary-button);
+  border-radius: 4px;
+  background: var(--primary-button);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.game-plan-banner-edit:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .game-plan-banner:not(.playbooks-banner) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px 16px;
+    padding: 16px;
+  }
+
+  .playbooks-banner {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .game-plan-banner:not(.playbooks-banner) .game-plan-banner-details {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    align-items: flex-start;
+  }
+
+  .game-plan-banner-details > div {
+    padding: 4px 10px 4px 0;
+  }
+
+  .game-plan-banner:not(.playbooks-banner) .game-plan-banner-edit {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
 .breadcrumb-bar {
   display: flex;
   align-items: center;
@@ -2379,11 +2514,12 @@ button:active:not(:disabled):not([role^='menuitem']) {
   max-width: 100%;
   box-sizing: border-box;
   padding: 0px 20px 0px 4px;
-  background: var(--primary-tab);
+  background: var(--navy);
   color: whitesmoke;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0;
+  border-bottom: 1px solid var(--navy-light);
 
   @media (max-width: 1024px) {
     padding: 10px 16px 8px;
@@ -2414,7 +2550,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  min-height: 46px;
+  min-height: 40px;
   max-width: min(38vw, 360px);
   padding-right: 12px;
   border-radius: 6px 6px 0 0;
@@ -2488,6 +2624,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: 0.3px;
 }
 
 .breadcrumb-bar li:first-child > button,
@@ -2837,13 +2974,44 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  padding: 0;
+  height: 38px;
+  min-width: 44px;
+  padding: 0 8px;
+  box-sizing: border-box;
   border-radius: 6px;
   border: 1px solid var(--secondary-button-border);
   background: var(--secondary-button);
   color: var(--text-h);
+  cursor: pointer;
+  transition: border-color 0.2s;
+
+  &:hover,
+  &[aria-expanded='true'] {
+    border-color: var(--accent-border);
+  }
+}
+
+.play-designer-toolbar > .toolbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-left: 1px solid var(--secondary-button-border);
+  padding-left: 10px;
+  margin-left: 3px;
+}
+
+.play-layout-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--secondary-button-border);
+  border-radius: 6px;
+  background: var(--secondary-button);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
   cursor: pointer;
   transition: border-color 0.2s;
 
@@ -2890,6 +3058,56 @@ button:active:not(:disabled):not([role^='menuitem']) {
       color: var(--text-h);
     }
   }
+}
+
+.play-layout-dropdown {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+  width: min(900px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+  padding: 10px;
+}
+
+.play-layout-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  h3 {
+    margin: 2px 4px 6px;
+    color: var(--text-h);
+    font-size: 12px;
+    line-height: 1.3;
+  }
+
+  button {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    min-height: 30px;
+    padding: 6px 4px;
+    font-size: 12px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+
+    &[aria-checked='true'] {
+      border-color: var(--accent-border);
+      background: var(--accent-bg);
+      color: var(--text-h);
+      font-weight: 600;
+    }
+
+    &:disabled {
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+  }
+}
+
+.play-layout-check-spacer {
+  flex: 0 0 15px;
+  height: 15px;
 }
 
 .data-grid-toolbar-dropdown {
@@ -3004,10 +3222,63 @@ button:active:not(:disabled):not([role^='menuitem']) {
   tbody tr {
     background: #fff;
     transition: background-color 0.12s;
+    user-select: none;
   }
 
   tbody tr:hover {
     background: #eaf4fd;
+  }
+
+  tbody tr.is-grouping-row,
+  tbody tr.is-grouping-row:hover {
+    background: aliceblue;
+  }
+
+  tbody tr.is-grouping-row td {
+    background: aliceblue;
+    color: #1f2937;
+  }
+
+  tbody tr.is-grouping-row td.data-grid-page-cell {
+    background: var(--form-bg);
+  }
+
+  .data-grid-grouping-cell {
+    padding: 9px 12px;
+    border-left: 4px solid #6b7280;
+    font-weight: 700;
+  }
+
+  tbody tr.is-grouping-row {
+    cursor: pointer;
+  }
+
+  .data-grid-grouping-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .data-grid-grouping-icon {
+    flex: 0 0 auto;
+    color: #a16207;
+    fill: #facc15;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    tbody tr.is-grouping-row,
+    tbody tr.is-grouping-row:hover {
+      background: #4b5563;
+    }
+
+    tbody tr.is-grouping-row td {
+      background: aliceblue;
+      color: #f9fafb;
+    }
+
+    .data-grid-grouping-cell {
+      border-left-color: #9ca3af;
+    }
   }
 
   .data-grid-page-header,
@@ -3021,7 +3292,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
     background: var(--form-bg);
 
     @media (prefers-color-scheme: dark) {
-      background: #1d3557;
       color: var(--text-h);
     }
   }
@@ -3271,6 +3541,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   flex: 1;
   min-height: 0;
+  background: var(--form-bg);
 }
 
 .print-options {
@@ -3396,7 +3667,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   width: 100%;
   aspect-ratio: var(--print-field-aspect-ratio, 2.25);
   min-height: 0;
-  margin-block: auto;
+  margin-block: 0;
 
   .play-designer-marker {
     --marker-size: 17px;
@@ -3520,7 +3791,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
   justify-content: space-between;
   gap: 16px;
   padding: 10px 10px;
-  border-bottom: 1px solid var(--border);
   background: var(--form-bg);
 }
 
@@ -3668,8 +3938,23 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .schedule-days {
+  position: relative;
+  isolation: isolate;
   flex: 1;
   min-height: 0;
+
+  &::before {
+    position: absolute;
+    z-index: -1;
+    bottom: 0;
+    left: 0;
+    width: min(420px, 50vw);
+    height: 300px;
+    background: url('/endzone_watermark.png') left bottom / 100% auto no-repeat;
+    content: '';
+    opacity: 1;
+    pointer-events: none;
+  }
 }
 
 .schedule-month-5-weeks .schedule-days {
@@ -3688,8 +3973,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
   position: sticky;
   top: 0;
   z-index: 1;
-  border-bottom: 1px solid var(--border);
-  background: var(--code-bg);
+  border: 1px solid var(--column-header-border);
+  background: var(--column-header-bg);
 }
 
 .schedule-weekdays > div {
@@ -3706,11 +3991,11 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-height: 0;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  background: var(--input-bg);
+  background: color-mix(in srgb, var(--input-bg) 82%, transparent);
 }
 
 .schedule-day.outside-month {
-  background: color-mix(in srgb, var(--code-bg) 40%, var(--input-bg));
+  background: color-mix(in srgb, color-mix(in srgb, var(--code-bg) 40%, var(--input-bg)) 82%, transparent);
   color: #687386;
 }
 
@@ -3972,8 +4257,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  background: rgba(10, 25, 47, 0.62);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .schedule-dialog,
@@ -4011,6 +4295,12 @@ button:active:not(:disabled):not([role^='menuitem']) {
   font-weight: 600;
 }
 
+.schedule-dialog-header {
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
 .schedule-dialog-header > div {
   gap: 9px;
 }
@@ -4027,6 +4317,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   gap: 12px;
   padding: 18px;
   overflow-y: auto;
+  background: var(--form-bg);
 }
 
 .schedule-field {
@@ -4068,7 +4359,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 .schedule-dialog-actions {
   justify-content: flex-end;
   padding: 12px 18px;
-  border-top: 1px solid var(--border);
+  background: var(--form-bg);
 }
 
 .schedule-dialog-actions .schedule-delete-button {
@@ -4559,6 +4850,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .game-plan-folder-tree {
+  position: relative;
+  isolation: isolate;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -4568,6 +4861,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   background: var(--left-pane-bg);
   color: var(--navy);
   font-size: 14px;
+
 }
 
 .game-plan-folder-group {
@@ -4582,11 +4876,44 @@ button:active:not(:disabled):not([role^='menuitem']) {
 .game-plan-folder-group h3 {
   display: flex;
   align-items: center;
+  margin: 0;
+}
+
+.game-plan-folder-group h3 .game-plan-folder-toggle {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
   gap: 9px;
   margin: 0;
   padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
   font-size: 14px;
   font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.game-plan-folder-group h3 .game-plan-folder-toggle:hover {
+  border-color: var(--left-pane-border);
+  background: #dfe3e7;
+}
+
+.game-plan-folder-group h3 .game-plan-folder-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.game-plan-folder-toggle-icon {
+  flex: 0 0 auto;
+  color: #a16207;
+  fill: #facc15;
 }
 
 .game-plan-folder-group ul {
@@ -4635,6 +4962,35 @@ button:active:not(:disabled):not([role^='menuitem']) {
   svg {
     flex: 0 0 auto;
   }
+}
+
+.game-plan-folder-count {
+  display: inline-flex;
+  min-width: 22px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0 5px;
+  border: 1px solid var(--left-pane-border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-plan-folder-group button.is-selected .game-plan-folder-count {
+  border-color: #9bb5d5;
+  background: #f5f8fc;
+}
+
+.game-plan-folder-group button .game-plan-folder-count.has-records {
+  border-color: #2f6b3c;
+  background: #2f6b3c;
+  color: #f3f4f6;
 }
 
 .game-plan-content {
@@ -5017,6 +5373,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   justify-content: space-between;
   padding: 10px 18px;
   border-top: 1px solid var(--border);
+  background: var(--form-bg);
 }
 
 .schedule-game-actions > div {
@@ -5181,7 +5538,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
     border: 0;
   }
 
-  .game-plan-folder-group h3 {
+  .game-plan-folder-group h3 .game-plan-folder-toggle {
     gap: 6px;
     padding: 4px;
     font-size: 13px;

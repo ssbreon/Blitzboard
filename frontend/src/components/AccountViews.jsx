@@ -211,7 +211,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       </fieldset>
       <div className="account-form-actions">
         <button type="button" className="dialog-cancel" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-        <button type="submit" className="dialog-create" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'OK'}</button>
+        <button type="submit" className="dialog-create" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
       </div>
     </form>}
 
