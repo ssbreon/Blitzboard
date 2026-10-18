@@ -425,6 +425,11 @@ button:active:not(:disabled):not([role^='menuitem']) {
     color: #fff;
   }
 
+  &.play-designer-tab-edit:hover:not(:disabled) {
+    background: var(--primary-button);
+    color: #fff;
+  }
+
   &.remove:hover:not(:disabled) {
     background: rgba(180, 35, 24, 0.12);
     color: #b42318;
@@ -462,27 +467,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
   .play-designer-tab-item .play-designer-tab {
     max-width: 126px;
-  }
-}
-
-.play-designer-rename-adjustment {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: min(360px, 100%);
-  padding: 8px 10px;
-  color: var(--text);
-  font-size: 13px;
-
-  input {
-    flex: 1;
-    min-width: 0;
-    padding: 6px 8px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--input-bg);
-    color: var(--text-h);
-    font: inherit;
   }
 }
 
@@ -1446,8 +1430,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
     color: var(--text-h);
   }
 
-  input[type='text'],
-  input[type='number'] {
+  input:not([type='checkbox']):not([type='radio']) {
     font: inherit;
     font-size: 16px;
     padding: 8px 10px;
@@ -1628,6 +1611,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
 @media (prefers-reduced-motion: reduce) {
   .app-bar-subscription-status > svg,
+  .game-plan-folder-count-spinner,
   .account-title-loading > svg { animation: none; }
 }
 
@@ -4558,12 +4542,28 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
 .schedule-install-page {
   box-sizing: border-box;
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   padding: 22px 32px;
   background: var(--input-bg);
   color: var(--text-h);
   text-align: left;
+}
+
+.schedule-install-library {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.schedule-install-library > .data-grid {
+  flex: 1;
+  min-height: 0;
 }
 
 .schedule-game-card {
@@ -4982,6 +4982,10 @@ button:active:not(:disabled):not([role^='menuitem']) {
   font-variant-numeric: tabular-nums;
 }
 
+.game-plan-folder-count-spinner {
+  animation: subscription-spin 1s linear infinite;
+}
+
 .game-plan-folder-group button.is-selected .game-plan-folder-count {
   border-color: #9bb5d5;
   background: #f5f8fc;
@@ -5123,7 +5127,14 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .schedule-install-page .data-grid-compact .data-grid-table-wrap {
-  max-height: min(36vh, 340px);
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.schedule-install-page > .data-grid {
+  flex: 1;
+  min-height: 0;
 }
 
 .schedule-install-page .data-grid-compact .data-grid-table th:last-child,

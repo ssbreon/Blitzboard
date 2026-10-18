@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, Copy, CreditCard, Folder, FolderOpen, LoaderCircle, LogOut, Pencil, Plus, Printer, Route, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LoaderCircle, LogOut, Pencil, Play, Plus, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -14,7 +14,6 @@ import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
 import { buildMarkersFromTemplate, PLAY_TEMPLATES } from './utils/formations'
 import { formatDate } from './utils/formatDate'
-import { themeLabel } from './utils/themes'
 import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
 import './App.css'
 
@@ -35,9 +34,10 @@ const GRID_COLUMNS = [
   { key: 'name', header: 'Name' },
   { key: 'category', header: 'Category', render: renderCategoryBadge },
   { key: 'playCount', header: 'Plays' },
-  { key: 'createdAt', header: 'Created', render: formatDate },
-  { key: 'updatedAt', header: 'Date Modified', render: formatDate },
+  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
 ]
+
+const ADJUSTMENTS_COLUMN = { key: 'adjustments', header: 'Adjustments', render: (value) => value?.length ? value.join(', ') : '—' }
 
 const PLAYBOOK_GRID_COLUMNS = [GRID_COLUMNS[0], { key: 'year', header: 'Year' }, ...GRID_COLUMNS.slice(1), { key: 'ownerName', header: 'Owner' }, STATUS_COLUMN]
 function formatGameDate(value) {
@@ -56,10 +56,9 @@ const GAME_PLAN_GRID_COLUMNS = [
 
 const PLAY_GRID_COLUMNS = [
   { key: 'name', header: 'Name' },
+  ADJUSTMENTS_COLUMN,
   { key: 'category', header: 'Category', render: renderCategoryBadge },
-  { key: 'createdAt', header: 'Created', render: formatDate },
-  { key: 'updatedAt', header: 'Date Modified', render: formatDate },
-  { key: 'theme', header: 'Theme', render: (value) => themeLabel(value) },
+  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
   { key: 'ownerName', header: 'Owner' },
   STATUS_COLUMN,
 ]
@@ -82,7 +81,7 @@ const GAME_PLAN_ITEM_COLUMNS = [
   { key: 'name', header: 'Name' },
   { key: 'playCount', header: 'Plays', render: (_, item) => item.gameCardId?.endsWith('-installs') ? item.installPlays?.length ?? 0 : item.playCount ?? 0 },
   { key: 'year', header: 'Year' },
-  { key: 'updatedAt', header: 'Date Modified', render: formatDate },
+  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
 ]
 const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
@@ -90,6 +89,27 @@ const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'category', header: 'Category' },
   { key: 'preview', header: 'Plays', render: (_, play) => <div className="schedule-grid-play-preview" role="img" aria-label={`${play.name} play diagram`}><PlayFieldView play={play} /></div> },
 ]
+
+async function withAdjustmentTitles(api, playbookId, rows) {
+  return Promise.all(rows.map(async (row) => {
+    if (row.rowType === 'grouping' || Array.isArray(row.adjustments)) return row
+    const sourcePlaybookId = row.sourcePlaybookId || playbookId
+    if (!sourcePlaybookId) return { ...row, adjustments: [] }
+    try {
+      const { items = [] } = await api.listSlides(sourcePlaybookId, row.id, true)
+      return { ...row, adjustments: items.map((slide) => slide.title || 'Adjustment') }
+    } catch {
+      return { ...row, adjustments: [] }
+    }
+  }))
+}
+
+function withoutGridOnlyFields(row, preserveTheme = false) {
+  const gridRow = { ...row }
+  delete gridRow.createdAt
+  if (!preserveTheme) delete gridRow.theme
+  return gridRow
+}
 
 function gameBreadcrumbLabel(game) {
   const opponent = game.opponent || game.name
@@ -231,7 +251,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
 
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
-      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <Plus size={22} aria-hidden="true" />}{grouping ? 'Edit Group Name' : 'New Grouping'}</h2>
+      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Group Name' : 'New Grouping'}</h2>
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
       {error && <p role="alert" className="data-grid-status data-grid-error">Unable to save grouping: {error}</p>}
       <div className="dialog-actions">
@@ -456,7 +476,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget, breadcrumbSettingsTarget, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbActionsTarget, breadcrumbSettingsTarget, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -483,9 +503,12 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   const [playbooksLoading, setPlaybooksLoading] = useState(isGamePlan || installMode)
   const [playbooksError, setPlaybooksError] = useState(null)
   const [gamePlanScoutPlays, setGamePlanScoutPlays] = useState(null)
+  const [gamePlanScoutPlaysLoading, setGamePlanScoutPlaysLoading] = useState(isGamePlan)
   const [playbookPlays, setPlaybookPlays] = useState({})
   const [loadedPlaybookKey, setLoadedPlaybookKey] = useState('')
   const [playbookPlaysError, setPlaybookPlaysError] = useState(null)
+  const [installGroupings, setInstallGroupings] = useState([])
+  const [installGroupingsError, setInstallGroupingsError] = useState(null)
   const [selectedPlaybookId, setSelectedPlaybookId] = useState('')
   const [formationFilter, setFormationFilter] = useState('')
   const [collapsedGamePlanFolders, setCollapsedGamePlanFolders] = useState(() => new Set())
@@ -498,9 +521,24 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   const [installSaving, setInstallSaving] = useState(false)
   const [installError, setInstallError] = useState(null)
   const [installPickerOpen, setInstallPickerOpen] = useState(false)
+  const [installPickerGroupingId, setInstallPickerGroupingId] = useState(null)
   const [gameCardActionBusy, setGameCardActionBusy] = useState(false)
   const [gameCardToast, setGameCardToast] = useState('')
   const selectedGameCardItems = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === selectedGameCard?.id)
+
+  useEffect(() => {
+    if (!installMode) return undefined
+    let active = true
+    api.listPlaybookRows(parentRecord.id)
+      .then(({ items }) => {
+        if (active) {
+          setInstallGroupings(items.filter((item) => item.rowType === 'grouping'))
+          setInstallGroupingsError(null)
+        }
+      })
+      .catch((failure) => { if (active) setInstallGroupingsError(failure.message) })
+    return () => { active = false }
+  }, [api, installMode, parentRecord.id, reloadToken])
 
   useEffect(() => {
     if (!isGamePlan && !installMode) return undefined
@@ -531,6 +569,9 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
       .catch(() => {
         if (active) setGamePlanScoutPlays(null)
       })
+      .finally(() => {
+        if (active) setGamePlanScoutPlaysLoading(false)
+      })
     return () => { active = false }
   }, [api, isGamePlan, parentRecord.id, reloadToken])
 
@@ -547,7 +588,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
     if ((!isGamePlan && !installMode) || !playbookKey) return undefined
     let active = true
     const ids = playbookKey.split('|')
-    Promise.all(ids.map(async (id) => [id, (await api.listPlays(id)).items]))
+    Promise.all(ids.map(async (id) => [id, await withAdjustmentTitles(api, id, (await api.listPlays(id)).items)]))
       .then((results) => {
         if (!active) return
         setPlaybookPlays((current) => ({ ...current, ...Object.fromEntries(results) }))
@@ -580,11 +621,20 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
     play: (playbookPlays[selection.playbookId] || []).find((play) => play.id === selection.playId),
     playbook: playbooks.find((item) => item.id === selection.playbookId),
   })).filter((item) => item.play && item.playbook?.category === (installMode ? parentRecord.category : selectedUnit))
-  const installGridItems = selectedInstallCards.map(({ selection, play, playbook }) => ({
+  const installPlayRows = selectedInstallCards.map(({ selection, play, playbook }) => ({
     ...play,
     sourcePlaybookId: selection.playbookId,
     sourcePlaybookName: playbook?.name || selection.playbookName || '',
+    installGroupingId: selection.groupingId,
   }))
+  const installGroupingIds = new Set(installGroupings.map((grouping) => grouping.id))
+  const installGridItems = [
+    ...installGroupings.flatMap((grouping) => [
+      { ...grouping, rowType: 'grouping' },
+      ...installPlayRows.filter((play) => play.installGroupingId === grouping.id),
+    ]),
+    ...installPlayRows.filter((play) => !installGroupingIds.has(play.installGroupingId)),
+  ].map((row, index) => ({ ...withoutGridOnlyFields(row), page: index + 1 }))
 
   function toggleInstallPlay(play) {
     const playbook = playbooks.find((item) => item.id === activePlaybookId)
@@ -611,6 +661,62 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
     } finally {
       setInstallSaving(false)
     }
+  }
+
+  async function reorderInstallPlays(ids) {
+    const rowsById = new Map(installGridItems.map((row) => [row.id, row]))
+    const orderedSelections = ids
+      .map((id) => rowsById.get(id))
+      .filter((row) => row && row.rowType !== 'grouping')
+      .map((row) => selectedInstallPlays.find((selection) => selection.playId === row.id && selection.playbookId === row.sourcePlaybookId))
+      .filter(Boolean)
+    const orderedKeys = new Set(orderedSelections.map((selection) => `${selection.playbookId}:${selection.playId}`))
+    let orderedIndex = 0
+    const nextPlays = selectedInstallPlays.map((selection) => orderedKeys.has(`${selection.playbookId}:${selection.playId}`)
+      ? orderedSelections[orderedIndex++]
+      : selection)
+    if (JSON.stringify(nextPlays) !== selectedInstallSignature) await saveInstallSelection(nextPlays)
+  }
+
+  async function moveInstallPlayToGrouping(row, groupingId) {
+    const nextPlays = selectedInstallPlays.map((selection) =>
+      selection.playId === row.id && selection.playbookId === row.sourcePlaybookId
+        ? { ...selection, groupingId }
+        : selection,
+    )
+    try {
+      await saveInstallSelection(nextPlays)
+    } catch {
+      return
+    }
+  }
+
+  function installRowActions(row) {
+    if (row.rowType === 'grouping') return [
+      ...(!readOnly ? [{ key: 'add-play', label: 'Add Plays', icon: Plus, onClick: () => {
+        setInstallPickerGroupingId(row.id)
+        setInstallPickerOpen(true)
+      } }] : []),
+      ...(!readOnly && onEditGrouping ? [{ key: 'edit-group-name', label: 'Edit Group Name', icon: Pencil, onClick: onEditGrouping }] : []),
+      ...(onDeleteGrouping ? [{ key: 'delete-grouping', label: 'Delete', icon: Trash2, destructive: true, onClick: onDeleteGrouping }] : []),
+    ]
+    return [
+      { key: 'open', label: 'View Play', icon: FolderOpen, onClick: onOpenPlay },
+      ...(!readOnly ? installGroupings.map((grouping) => ({
+        key: `move-to-${grouping.id}`,
+        label: `Move to ${grouping.name}`,
+        icon: Folder,
+        onClick: () => moveInstallPlayToGrouping(row, grouping.id),
+      })) : []),
+      ...(row.installGroupingId && !readOnly ? [{ key: 'remove-from-group', label: 'Remove from Group', icon: FolderOpen, onClick: () => moveInstallPlayToGrouping(row, undefined) }] : []),
+      { key: 'remove', label: 'Remove from Install', icon: Trash2, destructive: true, onClick: async () => {
+        try {
+          await saveInstallSelection(selectedInstallPlays.filter((selection) => selection.playId !== row.id || selection.playbookId !== row.sourcePlaybookId))
+        } catch {
+          return
+        }
+      } },
+    ]
   }
 
   async function saveInstall() {
@@ -798,13 +904,16 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
                 const selected = gameTab === tab.id && selectedUnit === unit
                 const FolderIcon = selected ? FolderOpen : Folder
                 const gameCard = GAME_CARD_VIEWS.find((card) => card.unit === unit && card.tab === (tab.id === 'installs' ? 'installs' : 'scout'))
+                const countLoading = tab.id === 'scoutingReports' ? gamePlanScoutPlaysLoading : playbooksLoading
                 const count = tab.id === 'scoutingReports'
                   ? gamePlanScoutPlays?.filter((play) => play.recordStatus !== 'Archived' && (play.unit || parentRecord.category || (selectedUnit === unit ? unit : '')) === unit).length ?? null
                   : playbooks.filter((item) => item.gamePlanId === parentRecord.id && item.gameCardId === gameCard?.id).length
                 return <li key={unit}>
                   <button type="button" className={selected ? 'is-selected' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => onGamePlanSelectionChange(unit, tab.id)}>
                     <FolderIcon size={19} aria-hidden="true" />{unit}
-                    <span className={`game-plan-folder-count${count > 0 ? ' has-records' : ''}`} aria-label={count === null ? `${tab.label} count loading` : `${count} ${tab.label.toLowerCase()}`} title={count === null ? 'Count unavailable' : `${count} ${tab.label.toLowerCase()}`}>{count ?? '...'}</span>
+                    <span className={`game-plan-folder-count${count > 0 ? ' has-records' : ''}`} aria-label={countLoading ? `${tab.label} count loading` : count === null ? `${tab.label} count unavailable` : `${count} ${tab.label.toLowerCase()}`} title={countLoading ? `Loading ${tab.label.toLowerCase()} count` : count === null ? 'Count unavailable' : `${count} ${tab.label.toLowerCase()}`}>
+                      {countLoading ? <LoaderCircle className="game-plan-folder-count-spinner" size={13} aria-hidden="true" /> : count ?? '\u2014'}
+                    </span>
                   </button>
                 </li>
               })}
@@ -833,7 +942,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
             key={`game-items-${parentRecord.id}-${selectedUnit}-${gameTab}`}
             title={`${selectedUnit} ${gameTab === 'installs' ? 'Installs' : 'Practice Scripts'}`}
             columns={GAME_PLAN_ITEM_COLUMNS}
-            items={selectedGameCardItems}
+            items={selectedGameCardItems.map((item) => withoutGridOnlyFields(item))}
             busy={busy || gameCardActionBusy}
             onNew={onAddGameCardItem && canAddGameCardItem ? () => onAddGameCardItem(selectedGameCard) : undefined}
             newLabel={gameTab === 'installs' ? 'Add Install' : 'Add Practice Script'}
@@ -881,6 +990,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
                 title={`${selectedUnit} install plays`}
                 columns={[
                   { key: 'name', header: 'Play Name' },
+                  ADJUSTMENTS_COLUMN,
                   { key: 'formation', header: 'Formation', render: (_, play) => formationLabel(play) },
                   { key: 'category', header: 'Category' },
                   { key: 'tags', header: 'Tags', render: (_, play) => playTags(play).join(', ') || '—' },
@@ -889,7 +999,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
                     return <button type="button" className={`schedule-install-add${selected ? ' is-selected' : ''}`} aria-label={`${selected ? 'Remove' : 'Add'} ${play.name} ${selected ? 'from' : 'to'} install`} aria-pressed={selected} onDoubleClick={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); toggleInstallPlay(play) }}><span className="schedule-install-add-preview"><PlayFieldView play={play} /></span><span className="schedule-install-add-state">{selected ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}</span></button>
                   } },
                 ]}
-                items={filteredInstallPlays}
+                items={filteredInstallPlays.map((play) => withoutGridOnlyFields(play, true))}
                 compact
                 suppressOpenHint
                 statusFilter
@@ -909,31 +1019,28 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
       </section> : installMode ? <section className="schedule-install-library">
         {playbooksError && <p className="schedule-error" role="alert">Unable to load playbooks: {playbooksError}</p>}
         {playbookPlaysError && <p className="schedule-error" role="alert">Unable to load selected plays: {playbookPlaysError}</p>}
+        {installGroupingsError && <p className="schedule-error" role="alert">Unable to load install groupings: {installGroupingsError}</p>}
         {installError && <p className="schedule-error" role="alert">Unable to update install: {installError}</p>}
         {playbooksLoading || playsLoading ? <p className="schedule-muted" role="status">Loading installed plays...</p> : <DataGrid
           key={`install-library-${parentRecord.id}`}
           title={`${parentRecord.name} plays`}
           columns={[
             { key: 'name', header: 'Play Name' },
+            ADJUSTMENTS_COLUMN,
             { key: 'sourcePlaybookName', header: 'Playbook' },
             { key: 'formation', header: 'Formation', render: (_, play) => formationLabel(play) },
             { key: 'category', header: 'Category' },
-            { key: 'theme', header: 'Theme', render: (value) => themeLabel(value) },
           ]}
           items={installGridItems}
-          onNew={() => setInstallPickerOpen(true)}
+          showPage
+          onReorder={readOnly ? undefined : reorderInstallPlays}
+          canReorderRows={(source, target) => source?.rowType !== 'grouping' && target?.rowType !== 'grouping' && source?.installGroupingId === target?.installGroupingId}
+          onNew={() => { setInstallPickerGroupingId(null); setInstallPickerOpen(true) }}
           newLabel="Add Plays"
+          onSecondaryNew={onNewGrouping}
+          secondaryNewLabel="New Grouping"
           busy={busy || installSaving}
-          rowActions={(row) => [
-            { key: 'open', label: 'View Play', icon: FolderOpen, onClick: onOpenPlay },
-            { key: 'remove', label: 'Remove from Install', icon: Trash2, destructive: true, onClick: async () => {
-              try {
-                await saveInstallSelection(selectedInstallPlays.filter((selection) => selection.playId !== row.id || selection.playbookId !== row.sourcePlaybookId))
-              } catch {
-                return
-              }
-            } },
-          ]}
+          rowActions={installRowActions}
           onRowDoubleClick={onOpenPlay}
         />}
         {installPickerOpen && <AddPlaysDialog
@@ -943,8 +1050,11 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
           onCancel={() => setInstallPickerOpen(false)}
           onAdd={async (additions) => {
             const known = new Set(selectedInstallPlays.map((selection) => `${selection.playbookId}:${selection.playId}`))
-            await saveInstallSelection([...selectedInstallPlays, ...additions.filter((selection) => !known.has(`${selection.playbookId}:${selection.playId}`))])
+            await saveInstallSelection([...selectedInstallPlays, ...additions
+              .filter((selection) => !known.has(`${selection.playbookId}:${selection.playId}`))
+              .map((selection) => installPickerGroupingId ? { ...selection, groupingId: installPickerGroupingId } : selection)])
             setInstallPickerOpen(false)
+            setInstallPickerGroupingId(null)
           }}
         />}
       </section> : <DataGrid
@@ -1000,8 +1110,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
   const writable = workspace.capabilities.edit
   const defaults = { ...workspace.defaults, ...authUser.preferences }
-  const fetchPlaybooks = useCallback(({ namePrefix }) => api.listPlaybooks(undefined, namePrefix).then((result) => result.items), [api])
-  const fetchGamePlans = useCallback(({ namePrefix }) => api.listGamePlans(undefined, namePrefix).then((result) => result.items), [api])
+  const fetchPlaybooks = useCallback(({ namePrefix }) => api.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [api])
+  const fetchGamePlans = useCallback(({ namePrefix }) => api.listGamePlans(undefined, namePrefix, true).then((result) => result.items), [api])
 
   useEffect(() => {
     let active = true
@@ -1018,10 +1128,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }, [api, playbooksReloadToken])
 
   const parentId = parent?.id
-  const fetchPlays = useCallback(({ namePrefix }) => api.listPlaybookRows(parentId, namePrefix).then((result) => result.items), [api, parentId])
-  const fetchScoutPlays = useCallback(({ namePrefix }) => api.listScoutPlays(parentId, undefined, namePrefix).then((result) => result.items), [api, parentId])
+  const fetchPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, parentId, (await api.listPlaybookRows(parentId, namePrefix, true)).items), [api, parentId])
+  const fetchScoutPlays = useCallback(({ namePrefix }) => api.listScoutPlays(parentId, undefined, namePrefix, true).then((result) => result.items), [api, parentId])
   const cardPlaybookId = cardPlaybook?.id
-  const fetchCardPlaybookPlays = useCallback(({ namePrefix }) => api.listPlays(cardPlaybookId, undefined, namePrefix).then((result) => result.items), [api, cardPlaybookId])
+  const fetchCardPlaybookPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, cardPlaybookId, (await api.listPlays(cardPlaybookId, undefined, namePrefix, true, true)).items), [api, cardPlaybookId])
 
   async function handleCreateCollection(payload) {
     if (newCollection === 'playbook') {
@@ -1257,7 +1367,19 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     setPlaysReloadToken((token) => token + 1)
   }
 
-  function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
+  async function loadPlayDetails(kind, parentId, row) {
+    if (kind !== 'play' || (row.markers !== undefined && row.theme !== undefined)) return row
+    try {
+      return await api.getPlay(parentId, row.id)
+    } catch (error) {
+      setStatusError(`Unable to load play: ${error.message}`)
+      return null
+    }
+  }
+
+  async function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
+    row = await loadPlayDetails(kind, parentId, row)
+    if (!row) return
     const template = PLAY_TEMPLATES.find((t) => t.id === row.template) || PLAY_TEMPLATES[0]
     setDesigner({
       kind,
@@ -1281,6 +1403,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function handleCopyPlay(kind, parentId, row) {
+    row = await loadPlayDetails(kind, parentId, row)
+    if (!row) return
     let groupingId
     if (kind === 'play') {
       const { items } = await api.listPlaybookRows(parentId)
@@ -1331,7 +1455,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     ] : [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r, collection) },
       ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
-      { key: 'print', label: 'Print...', icon: Printer, onClick: (r) => setPrintPlay({ ...r, perspective: r.perspective || defaultPlayPerspective(collection?.category) }) },
+      { key: 'print', label: 'Print...', icon: Printer, onClick: async (r) => {
+        const play = await loadPlayDetails(kind, parentId, r)
+        if (play) setPrintPlay({ ...play, perspective: play.perspective || defaultPlayPerspective(collection?.category) })
+      } },
       ...(writable ? [recordStatusAction(kind, row, parentId)] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (r) => handleDeletePlay(kind, parentId, r) }] : []),
     ]
@@ -1435,7 +1562,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${defaults.theme}:${defaults.fieldOrientation}`}
         open={newDialog?.target === 'play' || newDialog?.target === 'scoutPlay'}
         titleLabel={newDialog?.scoutingReport ? 'New Scouting Report' : newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
-        titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : Route}
+        titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : Play}
         onCancel={() => setNewDialog(null)}
         onCreate={handleCreatePlay}
         defaultTheme={defaults.theme}
@@ -1496,7 +1623,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           fetchRows={fetchCardPlaybookPlays}
           onReorder={(ids) => api.reorderPlays(cardPlaybook.id, ids)}
           onNew={writable && gameCard?.tab === 'scout' ? () => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true }) : undefined}
-          newLabel="Add Scout Play"
+          onNewGrouping={writable && gameCard?.tab === 'installs' ? () => setGroupingDialog({ parentId: cardPlaybook.id }) : undefined}
+          onEditGrouping={(grouping) => setGroupingDialog({ parentId: cardPlaybook.id, grouping })}
+          onDeleteGrouping={workspace.capabilities.delete ? (grouping) => handleDeleteGrouping(cardPlaybook.id, grouping) : undefined}
+          newLabel="New Scout Play"
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('play', row.sourcePlaybookId || cardPlaybook.id, row, cardPlaybook, gameCard?.tab === 'installs'), gameCard?.tab === 'installs' ? 'View installed play' : 'Open scout play')}
           onPrintAll={() => handlePrintCollection('playbook', cardPlaybook)}
           rowActions={playRowActions('play', cardPlaybook.id)}

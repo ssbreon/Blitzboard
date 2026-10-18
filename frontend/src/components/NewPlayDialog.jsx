@@ -3,7 +3,7 @@ import { PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
 import { DEFAULT_FIELD_ZONE, FIELD_ZONES } from '../utils/playGeometry'
 
-export const OFFENSE_PLAY_CATEGORIES = ['Run', 'Pass', 'Play-Action Pass', 'RPO', 'Gadget', 'Generic']
+export const OFFENSE_PLAY_CATEGORIES = ['Formation', 'Shift/Motion', 'Run', 'Pass', 'Play-Action Pass', 'RPO', 'Gadget', 'Generic']
 export const PLAY_CATEGORIES = ['Front', 'Stunt', 'Blitz', 'Coverage', 'Play Call']
 export const SPECIAL_TEAMS_PLAY_CATEGORIES = ['Kickoff', 'Kick Return', 'Punt', 'Punt Return', 'Field Goal', 'Extra Point', 'Generic']
 export function playCategoriesForCollection(category) {

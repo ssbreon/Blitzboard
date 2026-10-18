@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, GripVertical, Info, LoaderCircle, MoreVertical, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, X } from 'lucide-react'
 import { getCategoryBadgeStyle } from './CategoryBadge'
 
 const PAGE_SIZE = 50
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
@@ -136,7 +136,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   const currentPage = Math.min(page, totalPages - 1)
   const pageRows = visibleRows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
-  const canReorder = Boolean(onReorder) && items === undefined && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
+  const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
   const leadingColumns = (showPage ? 1 : 0) + (RowIcon ? 1 : 0)
 
   async function moveRow(rowId, toIndex) {
@@ -146,7 +146,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
     const next = [...rows]
     const [moved] = next.splice(fromIndex, 1)
     next.splice(toIndex, 0, moved)
-    setRows(next.map((row, index) => ({ ...row, page: index + 1 })))
+    if (items === undefined) setRows(next.map((row, index) => ({ ...row, page: index + 1 })))
     setPendingPageIds(next.filter((row, index) => row.page !== index + 1).map((row) => row.id))
     setReordering(true)
     setReorderError(null)
@@ -168,6 +168,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
     setDragId(null)
     setDropTarget(null)
     if (!sourceId || sourceId === targetRow.id) return
+    const sourceRow = rows.find((row) => row.id === sourceId)
+    if (canReorderRows && !canReorderRows(sourceRow, targetRow)) return
     const fromIndex = rows.findIndex((row) => row.id === sourceId)
     const insertAt = rows.findIndex((row) => row.id === targetRow.id) + (after ? 1 : 0)
     moveRow(sourceId, fromIndex < insertAt ? insertAt - 1 : insertAt)
@@ -178,8 +180,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
     if (!onReorder) return actions
     const index = rows.findIndex((item) => item.id === row.id)
     const moves = [
-      { key: 'move-up', label: 'Move Up', icon: ArrowUp, disabled: !canReorder || index <= 0, onClick: () => moveRow(row.id, index - 1) },
-      { key: 'move-down', label: 'Move Down', icon: ArrowDown, disabled: !canReorder || index >= rows.length - 1, onClick: () => moveRow(row.id, index + 1) },
+      { key: 'move-up', label: 'Move Up', icon: ArrowUp, disabled: !canReorder || index <= 0 || Boolean(canReorderRows && !canReorderRows(row, rows[index - 1])), onClick: () => moveRow(row.id, index - 1) },
+      { key: 'move-down', label: 'Move Down', icon: ArrowDown, disabled: !canReorder || index >= rows.length - 1 || Boolean(canReorderRows && !canReorderRows(row, rows[index + 1])), onClick: () => moveRow(row.id, index + 1) },
     ]
     const destructiveIndex = actions.findIndex((item) => item.destructive)
     const insertAt = row.rowType === 'grouping' || destructiveIndex < 0 ? actions.length : destructiveIndex
@@ -228,7 +230,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
             {newLabel}
           </button>
           {onSecondaryNew && <button type="button" className="toolbar-new-button" onClick={onSecondaryNew}>
-            <Plus className="toolbar-icon" aria-hidden="true" />
+            <FolderPlus className="toolbar-icon" aria-hidden="true" />
             {secondaryNewLabel}
           </button>}
           <label className="data-grid-name-filter">
@@ -376,7 +378,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                       dragId === row.id && 'is-dragging',
                       dropTarget?.id === row.id && (dropTarget.after ? 'drop-after' : 'drop-before'),
                     ].filter(Boolean).join(' ') || undefined}
-                    onDragOver={canReorder && dragId ? (event) => {
+                    onDragOver={canReorder && dragId && (!canReorderRows || canReorderRows(rows.find((item) => item.id === dragId), row)) ? (event) => {
                       event.preventDefault()
                       event.dataTransfer.dropEffect = 'move'
                       const rect = event.currentTarget.getBoundingClientRect()
@@ -394,8 +396,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                         className="data-grid-page-cell"
                         aria-busy={pendingPageIds.includes(row.id) || undefined}
                         title={canReorder ? 'Drag to reorder' : undefined}
-                        draggable={canReorder || undefined}
-                        onDragStart={canReorder ? (event) => {
+                        draggable={canReorder && (!canReorderRows || canReorderRows(row, row)) || undefined}
+                        onDragStart={canReorder && (!canReorderRows || canReorderRows(row, row)) ? (event) => {
                           event.dataTransfer.effectAllowed = 'move'
                           event.dataTransfer.setData('text/plain', row.id)
                           setDragId(row.id)

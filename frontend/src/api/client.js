@@ -34,10 +34,12 @@ function authenticationHeaders(path) {
   }
 }
 
-const listQuery = (category, namePrefix) => {
+const listQuery = (category, namePrefix, summary = false, preserveTheme = false) => {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
   if (namePrefix) params.set('namePrefix', namePrefix)
+  if (summary) params.set('summary', 'true')
+  if (preserveTheme) params.set('preserveTheme', 'true')
   const query = params.toString()
   return query ? `?${query}` : ''
 }
@@ -86,13 +88,17 @@ export function createApi(workspaceId, onMutationState) {
   removeMember: (id) => request(`/workspace/members/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   billing: () => request('/workspace/billing'),
   search: (query) => request(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`),
-  listPlaybooks: (category, namePrefix) => request(`/playbooks${listQuery(category, namePrefix)}`),
+  listPlaybooks: (category, namePrefix, summary = false) => request(`/playbooks${listQuery(category, namePrefix, summary)}`),
   createPlaybook: (payload) => request('/playbooks', { method: 'POST', body: JSON.stringify(payload) }),
   getPlaybook: (id) => request(`/playbooks/${id}`),
   updatePlaybook: (id, payload) => request(`/playbooks/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deletePlaybook: (id) => request(`/playbooks/${id}`, { method: 'DELETE' }),
-  listPlays: (id, category, namePrefix) => request(`/playbooks/${id}/plays${listQuery(category, namePrefix)}`),
-  listPlaybookRows: (id, namePrefix) => request(`/playbooks/${id}/rows${listQuery(undefined, namePrefix)}`),
+  listPlays: (id, category, namePrefix, summary = false, preserveTheme = false) => request(`/playbooks/${id}/plays${listQuery(category, namePrefix, summary, preserveTheme)}`),
+  listPlaybookRows: (id, namePrefix, summary = false) => {
+    const query = new URLSearchParams(listQuery(undefined, namePrefix))
+    if (summary) query.set('summary', 'true')
+    return request(`/playbooks/${id}/rows${query.size ? `?${query}` : ''}`)
+  },
   createGrouping: (id, payload) => request(`/playbooks/${id}/groupings`, { method: 'POST', body: JSON.stringify(payload) }),
   updateGrouping: (bookId, id, payload) => request(`/playbooks/${bookId}/groupings/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteGrouping: (bookId, id) => request(`/playbooks/${bookId}/groupings/${id}`, { method: 'DELETE' }),
@@ -101,14 +107,14 @@ export function createApi(workspaceId, onMutationState) {
   getPlay: (bookId, id) => request(`/playbooks/${bookId}/plays/${id}`),
   updatePlay: (bookId, id, payload) => request(`/playbooks/${bookId}/plays/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deletePlay: (bookId, id) => request(`/playbooks/${bookId}/plays/${id}`, { method: 'DELETE' }),
-  listSlides: (bookId, playId) => request(`/playbooks/${bookId}/plays/${playId}/slides`),
+  listSlides: (bookId, playId, summary = false) => request(`/playbooks/${bookId}/plays/${playId}/slides${summary ? '?summary=true' : ''}`),
   createSlide: (bookId, playId, payload) => request(`/playbooks/${bookId}/plays/${playId}/slides`, { method: 'POST', body: JSON.stringify(payload) }),
   getSlide: (bookId, playId, slideId) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`),
   updateSlide: (bookId, playId, slideId, payload) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteSlide: (bookId, playId, slideId) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`, { method: 'DELETE' }),
   createExport: (payload) => request('/exports', { method: 'POST', body: JSON.stringify(payload) }),
   getExport: (id) => request(`/exports/${id}`),
-  listGamePlans: (category, namePrefix) => request(`/game-plans${listQuery(category, namePrefix)}`),
+  listGamePlans: (category, namePrefix, summary = false) => request(`/game-plans${listQuery(category, namePrefix, summary)}`),
   createGamePlan: (payload) => request('/game-plans', { method: 'POST', body: JSON.stringify(payload) }),
   getGamePlan: (id) => request(`/game-plans/${id}`),
   updateGamePlan: (id, payload) => request(`/game-plans/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
@@ -117,7 +123,7 @@ export function createApi(workspaceId, onMutationState) {
   createScheduleEvent: (payload) => request('/schedule-events', { method: 'POST', body: JSON.stringify(payload) }),
   updateScheduleEvent: (id, payload) => request(`/schedule-events/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteScheduleEvent: (id) => request(`/schedule-events/${id}`, { method: 'DELETE' }),
-  listScoutPlays: (id, category, namePrefix) => request(`/game-plans/${id}/scout-plays${listQuery(category, namePrefix)}`),
+  listScoutPlays: (id, category, namePrefix, summary = false) => request(`/game-plans/${id}/scout-plays${listQuery(category, namePrefix, summary)}`),
   createScoutPlay: (id, payload) => request(`/game-plans/${id}/scout-plays`, { method: 'POST', body: JSON.stringify(payload) }),
   reorderScoutPlays: (id, ids) => request(`/game-plans/${id}/scout-plays/reorder`, { method: 'POST', body: JSON.stringify({ ids }) }),
   getScoutPlay: (gamePlanId, id) => request(`/game-plans/${gamePlanId}/scout-plays/${id}`),

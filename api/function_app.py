@@ -62,14 +62,18 @@ class Storage:
                 partition_key={"paths": ["/partitionKey"], "kind": "Hash"},
             )
 
-    def list(self, entity_type, parent_id=None, category=None, name_prefix=None, owner_id=None, workspace_id=None):
+    def list(self, entity_type, parent_id=None, category=None, name_prefix=None, owner_id=None, workspace_id=None, fields=None, parent_ids=None):
         scope = workspace_id or (request_workspace.get()["id"] if owner_id and request_workspace.get() else None)
         if self.container:
-            query = "SELECT * FROM c WHERE c.entityType = @entityType"
+            selection = ", ".join(f"c.{field}" for field in fields) if fields else "*"
+            query = f"SELECT {selection} FROM c WHERE c.entityType = @entityType"
             parameters = [{"name": "@entityType", "value": entity_type}]
             if parent_id:
                 query += " AND c.parentId = @parentId"
                 parameters.append({"name": "@parentId", "value": parent_id})
+            if parent_ids is not None:
+                query += " AND ARRAY_CONTAINS(@parentIds, c.parentId)"
+                parameters.append({"name": "@parentIds", "value": list(parent_ids)})
             if category is not None:
                 query += " AND c.category = @category"
                 parameters.append({"name": "@category", "value": category})
@@ -83,10 +87,12 @@ class Storage:
         else:
             records = list(self.memory[entity_type].values())
         workspace = self.get("workspaces", scope) if scope else None
-        return [with_record_status(entity_type, record) for record in records if (not parent_id or record.get("parentId") == parent_id)
+        records = [with_record_status(entity_type, record) for record in records if (not parent_id or record.get("parentId") == parent_id)
+            and (parent_ids is None or record.get("parentId") in parent_ids)
                 and (category is None or record.get("category") == category)
                 and (not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold()))
                 and (accounts.belongs(record, workspace) if workspace else (not scope and (not owner_id or record.get("ownerId") == owner_id)))]
+        return [{key: record[key] for key in fields if key in record} for record in records] if fields else records
 
     def get(self, entity_type, item_id):
         if self.container:
@@ -286,11 +292,29 @@ def list_paged(entity_type, parent_id, category, name_prefix):
             and (not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold()))]
 
 
-def list_playbook_rows(parent_id, name_prefix):
+def without_grid_only_fields(record, preserve_theme=False):
+    omitted = {"createdAt"}
+    if not preserve_theme:
+        omitted.add("theme")
+    return {key: value for key, value in record.items() if key not in omitted}
+
+
+def list_playbook_rows(parent_id, name_prefix, summary=False):
     records = renumber_pages("plays", paged_siblings("plays", parent_id))
-    return [with_owner_name({**record, **({"rowType": "grouping"} if record.get("entityType") == "playGroupings" else {})})
+    rows = [with_owner_name({**record, **({"rowType": "grouping"} if record.get("entityType") == "playGroupings" else {})})
             for record in records
             if not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold())]
+    if not summary:
+        return rows
+    adjustments = {row["id"]: [] for row in rows if row.get("rowType") != "grouping"}
+    if adjustments:
+        slides = storage.list("slides", workspace_id=request_workspace.get()["id"],
+                              fields=("id", "parentId", "title", "workspaceId", "ownerId"), parent_ids=adjustments)
+        for slide in slides:
+            adjustments[slide["parentId"]].append(slide.get("title") or "Adjustment")
+    omitted = {"markers", "drawings", "textAnnotations", "zones", "createdAt", "theme", "_etag", "_rid", "_self", "_ts", "_attachments"}
+    return [{**{key: value for key, value in row.items() if key not in omitted},
+             **({"adjustments": adjustments[row["id"]]} if row.get("rowType") != "grouping" else {})} for row in rows]
 
 
 def reorder_pages(entity_type, parent_id, payload):
@@ -445,7 +469,10 @@ def dispatch(req, user, workspace, role):
     if path == ["playbooks"]:
         if method == "GET":
             records = storage.list("playbooks", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id)
-            return response({"items": [with_owner_name(with_child_count(record, "plays", owner_id)) for record in records]})
+            items = [with_owner_name(with_child_count(record, "plays", owner_id)) for record in records]
+            if req.params.get("summary") == "true":
+                items = [without_grid_only_fields(record) for record in items]
+            return response({"items": items})
         if method == "POST":
             payload = body(req)
             if not payload.get("name"):
@@ -455,7 +482,10 @@ def dispatch(req, user, workspace, role):
     if path == ["game-plans"]:
         if method == "GET":
             records = storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id)
-            return response({"items": [with_owner_name(with_child_count(record, "scoutPlays", owner_id)) for record in records]})
+            items = [with_owner_name(with_child_count(record, "scoutPlays", owner_id)) for record in records]
+            if req.params.get("summary") == "true":
+                items = [without_grid_only_fields(record) for record in items]
+            return response({"items": items})
         if method == "POST":
             payload = body(req)
             if not payload.get("name"):
@@ -482,7 +512,10 @@ def dispatch(req, user, workspace, role):
             entity_type = "scoutPlays"
             if len(path) == 3:
                 if method == "GET":
-                    return response({"items": list_paged(entity_type, game_plan_id, req.params.get("category"), req.params.get("namePrefix"))})
+                    items = list_paged(entity_type, game_plan_id, req.params.get("category"), req.params.get("namePrefix"))
+                    if req.params.get("summary") == "true":
+                        items = [without_grid_only_fields(record, preserve_theme=True) for record in items]
+                    return response({"items": items})
                 if method == "POST":
                     return create_record(entity_type, body(req), owner_id, game_plan_id)
             if len(path) == 4 and path[3] == "reorder" and method == "POST":
@@ -518,7 +551,7 @@ def dispatch(req, user, workspace, role):
                 return func.HttpResponse(status_code=204)
 
         if len(path) == 3 and path[2] == "rows" and method == "GET":
-            return response({"items": list_playbook_rows(playbook_id, req.params.get("namePrefix"))})
+            return response({"items": list_playbook_rows(playbook_id, req.params.get("namePrefix"), req.params.get("summary") == "true")})
 
         if len(path) == 3 and path[2] == "groupings" and method == "POST":
             payload = body(req)
@@ -546,7 +579,11 @@ def dispatch(req, user, workspace, role):
         if len(path) >= 3 and path[2] == "plays":
             if len(path) == 3:
                 if method == "GET":
-                    return response({"items": list_paged("plays", playbook_id, req.params.get("category"), req.params.get("namePrefix"))})
+                    items = list_paged("plays", playbook_id, req.params.get("category"), req.params.get("namePrefix"))
+                    if req.params.get("summary") == "true":
+                        preserve_theme = req.params.get("preserveTheme") == "true"
+                        items = [without_grid_only_fields(record, preserve_theme=preserve_theme) for record in items]
+                    return response({"items": items})
                 if method == "POST":
                     return create_record("plays", body(req), owner_id, playbook_id)
 
@@ -570,9 +607,11 @@ def dispatch(req, user, workspace, role):
 
                 if len(path) >= 5 and path[4] == "slides":
                     if len(path) == 5:
-                        records = storage.list("slides", play_id, owner_id=owner_id)
+                        summary = method == "GET" and req.params.get("summary") == "true"
+                        records = storage.list("slides", play_id, owner_id=owner_id,
+                                               fields=("id", "parentId", "title", "workspaceId", "ownerId") if summary else None)
                         if method == "GET":
-                            return response({"items": records})
+                            return response({"items": [{"id": slide["id"], "title": slide.get("title") or "Adjustment"} for slide in records] if summary else records})
                         if method == "POST":
                             if len(records) >= 3:
                                 return response({

@@ -174,6 +174,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [activeSlideId, setActiveSlideId] = useState(null)
   const [activeSlideTitle, setActiveSlideTitle] = useState('')
   const [editingSlideId, setEditingSlideId] = useState(null)
+  const [adjustmentTitleDraft, setAdjustmentTitleDraft] = useState('')
   const [playerAnimation, setPlayerAnimation] = useState(null)
   const [removingSlideId, setRemovingSlideId] = useState(null)
   const slideDraftsRef = useRef({})
@@ -640,6 +641,21 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCategory(draftCategory)
     applyTemplate(draftTemplateId)
     setSettingsOpen(false)
+  }
+
+  function openAdjustmentRename(slide) {
+    activateSlide(slide.id)
+    setAdjustmentTitleDraft(slideDraftTitles[slide.id] ?? slideDraftsRef.current[slide.id]?.title ?? slide.title ?? 'Adjustment')
+    setEditingSlideId(slide.id)
+  }
+
+  function handleAdjustmentRename(event) {
+    event.preventDefault()
+    const title = adjustmentTitleDraft.trim()
+    if (!title || !editingSlideId) return
+    setActiveSlideTitle(title)
+    setSlideDraftTitles((current) => ({ ...current, [editingSlideId]: title }))
+    setEditingSlideId(null)
   }
 
   function flipPlay(axis) {
@@ -1316,6 +1332,25 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             </label>
             <div className="dialog-actions">
               <button type="button" className="dialog-cancel" onClick={() => setSettingsOpen(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="dialog-create">
+                Apply
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {editingSlideId && (
+        <div className="dialog-overlay" onClick={() => setEditingSlideId(null)}>
+          <form className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="adjustment-rename-title" onClick={(event) => event.stopPropagation()} onSubmit={handleAdjustmentRename}>
+            <h2 id="adjustment-rename-title"><Pencil size={24} aria-hidden="true" />Edit Adjustment</h2>
+            <label className="dialog-field">
+              <span>Adjustment name</span>
+              <input type="text" value={adjustmentTitleDraft} maxLength={80} autoFocus required onChange={(event) => setAdjustmentTitleDraft(event.target.value)} />
+            </label>
+            <div className="dialog-actions">
+              <button type="button" className="dialog-cancel" onClick={() => setEditingSlideId(null)}>
                 Cancel
               </button>
               <button type="submit" className="dialog-create">
@@ -2188,13 +2223,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   </button>
                   <button
                     type="button"
-                    className="play-designer-tab-action"
+                    className="play-designer-tab-action play-designer-tab-edit"
                     aria-label={`Rename ${title}`}
                     title={`Rename ${title}`}
-                    onClick={() => {
-                      activateSlide(slide.id)
-                      setEditingSlideId(slide.id)
-                    }}
+                    onClick={() => openAdjustmentRename(slide)}
                     disabled={readOnly || saving || Boolean(removingSlideId)}
                   >
                     <Pencil size={13} aria-hidden="true" />
@@ -2225,28 +2257,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </button>
             </div>
           </div>
-          {editingSlideId && activeSlideId === editingSlideId && (
-            <div className="play-designer-rename-adjustment">
-              <label htmlFor="adjustment-slide-title">Adjustment name</label>
-              <input
-                id="adjustment-slide-title"
-                value={activeSlideTitle}
-                maxLength={80}
-                autoFocus
-                onChange={(event) => {
-                  const title = event.target.value
-                  setActiveSlideTitle(title)
-                  setSlideDraftTitles((current) => ({ ...current, [editingSlideId]: title }))
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') setEditingSlideId(null)
-                }}
-              />
-              <button type="button" className="play-designer-tab-action" onClick={() => setEditingSlideId(null)} aria-label="Finish renaming">
-                <Check size={16} aria-hidden="true" />
-              </button>
-            </div>
-          )}
         </>
       )}
     </section>

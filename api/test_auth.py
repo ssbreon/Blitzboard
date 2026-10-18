@@ -49,6 +49,95 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_playbook_summary_rows_include_adjustment_titles_without_diagrams(self):
+        book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book"}))
+        plays_path = f"playbooks/{book['id']}/plays"
+        diagram = {"markers": [{"id": "QB", "x": 50}], "drawings": {"line": []}, "textAnnotations": [{"text": "Call"}], "zones": [{"id": "zone"}]}
+        play = response_json(call_api("POST", plays_path, "local-coach", {"name": "Play", "theme": "blackboard", **diagram}))
+        other = response_json(call_api("POST", plays_path, "local-coach", {"name": "Other"}))
+        slide_path = f"{plays_path}/{play['id']}/slides"
+        slide = response_json(call_api("POST", slide_path, "local-coach", {"title": "Check", **diagram}))
+        call_api("POST", slide_path, "local-coach", diagram)
+        other_book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Unrelated"}))
+        other_play_path = f"playbooks/{other_book['id']}/plays"
+        unrelated_play = response_json(call_api("POST", other_play_path, "local-coach", {"name": "Unrelated"}))
+        call_api("POST", f"{other_play_path}/{unrelated_play['id']}/slides", "local-coach", {"title": "Unrelated"})
+        call_api("POST", f"playbooks/{book['id']}/groupings", "local-coach", {"name": "Group"})
+        request = FakeRequest("GET", f"playbooks/{book['id']}/rows", "local-coach")
+        request.params = {"summary": "true"}
+        with patch.object(function_app.storage, "list", wraps=function_app.storage.list) as list_records:
+            rows = response_json(function_app.api(request))["items"]
+        slide_queries = [call for call in list_records.call_args_list if call.args[0] == "slides"]
+        self.assertEqual(len(slide_queries), 1)
+        self.assertEqual(set(slide_queries[0].kwargs["parent_ids"]), {play["id"], other["id"]})
+        self.assertEqual(set(slide_queries[0].kwargs["fields"]), {"id", "parentId", "title", "workspaceId", "ownerId"})
+        self.assertEqual([row["name"] for row in rows], ["Play", "Other", "Group"])
+        self.assertEqual(rows[0]["adjustments"], ["Check", "Adjustment"])
+        self.assertEqual(rows[1]["adjustments"], [])
+        self.assertEqual(rows[2]["rowType"], "grouping")
+        for row in rows:
+            self.assertTrue(set(diagram).isdisjoint(row))
+            self.assertNotIn("createdAt", row)
+            self.assertNotIn("theme", row)
+        request.params["namePrefix"] = "Other"
+        self.assertEqual([row["id"] for row in response_json(function_app.api(request))["items"]], [other["id"]])
+        request.params["namePrefix"] = "Missing"
+        self.assertEqual(response_json(function_app.api(request))["items"], [])
+        full_rows = response_json(call_api("GET", f"playbooks/{book['id']}/rows", "local-coach"))["items"]
+        full_play = response_json(call_api("GET", f"{plays_path}/{play['id']}", "local-coach"))
+        full_slides = response_json(call_api("GET", slide_path, "local-coach"))["items"]
+        for key, value in diagram.items():
+            self.assertEqual(full_rows[0][key], value)
+            self.assertEqual(full_play[key], value)
+            self.assertEqual(full_slides[0][key], value)
+        self.assertEqual(full_rows[0]["theme"], "blackboard")
+        self.assertIn("createdAt", full_rows[0])
+        self.assertEqual(full_play["theme"], "blackboard")
+        self.assertEqual(full_slides[0]["id"], slide["id"])
+        self.assertEqual(full_rows[1]["id"], other["id"])
+        slide_request = FakeRequest("GET", slide_path, "local-coach")
+        slide_request.params = {"summary": "true"}
+        metadata = response_json(function_app.api(slide_request))["items"]
+        self.assertEqual(metadata, [{"id": item["id"], "title": item.get("title") or "Adjustment"} for item in full_slides])
+        self.assertTrue(all(set(item) == {"id", "title"} for item in metadata))
+
+    def test_grid_summary_lists_omit_unused_fields_without_changing_full_gets(self):
+        book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book", "theme": "blackboard"}))
+        plan = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Plan", "theme": "blackboard"}))
+        play = response_json(call_api("POST", f"playbooks/{book['id']}/plays", "local-coach", {"name": "Play", "theme": "blackboard"}))
+        scout_play = response_json(call_api("POST", f"game-plans/{plan['id']}/scout-plays", "local-coach", {"name": "Scout", "theme": "blackboard"}))
+
+        for collection_path, record in (("playbooks", book), ("game-plans", plan)):
+            request = FakeRequest("GET", collection_path, "local-coach")
+            request.params = {"summary": "true"}
+            item = response_json(function_app.api(request))["items"][0]
+            self.assertNotIn("createdAt", item)
+            self.assertNotIn("theme", item)
+            full_record = response_json(call_api("GET", f"{collection_path}/{record['id']}", "local-coach"))
+            self.assertIn("createdAt", full_record)
+            self.assertEqual(full_record["theme"], "blackboard")
+            regular_list_item = response_json(call_api("GET", collection_path, "local-coach"))["items"][0]
+            self.assertIn("createdAt", regular_list_item)
+            self.assertEqual(regular_list_item["theme"], "blackboard")
+
+        play_request = FakeRequest("GET", f"playbooks/{book['id']}/plays", "local-coach")
+        play_request.params = {"summary": "true"}
+        play_summary = response_json(function_app.api(play_request))["items"][0]
+        self.assertNotIn("createdAt", play_summary)
+        self.assertNotIn("theme", play_summary)
+        play_request.params["preserveTheme"] = "true"
+        play_preview = response_json(function_app.api(play_request))["items"][0]
+        self.assertNotIn("createdAt", play_preview)
+        self.assertEqual(play_preview["theme"], "blackboard")
+        self.assertEqual(response_json(call_api("GET", f"playbooks/{book['id']}/plays/{play['id']}", "local-coach"))["theme"], "blackboard")
+
+        scout_request = FakeRequest("GET", f"game-plans/{plan['id']}/scout-plays", "local-coach")
+        scout_request.params = {"summary": "true"}
+        scout_summary = response_json(function_app.api(scout_request))["items"][0]
+        self.assertNotIn("createdAt", scout_summary)
+        self.assertEqual(scout_summary["theme"], "blackboard")
+        self.assertEqual(response_json(call_api("GET", f"game-plans/{plan['id']}/scout-plays/{scout_play['id']}", "local-coach"))["theme"], "blackboard")
+
     def test_schedule_events_are_validated_and_workspace_scoped(self):
         team = self.team_fixture()
         payload = {"name": "Tuesday Practice", "eventType": "Practice", "eventDate": "2026-10-13", "startTime": "16:00"}
