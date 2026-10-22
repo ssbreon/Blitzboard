@@ -1,0 +1,10 @@
+{
+  "version": 5,
+  "provider": "azure-cosmos-nosql",
+  "description": "Adds game type metadata to play and scout play records for grouping templates and filtering formation choices.",
+  "entityTypes": ["plays", "scoutPlays"],
+  "field": "gameType",
+  "values": ["11v11", "7v7", "4v4_flag"],
+  "legacyCompatibility": "Existing records without gameType infer it from their template ID. No bulk backfill is required.",
+  "mutation": "New Play and Scout Play creation stores gameType; subsequent designer saves persist it through the existing PATCH routes."
+}

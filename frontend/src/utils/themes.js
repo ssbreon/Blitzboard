@@ -4,7 +4,7 @@ export const PLAY_THEMES = [
     id: 'color',
     label: 'Green Field',
     fieldClass: '',
-    strokeColor: '#f59e0b',
+    strokeColor: '#ef9a00',
     toolDash: null,
   },
   {

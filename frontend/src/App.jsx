@@ -12,7 +12,7 @@ import { PlayFieldView } from './components/PlayFieldView'
 import { PlayDesigner } from './components/PlayDesigner'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
-import { buildMarkersFromTemplate, PLAY_TEMPLATES } from './utils/formations'
+import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
 import { formatDate } from './utils/formatDate'
 import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
 import './App.css'
@@ -85,7 +85,7 @@ const GAME_PLAN_ITEM_COLUMNS = [
 ]
 const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
-  { key: 'template', header: 'Formation', render: (value) => PLAY_TEMPLATES.find((template) => template.id === value)?.label || value || '—' },
+  { key: 'template', header: 'Formation', render: (value) => findPlayTemplate(value)?.label || value || '—' },
   { key: 'category', header: 'Category' },
   { key: 'preview', header: 'Plays', render: (_, play) => <div className="schedule-grid-play-preview" role="img" aria-label={`${play.name} play diagram`}><PlayFieldView play={play} /></div> },
 ]
@@ -162,7 +162,6 @@ function PlaybookBanner({ playbook, onEdit, disabled }) {
   return <section className="game-plan-banner playbook-banner" aria-label="Playbook details">
     <dl className="game-plan-banner-details">
       {details.map(([label, value]) => <div key={label}>
-        <dt>{label}</dt>
         <dd>{value}</dd>
       </div>)}
     </dl>
@@ -174,7 +173,7 @@ function PlaybookBanner({ playbook, onEdit, disabled }) {
 
 function PlaybooksBanner({ teamName, counts }) {
   const details = [
-    { id: 'team', label: '', value: teamName || '\u2014' },
+    { id: 'team', label: 'Team', value: teamName || '\u2014' },
     { id: 'offense', label: 'Offense Playbooks', value: counts?.Offense ?? '\u2014' },
     { id: 'defense', label: 'Defense Playbooks', value: counts?.Defense ?? '\u2014' },
     { id: 'special-teams', label: 'Special Teams Playbooks', value: counts?.['Special Teams'] ?? '\u2014' },
@@ -183,8 +182,7 @@ function PlaybooksBanner({ teamName, counts }) {
   return <section className="game-plan-banner playbooks-banner" aria-label="Playbooks summary">
     <dl className="game-plan-banner-details">
       {details.map(({ id, label, value }) => <div key={id}>
-        {label && <dt>{label}</dt>}
-        <dd>{value}</dd>
+        <dd>{label && `${label}: `}{value}</dd>
       </div>)}
     </dl>
   </section>
@@ -270,7 +268,7 @@ function playTags(play) {
 
 function formationLabel(play) {
   const value = play.formation || play.template
-  return PLAY_TEMPLATES.find((template) => template.id === value)?.label || value || '—'
+  return findPlayTemplate(value)?.label || value || '—'
 }
 
 function timezoneColumns(columns, timezone) {
@@ -969,7 +967,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
           </select></label>
           <label><span className="sr-only">Formation</span><select aria-label="Formation" value={formationFilter} onChange={(event) => setFormationFilter(event.target.value)} disabled={!availablePlays.length}>
             <option value="">Formation: All</option>
-            {currentFormations.map((formation) => <option key={formation} value={formation}>Formation: {PLAY_TEMPLATES.find((template) => template.id === formation)?.label || formation}</option>)}
+            {currentFormations.map((formation) => <option key={formation} value={formation}>Formation: {findPlayTemplate(formation)?.label || formation}</option>)}
           </select></label>
           <label><span className="sr-only">Category</span><select aria-label="Category" value={installCategoryFilter} onChange={(event) => setInstallCategoryFilter(event.target.value)} disabled={!availablePlays.length}>
             <option value="">Category: All</option>
@@ -1294,14 +1292,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     await api.reorderPlays(parentId, rows.map((item) => item.id))
   }
 
-  async function handleCreatePlay(name, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone) {
+  async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone) {
     const { target, parentId, unit, groupingId } = newDialog
     setNewDialog(null)
     const collectionCategory = newDialog.category || parent?.category
     const perspective = defaultPlayPerspective(target === 'scoutPlay' || newDialog.practiceScript ? 'Offense' : collectionCategory)
     const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
     const designerParentCategory = target === 'scoutPlay' ? playUnit : collectionCategory
-    const template = PLAY_TEMPLATES.find((t) => t.id === templateId) || PLAY_TEMPLATES[0]
+    const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
     const initialMarkers = buildMarkersFromTemplate(template).map((marker) =>
       perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
     )
@@ -1309,6 +1307,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       target === 'play'
         ? await api.createPlay(parentId, {
             name,
+          gameType,
             template: templateId,
             theme,
             category,
@@ -1320,6 +1319,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           })
         : await api.createScoutPlay(parentId, {
             name,
+          gameType,
             template: templateId,
             theme,
             category,
@@ -1338,6 +1338,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       parentId,
       id: record.id,
       name: record.name,
+      gameType: record.gameType || template.gameType,
       initialMarkers: record.markers || initialMarkers,
       initialDrawings: record.drawings,
       initialTextAnnotations: record.textAnnotations,
@@ -1380,12 +1381,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   async function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
     row = await loadPlayDetails(kind, parentId, row)
     if (!row) return
-    const template = PLAY_TEMPLATES.find((t) => t.id === row.template) || PLAY_TEMPLATES[0]
+    const template = findPlayTemplate(row.template) || DEFAULT_PLAY_TEMPLATE
     setDesigner({
       kind,
       parentId,
       id: row.id,
       name: row.name,
+      gameType: row.gameType || template.gameType,
       readOnly,
       initialMarkers: row.markers || buildMarkersFromTemplate(template),
       initialDrawings: row.drawings,
@@ -1413,6 +1415,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     }
     const payload = {
       name: `${row.name} (Copy)`,
+      gameType: row.gameType || findPlayTemplate(row.template)?.gameType,
       template: row.template,
       theme: row.theme,
       category: row.category,

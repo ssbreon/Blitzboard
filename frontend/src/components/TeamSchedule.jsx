@@ -44,7 +44,6 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
   const [location, setLocation] = useState(initialEvent?.location || '')
   const [gameSite, setGameSite] = useState(initialEvent?.gameSite || '')
   const [notes, setNotes] = useState(initialEvent?.notes || '')
-  const [category, setCategory] = useState(initialEvent?.category || 'Defense')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const isGame = eventType === 'Game'
@@ -54,7 +53,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
     setSaving(true)
     setError(null)
     try {
-      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, notes: notes.trim(), category })
+      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }) })
     } catch (failure) {
       setError(failure.message)
     } finally {
@@ -89,9 +88,9 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
             <label className="schedule-field"><span>Start</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={!canEdit || saving} /></label>
             {!isGame && <label className="schedule-field"><span>End</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={!canEdit || saving} /></label>}
           </div>
-          {isGame && <label className="schedule-field"><span>Scouting category</span><select value={category} onChange={(event) => setCategory(event.target.value)} disabled={!canEdit || saving}><option>Offense</option><option>Defense</option><option>Special Teams</option></select></label>}
           {!isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
-          <label className="schedule-field"><span>{isGame ? 'Scouting report' : 'Notes'}</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} /></label>
+          {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
+          </label>}
           {error && <p className="schedule-error" role="alert">{error}</p>}
         </div>
         <footer className="schedule-dialog-actions">
@@ -158,12 +157,10 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
         opponent: values.name,
         gameDate: values.eventDate,
         year: Number(values.eventDate.slice(0, 4)),
-        category: values.category,
         startTime: values.startTime,
         endTime: values.endTime,
         location: values.location,
         ...(values.gameSite && { gameSite: values.gameSite }),
-        notes: values.notes,
         ...(dialog.event?.installPlaybookIds && { installPlaybookIds: dialog.event.installPlaybookIds }),
       }
       if (dialog.event?.kind === 'game') await api.updateGamePlan(dialog.event.id, payload)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { PLAY_TEMPLATES } from '../utils/formations'
+import { DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
 import { DEFAULT_FIELD_ZONE, FIELD_ZONES } from '../utils/playGeometry'
 
@@ -12,13 +12,20 @@ export function playCategoriesForCollection(category) {
   return PLAY_CATEGORIES
 }
 export const FIELD_DECORATIONS = ['None', 'Hash Marks', 'Hash Marks and Numbers']
+const DEFAULT_FIELD_DECORATION = FIELD_DECORATIONS[2]
+const DEFAULT_PLAY_NAME = 'New Play'
 export const FIELD_ORIENTATIONS = ['High School', 'NCAA', 'NFL']
 
+function gameTypeLabel(gameType) {
+  return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
+}
+
 export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], categoryOptions = PLAY_CATEGORIES }) {
-  const [name, setName] = useState('')
-  const [templateId, setTemplateId] = useState(PLAY_TEMPLATES[0].id)
+  const [name, setName] = useState(DEFAULT_PLAY_NAME)
+  const [gameType, setGameType] = useState(DEFAULT_GAME_TYPE)
+  const [templateId, setTemplateId] = useState(DEFAULT_PLAY_TEMPLATE.id)
   const [category, setCategory] = useState(categoryOptions[0])
-  const [fieldDecoration, setFieldDecoration] = useState(FIELD_DECORATIONS[0])
+  const [fieldDecoration, setFieldDecoration] = useState(DEFAULT_FIELD_DECORATION)
   const [fieldZone, setFieldZone] = useState(DEFAULT_FIELD_ZONE)
   const [fieldOrientation, setFieldOrientation] = useState(defaultFieldOrientation)
   const [themeId, setThemeId] = useState(defaultTheme)
@@ -29,21 +36,23 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     event.preventDefault()
     const trimmed = name.trim()
     if (!trimmed) return
-    onCreate(trimmed, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone)
-    setName('')
-    setTemplateId(PLAY_TEMPLATES[0].id)
+    onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone)
+    setName(DEFAULT_PLAY_NAME)
+    setGameType(DEFAULT_GAME_TYPE)
+    setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
-    setFieldDecoration(FIELD_DECORATIONS[0])
+    setFieldDecoration(DEFAULT_FIELD_DECORATION)
     setFieldZone(DEFAULT_FIELD_ZONE)
     setFieldOrientation(defaultFieldOrientation)
     setThemeId(defaultTheme)
   }
 
   function handleCancel() {
-    setName('')
-    setTemplateId(PLAY_TEMPLATES[0].id)
+    setName(DEFAULT_PLAY_NAME)
+    setGameType(DEFAULT_GAME_TYPE)
+    setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
-    setFieldDecoration(FIELD_DECORATIONS[0])
+    setFieldDecoration(DEFAULT_FIELD_DECORATION)
     setFieldZone(DEFAULT_FIELD_ZONE)
     setFieldOrientation(defaultFieldOrientation)
     setThemeId(defaultTheme)
@@ -104,21 +113,37 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
             ))}
           </select>
         </label>
-        <fieldset className="dialog-field dialog-templates">
-          <legend>Template</legend>
-          {PLAY_TEMPLATES.map((template) => (
-            <label key={template.id} className="dialog-template-option">
-              <input
-                type="radio"
-                name="template"
-                value={template.id}
-                checked={templateId === template.id}
-                onChange={() => setTemplateId(template.id)}
-              />
-              <span>{template.label}</span>
-            </label>
-          ))}
-        </fieldset>
+        <label className="dialog-field">
+          <span>Game Type</span>
+          <select
+            value={gameType}
+            onChange={(event) => {
+              const nextGameType = event.target.value
+              setGameType(nextGameType)
+              setTemplateId(getTemplatesForGameType(nextGameType)[0].id)
+            }}
+          >
+            {Object.keys(PLAY_TEMPLATES).map((option) => (
+              <option key={option} value={option}>
+                {gameTypeLabel(option)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="dialog-field">
+          <span>Template</span>
+          <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+            {Object.entries(PLAY_TEMPLATES[gameType] || {}).map(([family, templates]) => (
+              <optgroup key={family} label={templates[0].formationFamilyLabel}>
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
         <label className="dialog-field">
           <span>Theme</span>
           <select value={themeId} onChange={(event) => setThemeId(event.target.value)}>

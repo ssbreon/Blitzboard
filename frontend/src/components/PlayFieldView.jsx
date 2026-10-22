@@ -202,7 +202,7 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
       {markers.map((marker) => (
         <span
           key={marker.id}
-          className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.color ? ' color-override' : ''}${themeClass}`}
+          className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.shape === 'rectangle' ? ' rectangle' : ''}${marker.color ? ' color-override' : ''}${themeClass}`}
           style={markerStyleVars(marker, theme.id)}
         >
           {marker.label}

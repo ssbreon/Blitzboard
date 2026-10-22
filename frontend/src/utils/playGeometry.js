@@ -153,8 +153,8 @@ export function hashMarkYPositionsForWindow(window, perspective = DEFAULT_PLAY_P
 
 export const DRAWING_TOOLS = [
   { id: 'select', label: 'Select' },
-  { id: 'block', label: 'Block', color: '#f59e0b', dash: null, arrow: false, endCap: 'tbar' },
-  { id: 'dtb', label: 'DTB', color: '#f59e0b', dash: '2 4', arrow: false, endCap: 'tbar' },
+  { id: 'block', label: 'Block', color: '#ef9a00', dash: null, arrow: false, endCap: 'tbar' },
+  { id: 'dtb', label: 'DTB', color: '#ef9a00', dash: '2 4', arrow: false, endCap: 'tbar' },
   { id: 'route', label: 'Route', color: '#1d4ed8', dash: null, arrow: true },
   { id: 'blitz', label: 'Blitz', color: '#b91c1c', dash: null, arrow: true },
   { id: 'coverage', label: 'Coverage', color: '#7c3aed', dash: '2 10', arrow: true },
@@ -434,6 +434,9 @@ export function markerStyleVars(marker, themeId) {
     left: `${marker.x}%`,
     top: `${marker.y}%`,
     '--marker-color': color,
+    ...(themeId === 'printerFriendly' && color
+      ? { '--marker-override-border': '#000' }
+      : {}),
     '--marker-decoration-color': usePrinterFriendlyNeutralColors ? '#374151' : decorationColor,
     '--marker-override-text': color?.toLowerCase() === '#ffffff' ? '#111' : '#fff',
     ...(usePrinterFriendlyNeutralColors

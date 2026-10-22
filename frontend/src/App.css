@@ -241,6 +241,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .play-designer-field {
+  container-type: inline-size;
   position: relative;
   flex-grow: 1;
   min-height: 420px;
@@ -761,7 +762,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 .player-custom-color {
   position: relative;
   overflow: hidden;
-  background: conic-gradient(#ef4444, #f59e0b, #22c55e, #0ea5e9, #7c3aed, #ef4444);
+  background: conic-gradient(#ef4444, #ef9a00, #22c55e, #0ea5e9, #7c3aed, #ef4444);
 
   input {
     position: absolute;
@@ -841,7 +842,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .player-decoration-option.vertical-line {
-  background: linear-gradient(to right, var(--preview-light-color, #fff) calc(50% - 1px), var(--preview-color) calc(50% - 1px), var(--preview-color) calc(50% + 1px), var(--preview-light-color, #fff) calc(50% + 1px));
+  background: linear-gradient(to right, var(--preview-light-color, #fff) calc(50% - 1.5px), var(--preview-color) calc(50% - 1.5px), var(--preview-color) calc(50% + 1.5px), var(--preview-light-color, #fff) calc(50% + 1.5px));
 }
 
 .play-designer-tool {
@@ -927,6 +928,14 @@ button:active:not(:disabled):not([role^='menuitem']) {
   pointer-events: none;
 }
 
+.play-designer-alignment-guide {
+  stroke: #ef4444;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
 .play-designer-route {
   fill: none;
   stroke-width: max(1.25px, calc(3px * var(--drawing-size-scale, 1)));
@@ -999,8 +1008,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .play-designer-marker {
-  --marker-size: 28px;
-  --marker-font-size: 9px;
+  --marker-size: clamp(12px, 1.35cqi, 26px);
+  --marker-font-size: clamp(7px, 0.625cqi, 12px);
 
   position: absolute;
   z-index: 2;
@@ -1009,7 +1018,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   margin: calc(var(--marker-size) / -2) 0 0 calc(var(--marker-size) / -2);
   padding: 0;
   border-radius: 50%;
-  border: 2px solid var(--marker-border-color, #fff);
+  border: max(1px, calc(var(--marker-size) * 0.075)) solid var(--marker-border-color, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1018,6 +1027,12 @@ button:active:not(:disabled):not([role^='menuitem']) {
   cursor: grab;
   user-select: none;
   touch-action: none;
+
+  &.rectangle {
+    width: calc(var(--marker-size) * 1.1);
+    margin-left: calc(var(--marker-size) * -0.55);
+    border-radius: 4px;
+  }
 
   &.offense {
     --team-color: #1d4ed8;
@@ -1060,7 +1075,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
   &.color-override.solid {
     background: var(--marker-color);
-    border-color: #fff;
+    border-color: var(--marker-override-border, #fff);
     color: var(--marker-override-text, #fff);
   }
 
@@ -1077,7 +1092,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   }
 
   &.vertical-line {
-    background: linear-gradient(to right, var(--marker-decoration-light-color, #fff) calc(50% - 1px), var(--marker-decoration-color, var(--decoration-color)) calc(50% - 1px), var(--marker-decoration-color, var(--decoration-color)) calc(50% + 1px), var(--marker-decoration-light-color, #fff) calc(50% + 1px));
+    background: linear-gradient(to right, var(--marker-decoration-light-color, #fff) calc(50% - 1.5px), var(--marker-decoration-color, var(--decoration-color)) calc(50% - 1.5px), var(--marker-decoration-color, var(--decoration-color)) calc(50% + 1.5px), var(--marker-decoration-light-color, #fff) calc(50% + 1.5px));
     border-color: var(--marker-border-color, #fff);
     color: #111;
   }
@@ -1085,7 +1100,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   &.color-override.half-left,
   &.color-override.half-right,
   &.color-override.vertical-line {
-    border-color: #fff;
+    border-color: var(--marker-override-border, #fff);
   }
 
   &.selected {
@@ -1461,21 +1476,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
     width: 100%;
     min-width: 0;
   }
-}
-
-.dialog-templates {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dialog-template-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 400;
-  color: var(--text);
-  cursor: pointer;
 }
 
 .dialog-checkbox {
@@ -2436,7 +2436,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   margin: 0;
   overflow-wrap: anywhere;
   color: inherit;
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 750;
 }
 

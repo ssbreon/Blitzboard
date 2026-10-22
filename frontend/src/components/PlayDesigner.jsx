@@ -1,10 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Settings, Undo2, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RectangleHorizontal, RotateCcw, Settings, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
 import { PrintPreviewDialog } from './PrintPreviewDialog'
-import { PLAY_TEMPLATES, buildMarkersFromTemplate } from '../utils/formations'
+import { findPlayTemplate, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, buildMarkersFromTemplate } from '../utils/formations'
 import { PLAY_THEMES, getTheme, normalizeThemeId } from '../utils/themes'
 import {
   BLITZ_FIRST_SEGMENT_DASH,
@@ -57,7 +57,11 @@ const TOOL_ICONS = {
   motion: <path stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" d="M3 12 7 8l4 8 4-8 6 4" />,
 }
 
-const PLAYER_COLORS = ['#ffffff', '#1d4ed8', '#b91c1c', '#15803d', '#f59e0b', '#7c3aed', '#374151']
+const PLAYER_COLORS = ['#ffffff', '#1d4ed8', '#b91c1c', '#15803d', '#ef9a00', '#7c3aed', '#374151']
+const PLAYER_SHAPES = [
+  { id: 'circle', label: 'Circle', Icon: Circle },
+  { id: 'rectangle', label: 'Rectangle', Icon: RectangleHorizontal },
+]
 const TEXT_FONT_SIZES = [12, 14, 16, 20, 24, 32]
 const TEXT_STYLE_TOGGLES = [
   { id: 'bold', label: 'Bold', glyph: 'B' },
@@ -106,7 +110,10 @@ function adjustmentDesign(slide, fallback) {
 export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbSettingsTarget }) {
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
-  const initialTemplateId = record.template || PLAY_TEMPLATES[0].id
+  const initialTemplate = findPlayTemplate(record.template)
+  const gameType = record.gameType || initialTemplate?.gameType || DEFAULT_GAME_TYPE
+  const gameTypeTemplates = getTemplatesForGameType(gameType)
+  const initialTemplateId = initialTemplate?.id || gameTypeTemplates[0]?.id || DEFAULT_PLAY_TEMPLATE.id
   const initialCategory = record.category || categoryOptions[0]
   const initialFieldDecoration = record.fieldDecoration || FIELD_DECORATIONS[0]
   const initialFieldOrientation = record.fieldOrientation || FIELD_ORIENTATIONS[0]
@@ -135,6 +142,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [zoneDrag, setZoneDrag] = useState(null)
   const [hoveredBlockCapId, setHoveredBlockCapId] = useState(null)
   const [dragId, setDragId] = useState(null)
+  const [alignmentGuides, setAlignmentGuides] = useState([])
   const [multiSelectedIds, setMultiSelectedIds] = useState([])
   const [groupDrag, setGroupDrag] = useState(null)
   const [marquee, setMarquee] = useState(null)
@@ -409,7 +417,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         setActiveSlideTitle(title)
         setSlideDraftTitles((current) => ({ ...current, [activeSlideId]: title }))
       } else {
-        const payload = { ...designPayload, name }
+        const payload = { ...designPayload, name, gameType }
         if (record.kind === 'play') {
           await api.updatePlay(record.parentId, record.id, payload)
         } else {
@@ -617,7 +625,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   function applyTemplate(nextTemplateId) {
     if (nextTemplateId === templateId) return
-    const template = PLAY_TEMPLATES.find((item) => item.id === nextTemplateId) || PLAY_TEMPLATES[0]
+    const template = findPlayTemplate(nextTemplateId) || DEFAULT_PLAY_TEMPLATE
     setTemplateId(template.id)
     setMarkers(buildMarkersFromTemplate(template))
     setDrawings(normalizeDrawings())
@@ -701,7 +709,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   function restartPlay() {
-    const template = PLAY_TEMPLATES.find((item) => item.id === templateId) || PLAY_TEMPLATES[0]
+    const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
     setMarkers(buildMarkersFromTemplate(template))
     setDrawings(normalizeDrawings())
     setTextAnnotations([])
@@ -1041,6 +1049,63 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setMarquee({ start: point, end: point, additive: event.shiftKey })
   }
 
+  function markerAlignmentGuides(markerId, x, y) {
+    const field = fieldRef.current
+    const fieldRect = field?.getBoundingClientRect()
+    if (!field || !fieldRect) return []
+
+    const markerRects = new Map(
+      Array.from(field.querySelectorAll('[data-marker-id]'), (element) => [element.dataset.markerId, element.getBoundingClientRect()]),
+    )
+    const draggedRect = markerRects.get(markerId)
+    if (!draggedRect) return []
+
+    const draggedCenter = { x: (x / 100) * fieldRect.width, y: (y / 100) * fieldRect.height }
+    const nearest = new Map()
+    const tolerance = 1
+    const toPercent = (point) => ({ x: (point.x / fieldRect.width) * 100, y: (point.y / fieldRect.height) * 100 })
+
+    for (const marker of markers) {
+      if (marker.id === markerId) continue
+      const markerRect = markerRects.get(marker.id)
+      if (!markerRect) continue
+
+      const otherCenter = { x: (marker.x / 100) * fieldRect.width, y: (marker.y / 100) * fieldRect.height }
+      const dx = otherCenter.x - draggedCenter.x
+      const dy = otherCenter.y - draggedCenter.y
+
+      if (Math.abs(dy) <= tolerance) {
+        const gap = Math.abs(dx) - (draggedRect.width + markerRect.width) / 2
+        if (gap > 0) {
+          const side = dx > 0 ? 'right' : 'left'
+          const guide = {
+            x1: draggedCenter.x + Math.sign(dx) * draggedRect.width / 2,
+            x2: otherCenter.x - Math.sign(dx) * markerRect.width / 2,
+            y1: (draggedCenter.y + otherCenter.y) / 2,
+            y2: (draggedCenter.y + otherCenter.y) / 2,
+          }
+          if (!nearest.has(side) || gap < nearest.get(side).gap) nearest.set(side, { gap, points: [toPercent({ x: guide.x1, y: guide.y1 }), toPercent({ x: guide.x2, y: guide.y2 })] })
+        }
+      }
+
+      if (Math.abs(dx) <= tolerance) {
+        const gap = Math.abs(dy) - (draggedRect.height + markerRect.height) / 2
+        if (gap > 0) {
+          const side = dy > 0 ? 'below' : 'above'
+          const guide = {
+            x1: (draggedCenter.x + otherCenter.x) / 2,
+            x2: (draggedCenter.x + otherCenter.x) / 2,
+            y1: draggedCenter.y + Math.sign(dy) * draggedRect.height / 2,
+            y2: otherCenter.y - Math.sign(dy) * markerRect.height / 2,
+          }
+          if (!nearest.has(side) || gap < nearest.get(side).gap) nearest.set(side, { gap, points: [toPercent({ x: guide.x1, y: guide.y1 }), toPercent({ x: guide.x2, y: guide.y2 })] })
+        }
+      }
+    }
+
+    return Array.from(nearest, ([side, { points }]) => ({ side, points }))
+  }
+
   function handleFieldPointerMove(event) {
     if (pathDrag) {
       const point = positionFromEvent(event)
@@ -1090,6 +1155,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     if (dragId) {
       const { x, y } = positionFromEvent(event)
+      setAlignmentGuides(markerAlignmentGuides(dragId, x, y))
       setMarkers((current) => current.map((marker) => (marker.id === dragId ? { ...marker, x, y } : marker)))
       return
     }
@@ -1155,6 +1221,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       setMultiSelectedIds([])
     }
     setDragId(null)
+    setAlignmentGuides([])
     setDragTextId(null)
     setDragTextOffset(null)
     setZoneDrag(null)
@@ -1323,7 +1390,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             <label className="dialog-field">
               <span>Template</span>
               <select value={draftTemplateId} onChange={(event) => setDraftTemplateId(event.target.value)}>
-                {PLAY_TEMPLATES.map((template) => (
+                {gameTypeTemplates.map((template) => (
                   <option key={template.id} value={template.id}>
                     {template.label}
                   </option>
@@ -1709,6 +1776,25 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             disabled={!appearanceEnabled}
           />
         </label>
+        <div className="player-appearance-group" role="group" aria-label="Player shape">
+          {PLAYER_SHAPES.map(({ id, label, Icon }) => {
+            const isActive = appearanceEnabled && (selectedMarker.shape || 'circle') === id
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`text-style-toggle player-shape-toggle${isActive ? ' active' : ''}`}
+                onClick={() => updateMarkerAppearance(selectedMarker.id, { shape: id })}
+                aria-label={`${label} player shape`}
+                aria-pressed={isActive}
+                title={label}
+                disabled={!appearanceEnabled}
+              >
+                <Icon size={16} aria-hidden="true" />
+              </button>
+            )
+          })}
+        </div>
         <div className="player-appearance-group" role="group" aria-label="Player color">
           <button
             type="button"
@@ -2024,6 +2110,16 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </g>
             )
           })}
+          {alignmentGuides.map(({ side, points }) => (
+            <line
+              key={side}
+              className="play-designer-alignment-guide"
+              x1={points[0].x}
+              y1={points[0].y}
+              x2={points[1].x}
+              y2={points[1].y}
+            />
+          ))}
           {activeChain && chainAnchor && (() => {
             const tool = DRAWING_TOOLS.find((t) => t.id === activeChain.type)
             const points = [
@@ -2153,7 +2249,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             <button
               key={marker.id}
               type="button"
-              className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.color ? ' color-override' : ''}${marker.id === selectedId || multiSelectedIds.includes(marker.id) ? ' selected' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}${themeClass}`}
+              data-marker-id={marker.id}
+              className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.shape === 'rectangle' ? ' rectangle' : ''}${marker.color ? ' color-override' : ''}${marker.id === selectedId || multiSelectedIds.includes(marker.id) ? ' selected' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}${themeClass}`}
               style={markerStyleVars(displayMarker, activeTheme.id)}
               draggable={false}
               onDragStart={(event) => event.preventDefault()}
