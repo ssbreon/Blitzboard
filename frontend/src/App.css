@@ -1428,6 +1428,163 @@ button:active:not(:disabled):not([role^='menuitem']) {
   }
 }
 
+.new-play-dialog {
+  box-sizing: border-box;
+  width: min(1120px, calc(100vw - 32px));
+  min-height: min(640px, calc(100vh - 32px));
+  gap: 12px;
+}
+
+.new-play-steps {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  b {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    font-size: 12px;
+  }
+
+  .active {
+    color: var(--text-h);
+    font-weight: 600;
+
+    b {
+      border-color: var(--accent-border);
+      background: var(--accent);
+      color: #fff;
+    }
+  }
+
+  .complete b {
+    border-color: var(--accent-border);
+    color: var(--accent-border);
+  }
+}
+
+.new-play-wizard-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 24px;
+  min-height: 0;
+}
+
+.new-play-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding-block: 4px;
+}
+
+.new-play-preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.new-play-preview-heading {
+  margin: 0;
+  color: var(--text-h);
+  font-size: 14px;
+  font-style:italic;
+  font-weight: 600;
+  text-align:center
+}
+
+.new-play-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+}
+
+.new-play-preview-field {
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  flex: none;
+  min-height: 0;
+  border-radius: 4px;
+
+  .play-designer-marker {
+    --marker-size: clamp(9px, 1.8cqi, 22px);
+    --marker-font-size: clamp(5px, 0.9cqi, 10px);
+  }
+
+  .play-designer-yard-number {
+    font-size: clamp(14px, 3.2cqi, 40px);
+  }
+
+  .play-designer-yard-arrow {
+    font-size: clamp(5px, 1cqi, 12px);
+
+    &.up {
+      margin-top: -3cqi;
+    }
+
+    &.down {
+      margin-top: 3cqi;
+    }
+  }
+}
+
+.new-play-preview-name {
+  overflow: hidden;
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new-play-actions {
+  margin-top: 2px;
+}
+
+@media (max-width: 640px) {
+  .new-play-dialog {
+    width: calc(100vw - 24px);
+    max-width: none;
+    padding: 18px;
+  }
+
+  .new-play-dialog h2 {
+    margin: -18px -18px 0;
+    padding-inline: 18px;
+  }
+
+  .new-play-wizard-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .new-play-preview {
+    padding: 10px;
+  }
+}
+
 .dialog-field {
   display: flex;
   flex-direction: column;

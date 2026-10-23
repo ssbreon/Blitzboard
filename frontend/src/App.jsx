@@ -1570,6 +1570,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onCreate={handleCreatePlay}
         defaultTheme={defaults.theme}
         defaultFieldOrientation={defaults.fieldOrientation}
+        defaultPerspective={defaultPlayPerspective(newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'Offense' : newDialog?.category || parent?.category)}
         categoryOptions={playCategoriesForCollection(newDialog?.unit || newDialog?.category || parent?.category)}
       />
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
