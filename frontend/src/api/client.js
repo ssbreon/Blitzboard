@@ -12,6 +12,7 @@ export function signOut() {
   try {
     sessionStorage.setItem(signedOutKey, 'true')
     sessionStorage.removeItem('blitzboard:workspace')
+    Object.keys(sessionStorage).filter((key) => key.startsWith('blitzboard:breadcrumb:')).forEach((key) => sessionStorage.removeItem(key))
   } catch { return }
 }
 

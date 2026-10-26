@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RectangleHorizontal, RotateCcw, Settings, Undo2, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RectangleHorizontal, RotateCcw, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
+import { PlayDiagramIcon } from './PlayDiagramIcon'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
 import { PrintPreviewDialog } from './PrintPreviewDialog'
-import { findPlayTemplate, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, buildMarkersFromTemplate } from '../utils/formations'
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { findPlayTemplate, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, PLAY_TEMPLATES, buildMarkersFromTemplate } from '../utils/formations'
 import { PLAY_THEMES, getTheme, normalizeThemeId } from '../utils/themes'
 import {
   BLITZ_FIRST_SEGMENT_DASH,
@@ -91,6 +93,10 @@ const ZONE_HANDLES = [
   { id: 'w', left: 0, top: 50 },
 ]
 
+function gameTypeLabel(gameType) {
+  return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
+}
+
 function adjustmentDesign(slide, fallback) {
   return {
     markers: Array.isArray(slide.markers) ? slide.markers : fallback.markers,
@@ -111,9 +117,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplate = findPlayTemplate(record.template)
-  const gameType = record.gameType || initialTemplate?.gameType || DEFAULT_GAME_TYPE
-  const gameTypeTemplates = getTemplatesForGameType(gameType)
-  const initialTemplateId = initialTemplate?.id || gameTypeTemplates[0]?.id || DEFAULT_PLAY_TEMPLATE.id
+  const initialGameType = record.gameType || initialTemplate?.gameType || DEFAULT_GAME_TYPE
+  const initialTemplateId = initialTemplate?.id || getTemplatesForGameType(initialGameType)[0]?.id || DEFAULT_PLAY_TEMPLATE.id
   const initialCategory = record.category || categoryOptions[0]
   const initialFieldDecoration = record.fieldDecoration || FIELD_DECORATIONS[0]
   const initialFieldOrientation = record.fieldOrientation || FIELD_ORIENTATIONS[0]
@@ -127,6 +132,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [drawings, setDrawings] = useState(normalizeDrawings(record.initialDrawings))
     const [textAnnotations, setTextAnnotations] = useState(normalizeTextAnnotations(record.initialTextAnnotations))
   const [zones, setZones] = useState(normalizeZones(record.initialZones))
+  const [gameType, setGameType] = useState(initialGameType)
   const [templateId, setTemplateId] = useState(initialTemplateId)
   const [category, setCategory] = useState(initialCategory)
   const [fieldDecoration, setFieldDecoration] = useState(initialFieldDecoration)
@@ -162,6 +168,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [printOpen, setPrintOpen] = useState(false)
   const [printFieldAspectRatio, setPrintFieldAspectRatio] = useState(2.25)
   const [draftTemplateId, setDraftTemplateId] = useState(initialTemplateId)
+  const [draftGameType, setDraftGameType] = useState(initialGameType)
   const [draftCategory, setDraftCategory] = useState(initialCategory)
   const [savedName, setSavedName] = useState(record.name)
   const [savedMarkers, setSavedMarkers] = useState(record.initialMarkers || [])
@@ -169,6 +176,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [savedTextAnnotations, setSavedTextAnnotations] = useState(normalizeTextAnnotations(record.initialTextAnnotations))
   const [savedZones, setSavedZones] = useState(normalizeZones(record.initialZones))
   const [savedTemplateId, setSavedTemplateId] = useState(initialTemplateId)
+  const [savedGameType, setSavedGameType] = useState(initialGameType)
   const [savedCategory, setSavedCategory] = useState(initialCategory)
   const [savedFieldDecoration, setSavedFieldDecoration] = useState(initialFieldDecoration)
   const [savedFieldOrientation, setSavedFieldOrientation] = useState(initialFieldOrientation)
@@ -185,6 +193,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [adjustmentTitleDraft, setAdjustmentTitleDraft] = useState('')
   const [playerAnimation, setPlayerAnimation] = useState(null)
   const [removingSlideId, setRemovingSlideId] = useState(null)
+  const [slideToDelete, setSlideToDelete] = useState(null)
   const slideDraftsRef = useRef({})
   const fieldRef = useRef(null)
   const menuRef = useRef(null)
@@ -288,7 +297,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   )
   const isDirty = activeSlideId
     ? designIsDirty || activeSlideTitle !== (activeSlide?.title || 'Adjustment')
-    : name !== savedName || designIsDirty
+    : name !== savedName || gameType !== savedGameType || designIsDirty
 
   const canUndoDrawing =
     isDirty && drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
@@ -430,6 +439,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         setSavedTextAnnotations(textAnnotations)
         setSavedZones(zones)
         setSavedTemplateId(templateId)
+        setSavedGameType(gameType)
         setSavedCategory(category)
         setSavedFieldDecoration(fieldDecoration)
         setSavedFieldOrientation(fieldOrientation)
@@ -550,7 +560,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   async function handleDeleteAdjustment(slide) {
     if (readOnly || !canDelete) return
-    if (!window.confirm(`Delete "${slide.title || 'Adjustment'}"? This cannot be undone.`)) return
     setRemovingSlideId(slide.id)
     setError(null)
     try {
@@ -573,6 +582,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       }
     } catch (err) {
       setError(`Unable to delete adjustment: ${err.message}`)
+      throw err
     } finally {
       setRemovingSlideId(null)
     }
@@ -618,6 +628,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   function openSettings() {
     setDraftName(name)
+    setDraftGameType(gameType)
     setDraftTemplateId(templateId)
     setDraftCategory(category)
     setSettingsOpen(true)
@@ -646,6 +657,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     event.preventDefault()
     if (!draftName.trim()) return
     if (!activeSlideId) setName(draftName.trim())
+    setGameType(draftGameType)
     setCategory(draftCategory)
     applyTemplate(draftTemplateId)
     setSettingsOpen(false)
@@ -1344,13 +1356,21 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   return (
     <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
       {breadcrumbSettingsTarget && createPortal(
-        <button type="button" className="breadcrumb-settings" onClick={openSettings} disabled={readOnly || saving} title="Edit Play Settings" aria-label="Edit Play Settings">
+        <button type="button" 
+          className="breadcrumb-settings breadcrumb-settings-icon-only" 
+          onClick={openSettings} disabled={readOnly || saving} 
+          title="Edit Play Settings" 
+          aria-label="Edit Play Settings">
           <Pencil size={18} aria-hidden="true" />
-          <span>Edit</span>
         </button>,
         breadcrumbSettingsTarget,
       )}
       {error && <p className="data-grid-status data-grid-error">{error}</p>}
+      {slideToDelete && <DeleteConfirmationDialog
+        message={`Are you sure you want to delete "${slideToDelete.title || 'Adjustment'}"? This cannot be undone.`}
+        onCancel={() => setSlideToDelete(null)}
+        onConfirm={() => handleDeleteAdjustment(slideToDelete)}
+      />}
       {printOpen && (
         <PrintPreviewDialog
           play={{
@@ -1372,7 +1392,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       {settingsOpen && (
         <div className="dialog-overlay" onClick={() => setSettingsOpen(false)}>
           <form className="dialog-panel" onClick={(event) => event.stopPropagation()} onSubmit={handleSettingsSave}>
-            <h2><Settings size={26} strokeWidth={1.8} aria-hidden="true" />Play Settings</h2>
+            <h2><PlayDiagramIcon size={26} strokeWidth={1.8} aria-hidden="true" />Play Settings</h2>
             <label className="dialog-field">
               <span>Play name</span>
               <input type="text" value={draftName} onChange={(event) => setDraftName(event.target.value)} readOnly={Boolean(activeSlideId)} required />
@@ -1388,12 +1408,25 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </select>
             </label>
             <label className="dialog-field">
+              <span>Game Type</span>
+              <select
+                value={draftGameType}
+                onChange={(event) => {
+                  const nextGameType = event.target.value
+                  setDraftGameType(nextGameType)
+                  setDraftTemplateId(getTemplatesForGameType(nextGameType)[0].id)
+                }}
+              >
+                {Object.keys(PLAY_TEMPLATES).map((option) => <option key={option} value={option}>{gameTypeLabel(option)}</option>)}
+              </select>
+            </label>
+            <label className="dialog-field">
               <span>Template</span>
               <select value={draftTemplateId} onChange={(event) => setDraftTemplateId(event.target.value)}>
-                {gameTypeTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.label}
-                  </option>
+                {Object.entries(PLAY_TEMPLATES[draftGameType] || {}).map(([family, templates]) => (
+                  <optgroup key={family} label={templates[0].formationFamilyLabel}>
+                    {templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}
+                  </optgroup>
                 ))}
               </select>
             </label>
@@ -2333,7 +2366,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                     className="play-designer-tab-action remove"
                     aria-label={`Delete ${title}`}
                     title={`Delete ${title}`}
-                    onClick={() => handleDeleteAdjustment(slide)}
+                    onClick={() => setSlideToDelete(slide)}
                     disabled={readOnly || !canDelete || saving || removingSlideId === slide.id}
                   >
                     <X size={15} aria-hidden="true" />

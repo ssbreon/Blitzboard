@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, GripVertical, LoaderCircle, Plus, Trash2, X } from 'lucide-react'
+import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Other']
@@ -123,6 +124,7 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
+  const [eventToDelete, setEventToDelete] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
@@ -198,7 +200,7 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
   }
 
   async function removeEvent(event) {
-    if (!canDelete || !window.confirm(`Delete “${event.kind === 'game' ? event.opponent || event.name : event.name}”?`)) return
+    if (!canDelete) return
     try {
       if (event.kind === 'game') await api.deleteGamePlan(event.id)
       else await api.deleteScheduleEvent(event.id)
@@ -207,6 +209,7 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
       onWorkspaceUpdated?.()
     } catch (failure) {
       setError(failure.message)
+      throw failure
     }
   }
 
@@ -274,7 +277,12 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
           })}
         </div>}
       </div>
-      {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => removeEvent(dialog.event)} />}
+      {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+      {eventToDelete && <DeleteConfirmationDialog
+        message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}
+        onCancel={() => setEventToDelete(null)}
+        onConfirm={() => removeEvent(eventToDelete)}
+      />}
     </main>
   )
 }

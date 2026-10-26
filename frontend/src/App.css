@@ -1686,6 +1686,37 @@ button:active:not(:disabled):not([role^='menuitem']) {
   }
 }
 
+.dialog-delete {
+  font: inherit;
+  font-size: 15px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid #b42318;
+  background: #b42318;
+  color: #fff;
+  cursor: pointer;
+  min-width: 78px;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.7;
+  }
+}
+
+.delete-confirmation-panel {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.delete-confirmation-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 14px;
+}
+
 .app-bar-brand {
   display: flex;
   align-items: center;
@@ -2545,17 +2576,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
   text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
 }
 
-.playbook-banner {
-  /* background: linear-gradient(90deg, rgba(4, 16, 32, .62), rgba(4, 16, 32, .4)), url('/coach_chalkboard_banner.png') center 50% / cover no-repeat; */
-  background: var(--navy-light);
-}
-
-.playbooks-banner {
-  grid-template-columns: minmax(0, 1fr);
-  /* background: url('/coaches_desk_banner.png') center 50% / cover no-repeat; */
-  background: var(--navy-light);
-}
-
 .game-plan-banner-details {
   display: flex;
   flex-wrap: wrap;
@@ -2619,18 +2639,13 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 @media (max-width: 760px) {
-  .game-plan-banner:not(.playbooks-banner) {
+  .game-plan-banner {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px 16px;
     padding: 16px;
   }
 
-  .playbooks-banner {
-    grid-template-columns: minmax(0, 1fr);
-    padding: 16px;
-  }
-
-  .game-plan-banner:not(.playbooks-banner) .game-plan-banner-details {
+  .game-plan-banner-details {
     grid-column: 1 / -1;
     grid-row: 2;
     align-items: flex-start;
@@ -2640,7 +2655,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
     padding: 4px 10px 4px 0;
   }
 
-  .game-plan-banner:not(.playbooks-banner) .game-plan-banner-edit {
+  .game-plan-banner-edit {
     grid-column: 2;
     grid-row: 1;
   }
@@ -2803,36 +2818,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
   cursor: default;
 }
 
-.breadcrumb-actions {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  flex: 1 0 auto;
-  justify-content: flex-end;
-  gap: 8px;
-  max-width: 100%;
-  margin-left: auto;
-  padding-left: 16px;
-  box-sizing: border-box;
-}
-
-.breadcrumb-actions .play-designer-cancel {
-  margin-left: auto;
-}
-
-.breadcrumb-actions:empty {
-  display: none;
-}
-
-.breadcrumb-actions button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 32px;
-}
-
 .breadcrumb-settings-target .breadcrumb-settings {
   display: flex;
   align-items: center;
@@ -2850,6 +2835,13 @@ button:active:not(:disabled):not([role^='menuitem']) {
   transition: background-color 140ms ease;
 }
 
+.breadcrumb-settings-target .breadcrumb-settings-icon-only {
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+}
+
 @media (max-width: 640px) {
   .breadcrumb-bar {
     padding: 10px 12px;
@@ -2859,24 +2851,10 @@ button:active:not(:disabled):not([role^='menuitem']) {
     max-width: 72vw;
   }
 
-  .breadcrumb-actions {
-    flex-basis: 100%;
-    padding-left: 0;
-  }
-
-  .breadcrumb-actions::before {
-    display: none;
-  }
 }
 
 .breadcrumb-settings-target .breadcrumb-settings:hover:not(:disabled) {
   background: var(--primary-button);
-}
-
-.breadcrumb-actions .breadcrumb-action {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
 }
 
 .data-grid-status-filter {
@@ -3581,6 +3559,17 @@ button:active:not(:disabled):not([role^='menuitem']) {
   display: flex;
   align-items: center;
   gap: 12px;
+
+  select {
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-h);
+    cursor: pointer;
+  }
 
   button {
     font: inherit;

@@ -160,15 +160,15 @@ Any action that permanently deletes or irreversibly modifies data MUST require u
 // ❌ BAD — one mis-click deletes a photo permanently
 <button onClick={() => onDelete(photo.id)}>Delete</button>
 
-// ✅ GOOD — confirmation required
-<button onClick={() => {
-  if (window.confirm('Delete this photo? This cannot be undone.')) {
-    onDelete(photo.id);
-  }
-}}>Delete</button>
+// ✅ GOOD — use the shared in-app delete confirmation dialog
+{deleteTarget && <DeleteConfirmationDialog
+  message={`Are you sure you want to delete "${deleteTarget.name}"? This cannot be undone.`}
+  onCancel={() => setDeleteTarget(null)}
+  onConfirm={() => onDelete(deleteTarget.id)}
+/>}
 ```
 
-For better UX, consider custom confirmation dialog instead of `window.confirm`.
+The dialog must provide **Delete** and **Cancel** buttons. Do not use `window.confirm()` for delete actions.
 
 ---
 
