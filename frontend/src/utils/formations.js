@@ -6,6 +6,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: ['11v11'],
     label: 'Pro Set vs 4-3 Over',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-3-over',
+    defenseFrontLabel: '4-3 Over',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -56,6 +59,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 4-3 Under',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-3-under',
+    defenseFrontLabel: '4-3 Under',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -102,6 +108,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 4-2 Nickel',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-2-nickel',
+    defenseFrontLabel: '4-2 Nickel',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -148,6 +157,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 3-4 Base',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-4-base',
+    defenseFrontLabel: '3-4 Base',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -194,6 +206,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 3-4 Tite',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-4-tite',
+    defenseFrontLabel: '3-4 Tite',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -240,6 +255,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 3-3 Stack',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-3-stack',
+    defenseFrontLabel: '3-3 Stack',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -264,9 +282,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
       { x: 46, y: 63 },  //Fullback
     ],
     defense: [
-      { x: 46.5, y: 40 }, // DE (weak)
+      { x: 45.5, y: 40 }, // DE (left)
       { x: 50, y: 40 },   // NT
-      { x: 54, y: 40 },   // DE (strong)
+      { x: 54, y: 40 },   // DE (right)
 
       { x: 42, y: 44 }, // SS (strong safety)
       { x: 46, y: 49 }, // SLB
@@ -285,6 +303,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs Bear',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: 'bear',
+    defenseFrontLabel: 'Bear',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -330,6 +351,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro Set vs 5-2',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '5-2',
+    defenseFrontLabel: '5-2',
     formationFamily: 'pro_set',
     formationFamilyLabel: 'Pro Set',
     position_labels: {
@@ -375,6 +399,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 4-3 Over',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-3-over',
+    defenseFrontLabel: '4-3 Over',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -425,6 +452,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 4-3 Under',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-3-under',
+    defenseFrontLabel: '4-3 Under',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -473,6 +503,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 4-2 Nickel',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '4-2-nickel',
+    defenseFrontLabel: '4-2 Nickel',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -520,6 +553,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 3-4 Base',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-4-base',
+    defenseFrontLabel: '3-4 Base',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -567,6 +603,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 3-4 Tite',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-4-tite',
+    defenseFrontLabel: '3-4 Tite',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -614,6 +653,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 3-3 Stack',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '3-3-stack',
+    defenseFrontLabel: '3-3 Stack',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -639,9 +681,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
       { x: 50, y: 59 },  //Fullback
     ],
     defense: [
-      { x: 46.5, y: 40 }, // DE (weak)
+      { x: 45.5, y: 40 }, // DE (left)
       { x: 50, y: 40 },   // NT
-      { x: 54, y: 40 },   // DE (strong)
+      { x: 54, y: 40 },   // DE (right)
 
       { x: 42, y: 44 }, // SS (strong safety)
       { x: 46, y: 49 }, // SLB
@@ -660,6 +702,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs Bear',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: 'bear',
+    defenseFrontLabel: 'Bear',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -706,6 +751,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Pro-I Set vs 5-2',
     gameType: '11v11',
+    formationCategory: '21_personnel',
+    defenseFront: '5-2',
+    defenseFrontLabel: '5-2',
     formationFamily: 'pro_i_set',
     formationFamilyLabel: 'Pro-I Set',
     position_labels: {
@@ -746,12 +794,464 @@ const PLAY_TEMPLATE_DEFINITIONS = [
       { x: 65, y: 62 }, // FS (free safety)
     ],
   },  
+  // 1) Ace vs 4-3 Over
+  {
+    id: '11v11-ace-vs-4-3-over',
+    legacyIds: [],
+    label: 'Ace vs 4-3 Over',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '4-3-over',
+    defenseFrontLabel: '4-3 Over',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'T', 'E', 'S', 'M', 'W', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      // Down linemen
+      { x: 44, y: 40 },     // DE over LT
+      { x: 47.5, y: 40 },   // T (3-tech)
+      { x: 50.5, y: 40 },   // T (1-tech)
+      { x: 54.5, y: 40 },   // DE over RT
+
+      // Linebackers
+      { x: 45.5, y: 49 }, // SLB
+      { x: 51, y: 50 },   // MLB
+      { x: 57, y: 49 }, // WLB
+
+      // Cornerbacks
+      { x: 16, y: 50 }, // CB (left)
+      { x: 84, y: 50 }, // CB (right)
+
+      // Safeties
+      { x: 35, y: 66 }, // SS (strong safety)
+      { x: 65, y: 66 }, // FS (free safety)
+    ],
+  },
+  // 2) Ace vs 4-3 Under
+  {
+    id: '11v11-ace-vs-4-3-under',
+    legacyIds: [],
+    label: 'Ace vs 4-3 Under',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '4-3-under',
+    defenseFrontLabel: '4-3 Under',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'T', 'E', 'S', 'M', 'W', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 45.5, y: 40 }, // DE (weak)
+      { x: 49.5, y: 40 }, // T (1-tech)
+      { x: 52.5, y: 40 }, // T (3-tech)
+      { x: 55, y: 40 },  // DE (strong)
+
+      { x: 43, y: 41 }, // SLB
+      { x: 48, y: 49 }, // MLB
+      { x: 53, y: 49 }, // WLB
+
+      { x: 16, y: 50 }, // CB (left)
+      { x: 84, y: 50 }, // CB (right)
+
+      { x: 35, y: 66 }, // SS (strong safety)
+      { x: 65, y: 66 }, // FS (free safety)
+    ],
+  },
+  // 3) Ace vs 4-2 Nickel
+  {
+    id: '11v11-ace-vs-4-2-nickel',
+    legacyIds: [],
+    label: 'Ace vs 4-2 Nickel',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '4-2-nickel',
+    defenseFrontLabel: '4-2 Nickel',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'T', 'E', 'N', 'M', 'W', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 44.5, y: 40 },   // DE (weak)
+      { x: 47.5, y: 40 }, // T (3-tech)
+      { x: 50.5, y: 40 }, // T (1-tech)
+      { x: 54.5, y: 40 }, // DE (strong)
+
+      { x: 43, y: 49 }, // Nickel
+      { x: 50, y: 49 }, // MLB
+      { x: 57, y: 49 }, // WLB
+
+      { x: 16, y: 50 }, // CB (left)
+      { x: 84, y: 50 }, // CB (right)
+
+      { x: 35, y: 66 }, // SS (strong safety)
+      { x: 65, y: 66 }, // FS (free safety)
+    ],
+  },
+  // 4) Ace vs 3-4 Base
+  {
+    id: '11v11-ace-vs-3-4-base',
+    legacyIds: [],
+    label: 'Ace vs 3-4 Base',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '3-4-base',
+    defenseFrontLabel: '3-4 Base',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'E', 'S', 'M', 'W', 'J', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 45.5, y: 40 }, // DE (weak)
+      { x: 50, y: 40 }, // NT
+      { x: 54.5, y: 40 }, // DE (strong)
+
+      { x: 43, y: 41 }, // SLB
+      { x: 48, y: 49 }, // MLB
+      { x: 52, y: 49 }, // WLB
+      { x: 59, y: 43 }, // Jack
+
+      { x: 16, y: 50 }, // CB (left)
+      { x: 84, y: 50 }, // CB (right)
+
+      { x: 35, y: 66 }, // SS (strong safety)
+      { x: 65, y: 66 }, // FS (free safety)
+    ],
+  },
+  // 5) Ace vs 3-4 Tite
+  {
+    id: '11v11-ace-vs-tite',
+    legacyIds: [],
+    label: 'Ace vs 3-4 Tite',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '3-4-tite',
+    defenseFrontLabel: '3-4 Tite',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'E', 'S', 'M', 'W', 'J', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 46.5, y: 40 }, // DE (4i weak)
+      { x: 50, y: 40 }, // NT (0-tech)
+      { x: 53.5, y: 40 }, // DE (4i strong)
+
+      { x: 43, y: 41 }, // SLB
+      { x: 47, y: 49 }, // MLB
+      { x: 53, y: 49 }, // WLB
+      { x: 59, y: 43 }, // Jack
+
+      { x: 16, y: 50 }, // CB (left)
+      { x: 84, y: 50 }, // CB (right)
+
+      { x: 35, y: 66 }, // SS (strong safety)
+      { x: 65, y: 66 }, // FS (free safety)
+    ],
+  },
+  // 6) Ace vs 3-3 Stack
+  {
+    id: '11v11-ace-vs-3-3-stack',
+    legacyIds: [],
+    label: 'Ace vs 3-3 Stack',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '3-3-stack',
+    defenseFrontLabel: '3-3 Stack',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'E', 'SS', 'S', 'M', 'W', 'WS', 'C', 'FS', 'C'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 45.5, y: 40 }, // DE (left)
+      { x: 50, y: 40 },   // NT
+      { x: 54, y: 40 },   // DE (right)
+
+      { x: 42, y: 44 }, // SS (strong safety)
+      { x: 46, y: 49 }, // SLB
+      { x: 50, y: 50 }, // MLB
+      { x: 54, y: 49 }, // WLB
+      { x: 68, y: 49 }, // WS (weak safety)
+
+      { x: 18, y: 54 }, // CB (left)
+      { x: 50, y: 67 }, // FS (free safety)
+      { x: 82, y: 54 }, // CB (right)
+    ],
+  },
+  // 7) Ace vs Bear
+  {
+    id: '11v11-ace-vs-bear',
+    legacyIds: [],
+    label: 'Ace vs Bear',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: 'bear',
+    defenseFrontLabel: 'Bear',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'T', 'T', 'E', 'S', 'M', 'W', 'C', 'FS', 'C'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 42, y: 40 }, // DE (weak)
+      { x: 47.5, y: 40 }, // T (weak 3-tech)
+      { x: 50, y: 40 }, // NT
+      { x: 52.5, y: 40 }, // T (strong 3-tech)
+      { x: 55, y: 40 }, // DE (strong)
+
+      { x: 44.5, y: 40 }, // SLB
+      { x: 50, y: 49 }, // MLB
+      { x: 68, y: 49 }, // WLB
+
+      { x: 18, y: 54 }, // CB (left)
+      { x: 50, y: 67 }, // FS (free safety)
+      { x: 82, y: 54 }, // CB (right)
+    ],
+  },
+  // 8) Ace vs 5-2
+  {
+    id: '11v11-ace-vs-5-2',
+    legacyIds: [],
+    label: 'Ace vs 5-2',
+    gameType: '11v11',
+    formationCategory: '11_personnel',
+    defenseFront: '5-2',
+    defenseFrontLabel: '5-2',
+    formationFamily: 'ace',
+    formationFamilyLabel: 'Ace',
+    position_labels: {
+      offense: ['RT', 'RG', 'C', 'LG', 'LT', 'Y', 'Z', 'X', 'Q', 'H', 'F'],
+      defense: ['E', 'T', 'E', 'S', 'M', 'W', 'J', 'C', 'C', 'SS', 'FS'],
+    },
+    offense: [
+      // Offensive line
+      { x: 46, y: 50 },  //RT
+      { x: 48, y: 50 },  //RG
+      { x: 50, y: 50 },  //C
+      { x: 52, y: 50 },  //LG
+      { x: 54, y: 50 },  //LT
+
+      // Tight end (strong side)
+      { x: 44, y: 50 },  //TE
+
+      // Wide receivers
+      { x: 17, y: 50 },  //Z
+      { x: 83, y: 50 },  //X
+
+      // Quarterback
+      { x: 50, y: 59 },  //Quarterback
+
+      // H-back / slot
+      { x: 69, y: 52 },  //H
+
+      // Tailback
+      { x: 47, y: 61 },  //F
+    ],
+    defense: [
+      { x: 46, y: 40 }, // DE (weak)
+      { x: 50, y: 40 }, // NT
+      { x: 54, y: 40 }, // DE (strong)
+
+      { x: 43, y: 40 }, // SLB (on LOS)
+      { x: 48, y: 49 }, // MLB
+      { x: 52, y: 49 }, // WLB
+      { x: 57, y: 40 }, // Jack (strong edge)
+
+      { x: 18, y: 53 }, // CB (left)
+      { x: 82, y: 53 }, // CB (right)
+      { x: 35, y: 62 }, // SS (strong safety)
+      { x: 65, y: 62 }, // FS (free safety)
+    ],
+  },
   // 1) Air Raid vs 4-3 Over
   {
     id: 'air-raid-vs-4-3-over',
     legacyIds: [],
     label: 'Air Raid vs 4-3 Over',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '4-3-over',
+    defenseFrontLabel: '4-3 Over',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -799,6 +1299,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 4-3 Under',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '4-3-under',
+    defenseFrontLabel: '4-3 Under',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -850,6 +1353,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 4-2 Nickel',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '4-2-nickel',
+    defenseFrontLabel: '4-2 Nickel',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -898,6 +1404,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 3-4 Base',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '3-4-base',
+    defenseFrontLabel: '3-4 Base',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -946,6 +1455,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 3-4 Tite',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '3-4-tite',
+    defenseFrontLabel: '3-4 Tite',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -994,6 +1506,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 3-3 Stack',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '3-3-stack',
+    defenseFrontLabel: '3-3 Stack',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -1039,6 +1554,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs Bear',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: 'bear',
+    defenseFrontLabel: 'Bear',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -1084,6 +1602,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     legacyIds: [],
     label: 'Air Raid vs 5-2',
     gameType: '11v11',
+    formationCategory: '10_personnel',
+    defenseFront: '5-2',
+    defenseFrontLabel: '5-2',
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -1129,6 +1650,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     id: '7v7',
     label: 'Air Raid',
     gameType: '7v7',
+    formationCategory: '11_personnel',
+    defenseFront: null,
+    defenseFrontLabel: null,
     formationFamily: 'air_raid',
     formationFamilyLabel: 'Air Raid',
     position_labels: {
@@ -1158,6 +1682,9 @@ const PLAY_TEMPLATE_DEFINITIONS = [
     id: '4v4',
     label: 'Spread',
     gameType: '4v4_flag',
+    formationCategory: '10_personnel',
+    defenseFront: null,
+    defenseFrontLabel: null,
     formationFamily: 'spread',
     formationFamilyLabel: 'Spread',
     position_labels: {
