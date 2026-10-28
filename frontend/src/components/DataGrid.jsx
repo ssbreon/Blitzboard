@@ -521,7 +521,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
               <button type="button" disabled={currentPage === 0} onClick={() => setPage((p) => p - 1)}>
                 Previous
               </button>
-              <select aria-label="Go to page" value={currentPage} onChange={(event) => setPage(Number(event.target.value))}>
+              <select id="go-to-page" aria-label="Go to page" value={currentPage} onChange={(event) => setPage(Number(event.target.value))}>
                 {Array.from({ length: totalPages }, (_, index) => (
                   <option key={index} value={index}>Page {index + 1} of {totalPages}</option>
                 ))}

@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RectangleHorizontal, RotateCcw, Undo2, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
 import { PlayDiagramIcon } from './PlayDiagramIcon'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
@@ -60,9 +60,24 @@ const TOOL_ICONS = {
 }
 
 const PLAYER_COLORS = ['#ffffff', '#1d4ed8', '#b91c1c', '#15803d', '#ef9a00', '#7c3aed', '#374151']
+const RectanglePlayerIcon = ({ size = 16, ...props }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect width="20" height="19" x="1" y="4" rx="2" />
+  </svg>
+)
 const PLAYER_SHAPES = [
   { id: 'circle', label: 'Circle', Icon: Circle },
-  { id: 'rectangle', label: 'Rectangle', Icon: RectangleHorizontal },
+  { id: 'rectangle', label: 'Rectangle', Icon: RectanglePlayerIcon },
 ]
 const TEXT_FONT_SIZES = [12, 14, 16, 20, 24, 32]
 const TEXT_STYLE_TOGGLES = [
@@ -113,7 +128,7 @@ function adjustmentDesign(slide, fallback) {
   }
 }
 
-export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbSettingsTarget }) {
+export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplate = findPlayTemplate(record.template)
@@ -1355,6 +1370,19 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   return (
     <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
+      {parentSettingsBreadcrumbTarget && onEditParentSettings && createPortal(
+        <button
+          type="button"
+          className="breadcrumb-settings breadcrumb-settings-icon-only"
+          onClick={onEditParentSettings}
+          disabled={readOnly || saving}
+          title={parentSettingsLabel === 'Playbook' ? 'Edit playbook settings' : `Edit ${parentSettingsLabel} Settings`}
+          aria-label={parentSettingsLabel === 'Playbook' ? 'Edit playbook settings' : `Edit ${parentSettingsLabel} Settings`}
+        >
+          <Pencil size={18} aria-hidden="true" />
+        </button>,
+        parentSettingsBreadcrumbTarget,
+      )}
       {breadcrumbSettingsTarget && createPortal(
         <button type="button" 
           className="breadcrumb-settings breadcrumb-settings-icon-only" 

@@ -21,9 +21,9 @@ function gameTypeLabel(gameType) {
   return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
 }
 
-export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES }) {
+export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES }) {
   const [step, setStep] = useState(1)
-  const [name, setName] = useState(DEFAULT_PLAY_NAME)
+  const [name, setName] = useState(initialName)
   const [gameType, setGameType] = useState(DEFAULT_GAME_TYPE)
   const [templateId, setTemplateId] = useState(DEFAULT_PLAY_TEMPLATE.id)
   const [category, setCategory] = useState(categoryOptions[0])
@@ -63,7 +63,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     if (!trimmed) return
     onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone)
     setStep(1)
-    setName(DEFAULT_PLAY_NAME)
+    setName(initialName)
     setGameType(DEFAULT_GAME_TYPE)
     setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
@@ -75,7 +75,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
 
   function handleCancel() {
     setStep(1)
-    setName(DEFAULT_PLAY_NAME)
+    setName(initialName)
     setGameType(DEFAULT_GAME_TYPE)
     setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
