@@ -1209,7 +1209,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function handlePrintCollection(kind, row) {
-    const result = kind === 'playbook' ? await api.listPlays(row.id) : await api.listScoutPlays(row.id)
+    const result = kind === 'playbook' ? await api.listPlaybookRows(row.id) : await api.listScoutPlays(row.id)
     setPrintCollection({ collection: { ...row, kind }, plays: result.items })
   }
 

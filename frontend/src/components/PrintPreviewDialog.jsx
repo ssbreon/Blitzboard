@@ -34,6 +34,27 @@ function chunk(items, size) {
   return pages
 }
 
+function buildPrintPages(items, perPage, includeGroupings) {
+  if (!includeGroupings) return chunk(items.filter((item) => item.rowType !== 'grouping'), perPage).map((plays) => ({ type: 'plays', plays }))
+
+  const pages = []
+  let pendingPlays = []
+  items.forEach((item, index) => {
+    if (item.rowType !== 'grouping') {
+      pendingPlays.push(item)
+      return
+    }
+
+    pages.push(...chunk(pendingPlays, perPage).map((plays) => ({ type: 'plays', plays })))
+    pendingPlays = []
+    const nextGroupingIndex = items.findIndex((next, nextIndex) => nextIndex > index && next.rowType === 'grouping')
+    const playCount = (nextGroupingIndex < 0 ? items.length : nextGroupingIndex) - index - 1
+    pages.push({ type: 'grouping', grouping: item, playCount })
+  })
+  pages.push(...chunk(pendingPlays, perPage).map((plays) => ({ type: 'plays', plays })))
+  return pages
+}
+
 // Two plays stack along the page's short axis so each cell keeps a usable aspect ratio.
 function gridColumns(perPage, orientation) {
   if (perPage === 1) return 1
@@ -48,6 +69,7 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
   const [showTitle, setShowTitle] = useState(true)
   const [titlePage, setTitlePage] = useState(Boolean(collection))
   const [perPage, setPerPage] = useState(collection ? 2 : 1)
+  const [includeGroupings, setIncludeGroupings] = useState(true)
   const [scale, setScale] = useState(1)
   const stageRef = useRef(null)
 
@@ -55,7 +77,7 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
   const sheet = sheetPixels(pageSize, orientation)
   const columns = gridColumns(perPage, orientation)
   const drawingSizeScale = PRINT_MARKER_SIZES[perPage] / DESIGNER_MARKER_SIZE
-  const playPages = chunk(items, perPage)
+  const printPages = buildPrintPages(items, perPage, Boolean(collection?.kind === 'playbook' && includeGroupings))
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -147,6 +169,12 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
                   <span>Print a title page</span>
                 </label>
               )}
+              {collection?.kind === 'playbook' && (
+                <label className="dialog-field dialog-checkbox">
+                  <input type="checkbox" checked={includeGroupings} onChange={(event) => setIncludeGroupings(event.target.checked)} />
+                  <span>Include groupings</span>
+                </label>
+              )}
               <label className="dialog-field dialog-checkbox">
                 <input type="checkbox" checked={showTitle} onChange={(event) => setShowTitle(event.target.checked)} />
                 <span>{items.length > 1 ? 'Include play names' : 'Include play name'}</span>
@@ -174,22 +202,31 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
                       </div>
                     </div>,
                   )}
-                {playPages.map((pagePlays, index) =>
-                  renderPage(
-                    `plays-${index}`,
-                    <div className={`print-grid per-page-${perPage}`} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
-                      {pagePlays.map((item) => (
-                        <div key={item.id || item.name} className="print-cell" style={{ '--print-field-aspect-ratio': fieldAspectRatio }}>
-                          {showTitle && <h1 className="print-sheet-title">{item.name}</h1>}
-                          <PlayFieldView
-                            play={{ ...item, perspective: item.perspective || defaultPlayPerspective(collection?.category) }}
-                            className="print-field"
-                            drawingSizeScale={drawingSizeScale}
-                          />
-                        </div>
-                      ))}
-                    </div>,
-                  ),
+                {printPages.map((page, index) =>
+                  page.type === 'grouping'
+                    ? renderPage(
+                        `grouping-${page.grouping.id}`,
+                        <div className="print-grouping-page">
+                          <span className="print-grouping-label">Play Grouping</span>
+                          <h1>{page.grouping.name}</h1>
+                          <p>{page.playCount} {page.playCount === 1 ? 'play' : 'plays'}</p>
+                        </div>,
+                      )
+                    : renderPage(
+                        `plays-${index}`,
+                        <div className={`print-grid per-page-${perPage}`} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+                          {page.plays.map((item) => (
+                            <div key={item.id || item.name} className="print-cell" style={{ '--print-field-aspect-ratio': fieldAspectRatio }}>
+                              {showTitle && <h1 className="print-sheet-title">{item.name}</h1>}
+                              <PlayFieldView
+                                play={{ ...item, perspective: item.perspective || defaultPlayPerspective(collection?.category) }}
+                                className="print-field"
+                                drawingSizeScale={drawingSizeScale}
+                              />
+                            </div>
+                          ))}
+                        </div>,
+                      ),
                 )}
               </div>
             </div>

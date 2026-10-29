@@ -1009,7 +1009,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
 .play-designer-marker {
   --marker-size: clamp(12px, 1.35cqi, 26px);
-  --marker-font-size: clamp(7px, 0.625cqi, 12px);
+  --marker-font-size: clamp(8.5px, 0.775cqi, 13.5px);
 
   position: absolute;
   z-index: 2;
@@ -1018,7 +1018,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   margin: calc(var(--marker-size) / -2) 0 0 calc(var(--marker-size) / -2);
   padding: 0;
   border-radius: 50%;
-  border: max(1px, calc(var(--marker-size) * 0.075)) solid var(--marker-border-color, #fff);
+  border: max(1px, calc(var(--marker-size) * 0.09)) solid var(--marker-border-color, #fff);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1530,7 +1530,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
   .play-designer-marker {
     --marker-size: clamp(9px, 1.8cqi, 22px);
-    --marker-font-size: clamp(5px, 0.9cqi, 10px);
+    --marker-font-size: clamp(6.5px, 1.05cqi, 11.5px);
   }
 
   .play-designer-yard-number {
@@ -3767,20 +3767,20 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
   .play-designer-marker {
     --marker-size: 17px;
-    --marker-font-size: 6px;
+    --marker-font-size: 7.5px;
 
-    border-width: 1.25px;
+    border-width: 1.5px;
   }
 }
 
 .print-grid.per-page-2 .print-field .play-designer-marker {
   --marker-size: 13px;
-  --marker-font-size: 5px;
+  --marker-font-size: 6.5px;
 }
 
 .print-grid.per-page-4 .print-field .play-designer-marker {
   --marker-size: 10px;
-  --marker-font-size: 4px;
+  --marker-font-size: 5.5px;
 }
 
 .print-grid.per-page-2 .print-field .play-designer-text-annotation {
@@ -3800,6 +3800,41 @@ button:active:not(:disabled):not([role^='menuitem']) {
   gap: 24px;
   padding: 48px;
   text-align: center;
+}
+
+.print-grouping-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 48px;
+  text-align: center;
+
+  h1 {
+    max-width: 100%;
+    margin: 0;
+    font-family: var(--heading);
+    font-size: 48px;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #000;
+    overflow-wrap: anywhere;
+  }
+
+  p {
+    margin: 0;
+    font-size: 20px;
+    color: #374151;
+  }
+}
+
+.print-grouping-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ff6a33;
+  text-transform: uppercase;
 }
 
 .print-title-main {
@@ -5830,6 +5865,10 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 @media print {
+  body:has(> .print-portal) > #root {
+    display: none !important;
+  }
+
   body > *:not(.print-portal):not(#root) {
     display: none !important;
   }
@@ -5880,6 +5919,15 @@ button:active:not(:disabled):not([role^='menuitem']) {
   .print-page {
     width: auto !important;
     height: auto !important;
+    break-after: auto;
+    break-inside: avoid;
+    page-break-after: auto;
+    page-break-inside: avoid;
+  }
+
+  .print-page + .print-page {
+    break-before: page;
+    page-break-before: always;
   }
 
   .print-sheet {

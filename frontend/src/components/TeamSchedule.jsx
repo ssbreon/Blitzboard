@@ -223,7 +223,7 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
       <header className="schedule-toolbar">
         <div className="schedule-subtoolbar-actions">
           <button type="button" className="schedule-primary-button" disabled={!canEdit} onClick={() => setDialog({ date: dateKey(calendarDate) })}><Plus size={18} /> New Event</button>
-          <label className="schedule-jump-picker"><span>Jump to</span><input aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
+          <label className="schedule-jump-picker" htmlFor="jump-to-date"><span>Jump to</span><input id="jump-to-date" aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
         </div>
         <div className="schedule-toolbar-controls">
           <button type="button" className="schedule-secondary-button" onClick={() => setCalendarDate(new Date())}>Today</button>
