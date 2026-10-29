@@ -153,6 +153,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   const filteredRows = rows.filter((row) => (!filterRows || filterRows(row))
     && (!selectedCategories.length || !row.category || selectedCategories.includes(row.category))
     && (!statusFilter || selectedStatus === (row.recordStatus ?? 'Active')))
+  const selectedRowCount = filteredRows.filter((row) => selectedRowIds.has(row.id)).length
   const visibleRows = []
   let followingCollapsedGroup = false
   for (const row of filteredRows) {
@@ -576,11 +577,14 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
             </table>
           </div>
           {(!compact || totalPages > 1) && <div className="data-grid-pager">
-            <span>
-              {filteredRows.length === 0
-                ? '0 rows'
-                : `Rows ${firstVisibleRow}-${lastVisibleRow} of ${filteredRows.length}`}
-            </span>
+            <div className="data-grid-pager-summary">
+              <span>
+                {filteredRows.length === 0
+                  ? '0 rows'
+                  : `Rows ${firstVisibleRow}-${lastVisibleRow} of ${filteredRows.length}`}
+              </span>
+              {selectedRowCount > 1 && <span className="data-grid-selected-count" aria-live="polite">{selectedRowCount} selected</span>}
+            </div>
             <div className="data-grid-pager-controls">
               <button type="button" disabled={showAllPages || currentPage === 0} onClick={() => setPage((p) => p - 1)}>
                 Previous

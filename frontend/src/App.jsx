@@ -1201,10 +1201,12 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       : `Are you sure you want to delete these ${selectedRows.length} items? This cannot be undone.`
     setDeleteConfirmation({
       message,
-      onConfirm: async () => {
-        for (const selectedRow of selectedRows) {
+      onConfirm: async ({ onProgress }) => {
+        onProgress(0, selectedRows.length)
+        for (const [index, selectedRow] of selectedRows.entries()) {
           if (kind === 'playbook') await api.deletePlaybook(selectedRow.id)
           else await api.deleteGamePlan(selectedRow.id)
+          onProgress(index + 1, selectedRows.length)
         }
         if (kind === 'playbook') {
           setPlaybooksReloadToken((t) => t + 1)
@@ -1350,8 +1352,12 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       message: selectedGroupings.length === 1
         ? `Are you sure you want to delete grouping "${selectedGroupings[0].name}"? This cannot be undone.`
         : `Are you sure you want to delete these ${selectedGroupings.length} groupings? This cannot be undone.`,
-      onConfirm: async () => {
-        for (const selectedGrouping of selectedGroupings) await api.deleteGrouping(parentId, selectedGrouping.id)
+      onConfirm: async ({ onProgress }) => {
+        onProgress(0, selectedGroupings.length)
+        for (const [index, selectedGrouping] of selectedGroupings.entries()) {
+          await api.deleteGrouping(parentId, selectedGrouping.id)
+          onProgress(index + 1, selectedGroupings.length)
+        }
         setPlaysReloadToken((token) => token + 1)
       },
     })
@@ -1433,11 +1439,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       message: selectedRows.length === 1
         ? `Are you sure you want to delete "${selectedRows[0].name}"? This cannot be undone.`
         : `Are you sure you want to delete these ${selectedRows.length} items? This cannot be undone.`,
-      onConfirm: async () => {
-        for (const selectedRow of selectedRows) {
+      onConfirm: async ({ onProgress }) => {
+        onProgress(0, selectedRows.length)
+        for (const [index, selectedRow] of selectedRows.entries()) {
           if (selectedRow.rowType === 'grouping') await api.deleteGrouping(parentId, selectedRow.id)
           else if (kind === 'play') await api.deletePlay(parentId, selectedRow.id)
           else await api.deleteScoutPlay(parentId, selectedRow.id)
+          onProgress(index + 1, selectedRows.length)
         }
         if (kind === 'play') setPlaysReloadToken((t) => t + 1)
         else setScoutPlaysReloadToken((t) => t + 1)

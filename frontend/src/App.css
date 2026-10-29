@@ -1687,6 +1687,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
 }
 
 .dialog-delete {
+  position: relative;
+  overflow: hidden;
   font: inherit;
   font-size: 15px;
   padding: 8px 16px;
@@ -1695,7 +1697,20 @@ button:active:not(:disabled):not([role^='menuitem']) {
   background: #b42318;
   color: #fff;
   cursor: pointer;
-  min-width: 78px;
+  min-width: 160px;
+
+  .dialog-delete-progress {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: #5c2400;
+    transition: width 180ms ease;
+    pointer-events: none;
+  }
+
+  .dialog-delete-label {
+    position: relative;
+    z-index: 1;
+  }
 
   &:hover {
     opacity: 0.9;
@@ -3548,6 +3563,18 @@ button:active:not(:disabled):not([role^='menuitem']) {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.data-grid-pager-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.data-grid-selected-count {
+  color: var(--primary-button);
+  font-weight: 600;
 }
 
 .data-grid-pager-controls {
