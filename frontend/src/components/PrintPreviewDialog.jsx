@@ -21,6 +21,10 @@ const ORIENTATIONS = [
 const PLAYS_PER_PAGE = [1, 2, 4]
 const DESIGNER_MARKER_SIZE = 28
 const PRINT_MARKER_SIZES = { 1: 17, 2: 13, 4: 10 }
+const PRINT_SHEET_GAP = 10
+const PRINT_GRID_GAP = 12
+const PRINT_FOOTER_HEIGHT = 18
+const PRINT_CELL_VERTICAL_INSETS = 18
 
 function sheetPixels(pageSize, orientation) {
   const width = (pageSize.width - PAGE_MARGIN_IN * 2) * DPI
@@ -62,8 +66,19 @@ function gridColumns(perPage, orientation) {
   return 2
 }
 
-export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspectRatio = 2.25 }) {
+function printFieldHeight(sheet, orientation, perPage, showTitle) {
+  if (orientation === 'landscape') return sheet.height * (perPage === 1 ? 2 / 3 : 1 / 2)
+
+  const footerSpace = PRINT_FOOTER_HEIGHT + PRINT_SHEET_GAP
+  const titleSpace = showTitle ? (perPage === 1 ? 32 : 24) : 0
+  if (perPage === 1) return sheet.height / 2 - footerSpace - titleSpace
+
+  return (sheet.height - footerSpace - PRINT_GRID_GAP - perPage * (titleSpace + PRINT_CELL_VERTICAL_INSETS)) / perPage
+}
+
+export function PrintPreviewDialog({ play, plays, collection, parentCollectionName, onClose, fieldAspectRatio = 2.25 }) {
   const items = play ? [play] : plays || []
+  const [printedDate] = useState(() => new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date()))
   const [pageSizeId, setPageSizeId] = useState(PAGE_SIZES[0].id)
   const [orientation, setOrientation] = useState('landscape')
   const [showTitle, setShowTitle] = useState(true)
@@ -77,6 +92,7 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
   const sheet = sheetPixels(pageSize, orientation)
   const columns = gridColumns(perPage, orientation)
   const drawingSizeScale = PRINT_MARKER_SIZES[perPage] / DESIGNER_MARKER_SIZE
+  const fieldHeight = printFieldHeight(sheet, orientation, perPage, showTitle)
   const printPages = buildPrintPages(items, perPage, Boolean(collection?.kind === 'playbook' && includeGroupings))
 
   useEffect(() => {
@@ -105,6 +121,10 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
       <div key={key} className="print-page" style={{ width: sheet.width * scale, height: sheet.height * scale }}>
         <div className="print-sheet" style={{ width: sheet.width, height: sheet.height, '--print-scale': scale }}>
           {children}
+          <div className="print-page-footer">
+            <span>{collection?.name || parentCollectionName}</span>
+            <span>{printedDate}</span>
+          </div>
         </div>
       </div>
     )
@@ -216,7 +236,7 @@ export function PrintPreviewDialog({ play, plays, collection, onClose, fieldAspe
                         `plays-${index}`,
                         <div className={`print-grid per-page-${perPage}`} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
                           {page.plays.map((item) => (
-                            <div key={item.id || item.name} className="print-cell" style={{ '--print-field-aspect-ratio': fieldAspectRatio }}>
+                            <div key={item.id || item.name} className="print-cell" style={{ '--print-field-aspect-ratio': fieldAspectRatio, '--print-field-height': `${fieldHeight}px` }}>
                               {showTitle && <h1 className="print-sheet-title">{item.name}</h1>}
                               <PlayFieldView
                                 play={{ ...item, perspective: item.perspective || defaultPlayPerspective(collection?.category) }}

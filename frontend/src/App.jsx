@@ -1279,6 +1279,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone) {
     const { target, parentId, unit, groupingId } = newDialog
     setNewDialog(null)
+    const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent?.id === parentId ? parent : null
     const collectionCategory = newDialog.category || parent?.category
     const perspective = defaultPlayPerspective(target === 'scoutPlay' || newDialog.practiceScript ? 'Offense' : collectionCategory)
     const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
@@ -1331,6 +1332,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       template: record.template,
       category: record.category,
       parentCategory: designerParentCategory,
+      parentCollectionName: collection?.name,
       fieldDecoration: record.fieldDecoration,
       fieldOrientation: record.fieldOrientation,
       fieldZone: record.fieldZone,
@@ -1392,6 +1394,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       template: row.template,
       category: row.category,
       parentCategory: collection?.kind === 'gamePlan' ? row.unit || collection.category : collection?.category,
+      parentCollectionName: collection?.name,
       fieldDecoration: row.fieldDecoration,
       fieldOrientation: row.fieldOrientation,
       fieldZone: row.fieldZone,
@@ -1513,7 +1516,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: async (r) => {
         const play = await loadPlayDetails(kind, parentId, r)
-        if (play) setPrintPlay({ ...play, perspective: play.perspective || defaultPlayPerspective(collection?.category) })
+        if (play) setPrintPlay({
+          play: { ...play, perspective: play.perspective || defaultPlayPerspective(collection?.category) },
+          collectionName: collection?.name,
+        })
       } },
       ...(writable ? [recordStatusAction(kind, row, parentId)] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (r) => handleDeletePlay(kind, parentId, r) }] : []),
@@ -1636,7 +1642,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onCreate={handleCreateCollection}
         />
       )}
-      {printPlay && <PrintPreviewDialog play={printPlay} onClose={() => setPrintPlay(null)} />}
+      {printPlay && <PrintPreviewDialog play={printPlay.play} parentCollectionName={printPlay.collectionName} onClose={() => setPrintPlay(null)} />}
       {printCollection && (
         <PrintPreviewDialog
           plays={printCollection.plays}

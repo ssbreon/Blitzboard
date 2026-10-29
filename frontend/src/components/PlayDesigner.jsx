@@ -1418,6 +1418,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             fieldZone,
             perspective,
           }}
+          parentCollectionName={record.parentCollectionName}
           fieldAspectRatio={printFieldAspectRatio}
           onClose={() => setPrintOpen(false)}
         />

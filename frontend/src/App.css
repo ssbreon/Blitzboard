@@ -3773,6 +3773,17 @@ button:active:not(:disabled):not([role^='menuitem']) {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
 
+.print-page-footer {
+  display: flex;
+  flex: none;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 18px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
 .print-grid {
   display: grid;
   flex: 1;
@@ -3794,6 +3805,12 @@ button:active:not(:disabled):not([role^='menuitem']) {
 .print-grid.per-page-1 .print-cell {
   border: none;
   padding: 0;
+}
+
+.print-grid.per-page-2 .print-cell,
+.print-grid.per-page-4 .print-cell {
+  border: none;
+  border-radius: 0;
 }
 
 .print-sheet-title {
@@ -3819,6 +3836,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
   aspect-ratio: var(--print-field-aspect-ratio, 2.25);
   min-height: 0;
   margin-block: 0;
+  border-left: 2px solid var(--navy);
+  border-right: 2px solid var(--navy);
 
   .play-designer-marker {
     --marker-size: 17px;
@@ -3826,6 +3845,11 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
     border-width: 1.5px;
   }
+}
+
+.print-grid:not(.per-page-4) .print-field {
+  height: var(--print-field-height);
+  aspect-ratio: auto;
 }
 
 .print-grid.per-page-2 .print-field .play-designer-marker {
