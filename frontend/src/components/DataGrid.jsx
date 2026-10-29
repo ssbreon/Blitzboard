@@ -13,6 +13,9 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   const isLoading = items === undefined && loading
   const [error, setError] = useState(null)
   const [page, setPage] = useState(0)
+  const [showAllPages, setShowAllPages] = useState(false)
+  const [selectedRowIds, setSelectedRowIds] = useState(() => new Set())
+  const [selectionAnchorId, setSelectionAnchorId] = useState(null)
   const [selectedCategories, setSelectedCategories] = useState([])
   const [selectedStatus, setSelectedStatus] = useState('Active')
   const [collapsedGroupingIds, setCollapsedGroupingIds] = useState(() => new Set())
@@ -107,7 +110,35 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
 
   function toggleCategory(option) {
     setSelectedCategories((current) => current.includes(option) ? current.filter((c) => c !== option) : [...current, option])
+    setSelectedRowIds(new Set())
+    setSelectionAnchorId(null)
     setPage(0)
+  }
+
+  function selectRow(event, row) {
+    if (event.target.closest?.('button, a, input, select, textarea, [role="button"], [data-grid-no-select]')) return
+    const rowIndex = pageRows.findIndex((item) => item.id === row.id)
+    const modified = event.ctrlKey || event.metaKey
+    if (event.shiftKey) {
+      const anchorIndex = pageRows.findIndex((item) => item.id === selectionAnchorId)
+      const start = anchorIndex < 0 ? rowIndex : Math.min(anchorIndex, rowIndex)
+      const end = anchorIndex < 0 ? rowIndex : Math.max(anchorIndex, rowIndex)
+      const next = new Set(modified ? selectedRowIds : [])
+      pageRows.slice(start, end + 1).forEach((item) => next.add(item.id))
+      setSelectedRowIds(next)
+      if (anchorIndex < 0) setSelectionAnchorId(row.id)
+    } else if (modified) {
+      setSelectedRowIds((current) => {
+        const next = new Set(current)
+        if (next.has(row.id)) next.delete(row.id)
+        else next.add(row.id)
+        return next
+      })
+      setSelectionAnchorId(row.id)
+    } else {
+      setSelectedRowIds(new Set([row.id]))
+      setSelectionAnchorId(row.id)
+    }
   }
 
   function toggleGrouping(groupingId) {
@@ -134,7 +165,9 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   }
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages - 1)
-  const pageRows = visibleRows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
+  const pageRows = showAllPages ? visibleRows : visibleRows.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
+  const firstVisibleRow = showAllPages ? (visibleRows.length ? 1 : 0) : currentPage * PAGE_SIZE + 1
+  const lastVisibleRow = showAllPages ? visibleRows.length : Math.min(visibleRows.length, (currentPage + 1) * PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
   const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
   const leadingColumns = (showPage ? 1 : 0) + (RowIcon ? 1 : 0)
@@ -176,6 +209,26 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   }
 
   function rowMenuItems(row) {
+    const selectedRows = rows.filter((item) => selectedRowIds.has(item.id))
+    if (selectedRowIds.has(row.id) && selectedRows.length > 1) {
+      const deleteActions = selectedRows.map((item) => {
+        const actions = rowActions ? rowActions(item) : []
+        return actions.find((action) => action.label === 'Delete')
+      })
+      const deleteKey = deleteActions[0]?.key
+      if (deleteActions.every((action) => action && action.key === deleteKey)) {
+        return [{
+          key: 'delete-selected',
+          label: 'Delete',
+          icon: deleteActions[0].icon,
+          destructive: true,
+          disabled: deleteActions.some((action) => action.disabled),
+          bulk: true,
+          onClick: () => deleteActions[0].onClick(selectedRows),
+        }]
+      }
+      return []
+    }
     const actions = rowActions ? rowActions(row) : []
     if (!onReorder) return actions
     const index = rows.findIndex((item) => item.id === row.id)
@@ -241,6 +294,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
               value={searchName}
               onChange={(event) => {
                 setSearchName(event.target.value)
+                setSelectedRowIds(new Set())
+                setSelectionAnchorId(null)
                 setPage(0)
               }}
               placeholder="Search name"
@@ -299,6 +354,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                         aria-checked={selectedStatus === status}
                         onClick={() => {
                           setSelectedStatus(status)
+                          setSelectedRowIds(new Set())
+                          setSelectionAnchorId(null)
                           setPage(0)
                           setMenuOpen(false)
                         }}
@@ -356,6 +413,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                 {pageRows.map((row) => (
                   <tr
                     key={row.id}
+                    aria-selected={selectedRowIds.has(row.id)}
                     aria-expanded={row.rowType === 'grouping' ? !collapsedGroupingIds.has(row.id) : undefined}
                     tabIndex={row.rowType === 'grouping' ? 0 : undefined}
                     onDoubleClick={row.rowType === 'grouping' ? () => toggleGrouping(row.id) : onRowDoubleClick ? () => {
@@ -368,6 +426,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                         toggleGrouping(row.id)
                       }
                     } : undefined}
+                    onClick={(event) => selectRow(event, row)}
                     onContextMenu={rowActions ? (event) => {
                       const trigger = event.currentTarget.querySelector('.row-actions-button')
                       if (openRowMenu(row, trigger, { x: event.clientX, y: event.clientY })) event.preventDefault()
@@ -375,6 +434,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                     style={row.rowType === 'grouping' || onRowDoubleClick ? { cursor: 'pointer' } : undefined}
                     className={[
                       row.rowType === 'grouping' && 'is-grouping-row',
+                      selectedRowIds.has(row.id) && 'is-selected',
                       dragId === row.id && 'is-dragging',
                       dropTarget?.id === row.id && (dropTarget.after ? 'drop-after' : 'drop-before'),
                     ].filter(Boolean).join(' ') || undefined}
@@ -493,6 +553,10 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                                       closeRowMenu()
                                       rowMenuTriggerRef.current?.focus()
                                       item.onClick(row)
+                                      if (item.bulk) {
+                                        setSelectedRowIds(new Set())
+                                        setSelectionAnchorId(null)
+                                      }
                                       if (item.key === 'open') dismissOpenHint()
                                     }}
                                   >
@@ -515,18 +579,32 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
             <span>
               {filteredRows.length === 0
                 ? '0 rows'
-                : `Rows ${currentPage * PAGE_SIZE + 1}-${Math.min(filteredRows.length, (currentPage + 1) * PAGE_SIZE)} of ${filteredRows.length}`}
+                : `Rows ${firstVisibleRow}-${lastVisibleRow} of ${filteredRows.length}`}
             </span>
             <div className="data-grid-pager-controls">
-              <button type="button" disabled={currentPage === 0} onClick={() => setPage((p) => p - 1)}>
+              <button type="button" disabled={showAllPages || currentPage === 0} onClick={() => setPage((p) => p - 1)}>
                 Previous
               </button>
-              <select id="go-to-page" aria-label="Go to page" value={currentPage} onChange={(event) => setPage(Number(event.target.value))}>
+              <select
+                id="go-to-page"
+                aria-label="Go to page"
+                value={showAllPages ? 'all' : currentPage}
+                onChange={(event) => {
+                  if (event.target.value === 'all') {
+                    setPage(0)
+                    setShowAllPages(true)
+                  } else {
+                    setShowAllPages(false)
+                    setPage(Number(event.target.value))
+                  }
+                }}
+              >
                 {Array.from({ length: totalPages }, (_, index) => (
                   <option key={index} value={index}>Page {index + 1} of {totalPages}</option>
                 ))}
+                <option value="all">(Show All Pages)</option>
               </select>
-              <button type="button" disabled={currentPage >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
+              <button type="button" disabled={showAllPages || currentPage >= totalPages - 1} onClick={() => setPage((p) => p + 1)}>
                 Next
               </button>
             </div>

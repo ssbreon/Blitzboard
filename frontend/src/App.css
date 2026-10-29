@@ -3315,6 +3315,16 @@ button:active:not(:disabled):not([role^='menuitem']) {
     background: #eaf4fd;
   }
 
+  tbody tr.is-selected,
+  tbody tr.is-selected:hover,
+  tbody tr.is-selected td {
+    background: #dceeff;
+  }
+
+  tbody tr.is-selected td:first-child {
+    box-shadow: inset 3px 0 #2563eb;
+  }
+
   tbody tr.is-grouping-row,
   tbody tr.is-grouping-row:hover {
     background: aliceblue;
@@ -3323,6 +3333,10 @@ button:active:not(:disabled):not([role^='menuitem']) {
   tbody tr.is-grouping-row td {
     background: aliceblue;
     color: #1f2937;
+  }
+
+  tbody tr.is-grouping-row.is-selected td {
+    background: #dceeff;
   }
 
   tbody tr.is-grouping-row td.data-grid-page-cell {
@@ -3360,6 +3374,20 @@ button:active:not(:disabled):not([role^='menuitem']) {
     tbody tr.is-grouping-row td {
       background: aliceblue;
       color: #f9fafb;
+    }
+
+    tbody tr.is-grouping-row.is-selected td {
+      background: #29445a;
+    }
+
+    tbody tr.is-selected,
+    tbody tr.is-selected:hover,
+    tbody tr.is-selected td {
+      background: #29445a;
+    }
+
+    tbody tr.is-selected td:first-child {
+      box-shadow: inset 3px 0 #60a5fa;
     }
 
     .data-grid-grouping-cell {

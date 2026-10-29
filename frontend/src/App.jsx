@@ -690,6 +690,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   }
 
   async function handleGameCardItemAction(action, card, item) {
+    const selectedItems = Array.isArray(item) ? item : [item]
     if (action === 'open') {
       onOpenGameCardItem(card, item)
       return
@@ -700,11 +701,11 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
         await onDuplicateGameCardItem(item)
         setGameCardToast(`Duplicated ${item.name}`)
       } else {
-        await onDeleteGameCardItem(item)
-        setGameCardToast(`Deleted ${item.name}`)
+        for (const selectedItem of selectedItems) await onDeleteGameCardItem(selectedItem)
+        setGameCardToast(selectedItems.length === 1 ? `Deleted ${selectedItems[0].name}` : `Deleted ${selectedItems.length} items`)
       }
     } catch (failure) {
-      setGameCardToast(`Unable to ${action} ${item.name}: ${failure.message}`)
+      setGameCardToast(`Unable to ${action} ${selectedItems.length === 1 ? selectedItems[0].name : `${selectedItems.length} items`}: ${failure.message}`)
     } finally {
       setGameCardActionBusy(false)
       window.setTimeout(() => setGameCardToast(''), 4000)
@@ -1194,14 +1195,20 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   function handleDeleteCollection(kind, row) {
+    const selectedRows = Array.isArray(row) ? row : [row]
+    const message = selectedRows.length === 1
+      ? `Are you sure you want to delete "${selectedRows[0].name}"? This cannot be undone.`
+      : `Are you sure you want to delete these ${selectedRows.length} items? This cannot be undone.`
     setDeleteConfirmation({
-      message: `Are you sure you want to delete "${row.name}"? This cannot be undone.`,
+      message,
       onConfirm: async () => {
+        for (const selectedRow of selectedRows) {
+          if (kind === 'playbook') await api.deletePlaybook(selectedRow.id)
+          else await api.deleteGamePlan(selectedRow.id)
+        }
         if (kind === 'playbook') {
-          await api.deletePlaybook(row.id)
           setPlaybooksReloadToken((t) => t + 1)
         } else {
-          await api.deleteGamePlan(row.id)
           setGamePlansReloadToken((t) => t + 1)
         }
       },
@@ -1338,10 +1345,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   function handleDeleteGrouping(parentId, grouping) {
+    const selectedGroupings = Array.isArray(grouping) ? grouping : [grouping]
     setDeleteConfirmation({
-      message: `Are you sure you want to delete grouping "${grouping.name}"? This cannot be undone.`,
+      message: selectedGroupings.length === 1
+        ? `Are you sure you want to delete grouping "${selectedGroupings[0].name}"? This cannot be undone.`
+        : `Are you sure you want to delete these ${selectedGroupings.length} groupings? This cannot be undone.`,
       onConfirm: async () => {
-        await api.deleteGrouping(parentId, grouping.id)
+        for (const selectedGrouping of selectedGroupings) await api.deleteGrouping(parentId, selectedGrouping.id)
         setPlaysReloadToken((token) => token + 1)
       },
     })
@@ -1418,16 +1428,19 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   function handleDeletePlay(kind, parentId, row) {
+    const selectedRows = Array.isArray(row) ? row : [row]
     setDeleteConfirmation({
-      message: `Are you sure you want to delete "${row.name}"? This cannot be undone.`,
+      message: selectedRows.length === 1
+        ? `Are you sure you want to delete "${selectedRows[0].name}"? This cannot be undone.`
+        : `Are you sure you want to delete these ${selectedRows.length} items? This cannot be undone.`,
       onConfirm: async () => {
-        if (kind === 'play') {
-          await api.deletePlay(parentId, row.id)
-          setPlaysReloadToken((t) => t + 1)
-        } else {
-          await api.deleteScoutPlay(parentId, row.id)
-          setScoutPlaysReloadToken((t) => t + 1)
+        for (const selectedRow of selectedRows) {
+          if (selectedRow.rowType === 'grouping') await api.deleteGrouping(parentId, selectedRow.id)
+          else if (kind === 'play') await api.deletePlay(parentId, selectedRow.id)
+          else await api.deleteScoutPlay(parentId, selectedRow.id)
         }
+        if (kind === 'play') setPlaysReloadToken((t) => t + 1)
+        else setScoutPlaysReloadToken((t) => t + 1)
       },
     })
   }
@@ -1486,7 +1499,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     return (row) => row.rowType === 'grouping' ? [
       ...(writable ? [{ key: 'add-play', label: 'Add Play', icon: Plus, onClick: (item) => setNewDialog({ target: 'play', parentId, groupingId: item.id }) }] : []),
       ...(writable ? [{ key: 'edit-group-name', label: 'Edit Group Name', icon: Pencil, onClick: (item) => setGroupingDialog({ parentId, grouping: item }) }] : []),
-      ...(workspace.capabilities.delete ? [{ key: 'delete-grouping', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeleteGrouping(parentId, item) }] : []),
+      ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeletePlay(kind, parentId, item) }] : []),
     ] : [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r, collection) },
       ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
