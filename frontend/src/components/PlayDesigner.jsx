@@ -128,7 +128,7 @@ function adjustmentDesign(slide, fallback) {
   }
 }
 
-export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
+export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, onNameApplied, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
   const drawingMaskId = useId()
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplate = findPlayTemplate(record.template)
@@ -532,6 +532,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     } else {
       restoreDesign(savedBaseDesign)
       setName(savedName)
+      onNameApplied?.(savedName, false)
     }
     setError(null)
   }
@@ -671,7 +672,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   function handleSettingsSave(event) {
     event.preventDefault()
     if (!draftName.trim()) return
-    if (!activeSlideId) setName(draftName.trim())
+    if (!activeSlideId) {
+      const appliedName = draftName.trim()
+      setName(appliedName)
+      onNameApplied?.(appliedName, appliedName !== savedName)
+    }
     setGameType(draftGameType)
     setCategory(draftCategory)
     applyTemplate(draftTemplateId)

@@ -1603,7 +1603,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />
           </li>}
           {designer && <li>
-            <span aria-current="page"><BreadcrumbLabel icon={designer.kind === 'scoutPlay' ? ScanSearch : PlayDiagramIcon}>{designer.name}</BreadcrumbLabel></span>
+            <span aria-current="page"><BreadcrumbLabel icon={designer.kind === 'scoutPlay' ? ScanSearch : PlayDiagramIcon}>{designer.name}{designer.nameDirty ? '*' : ''}</BreadcrumbLabel></span>
             <div className="breadcrumb-settings-target" ref={setDesignerBreadcrumbSettingsTarget} />
           </li>}
         </ol>
@@ -1660,7 +1660,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             setDesigner(null)
           }, 'Edit parent settings')}
           onGuardChange={onGuardChange}
-          onNameSaved={(name) => setDesigner((current) => current ? { ...current, name } : current)}
+          onNameSaved={(name) => setDesigner((current) => current ? { ...current, name, nameDirty: false } : current)}
+          onNameApplied={(name, dirty) => setDesigner((current) => current ? { ...current, name, nameDirty: dirty } : current)}
         />
       ) : cardPlaybook ? (
         <PlaysDrillthroughView
