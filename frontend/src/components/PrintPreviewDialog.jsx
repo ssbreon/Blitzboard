@@ -52,8 +52,9 @@ function buildPrintPages(items, perPage, includeGroupings) {
     pages.push(...chunk(pendingPlays, perPage).map((plays) => ({ type: 'plays', plays })))
     pendingPlays = []
     const nextGroupingIndex = items.findIndex((next, nextIndex) => nextIndex > index && next.rowType === 'grouping')
-    const playCount = (nextGroupingIndex < 0 ? items.length : nextGroupingIndex) - index - 1
-    pages.push({ type: 'grouping', grouping: item, playCount })
+    const groupingPlays = items.slice(index + 1, nextGroupingIndex < 0 ? items.length : nextGroupingIndex)
+      .filter((play) => play.rowType !== 'grouping')
+    pages.push({ type: 'grouping', grouping: item, plays: groupingPlays, playCount: groupingPlays.length })
   })
   pages.push(...chunk(pendingPlays, perPage).map((plays) => ({ type: 'plays', plays })))
   return pages
@@ -230,6 +231,9 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
                           <span className="print-grouping-label">Play Grouping</span>
                           <h1>{page.grouping.name}</h1>
                           <p>{page.playCount} {page.playCount === 1 ? 'play' : 'plays'}</p>
+                          {page.plays.length > 0 && <ul className="print-grouping-plays">
+                            {page.plays.map((item) => <li key={item.id || item.name}>{item.name}</li>)}
+                          </ul>}
                         </div>,
                       )
                     : renderPage(

@@ -3909,6 +3909,24 @@ button:active:not(:disabled):not([role^='menuitem']) {
   }
 }
 
+.print-grouping-plays {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 24px;
+  width: min(100%, 720px);
+  margin: 0;
+  padding: 0 0 0 1.25em;
+  list-style: disc;
+  text-align: left;
+
+  li {
+    min-width: 0;
+    font-size: 16px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+}
+
 .print-grouping-label {
   font-size: 14px;
   font-weight: 700;

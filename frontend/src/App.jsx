@@ -1222,6 +1222,19 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     setPrintCollection({ collection: { ...row, kind }, plays: result.items })
   }
 
+  async function handlePrintGrouping(parentId, grouping, collection) {
+    try {
+      const { items } = await api.listPlaybookRows(parentId)
+      const groupingIndex = items.findIndex((item) => item.rowType === 'grouping' && item.id === grouping.id)
+      if (groupingIndex < 0) throw new Error('Grouping was not found.')
+      const nextGroupingIndex = items.findIndex((item, index) => index > groupingIndex && item.rowType === 'grouping')
+      const endIndex = nextGroupingIndex < 0 ? items.length : nextGroupingIndex
+      setPrintCollection({ collection: { ...collection, kind: 'playbook' }, plays: items.slice(groupingIndex, endIndex) })
+    } catch (error) {
+      setStatusError(`Unable to load grouping: ${error.message}`)
+    }
+  }
+
   async function handleRecordStatus(kind, row, parentId) {
     const restoring = row.recordStatus === 'Archived'
     if (!restoring && !window.confirm(`Archive "${row.name}"? It will be hidden from the default Active grid view. Its data will remain intact in the database and can be restored later.`)) return
@@ -1509,6 +1522,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent
     return (row) => row.rowType === 'grouping' ? [
       ...(writable ? [{ key: 'add-play', label: 'Add Play', icon: Plus, onClick: (item) => setNewDialog({ target: 'play', parentId, groupingId: item.id }) }] : []),
+      ...(kind === 'play' ? [{ key: 'print-grouping', label: 'Print Grouping', icon: Printer, onClick: (item) => handlePrintGrouping(parentId, item, collection) }] : []),
       ...(writable ? [{ key: 'edit-group-name', label: 'Edit Group Name', icon: Pencil, onClick: (item) => setGroupingDialog({ parentId, grouping: item }) }] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeletePlay(kind, parentId, item) }] : []),
     ] : [
