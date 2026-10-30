@@ -68,7 +68,7 @@ Each checked row below produces a VS Code debug configuration in `.vscode/launch
 | Dependent Service | Emulator | Purpose |
 |-------------------|----------|---------|
 | Azure Storage | Azurite Container | Provides local Blob, Queue, and Table Storage endpoints for `AzureWebJobsStorage` and future storage adapters. Existing Azurite data files were detected in the workspace. |
-| Azure Cosmos DB | Cosmos DB Emulator | Provides the local Cosmos DB NoSQL endpoint configured by `COSMOS_ENDPOINT`, including the `coaches-playboard` database and `playboard` container. |
+| Azure Cosmos DB | Cosmos DB Emulator | Provides the local Cosmos DB NoSQL endpoint configured by `COSMOS_ENDPOINT`, including the `blitzboard-studio` database and `playboard` container. |
 
 ---
 

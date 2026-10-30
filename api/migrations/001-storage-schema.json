@@ -1,8 +1,8 @@
 {
   "version": 1,
   "provider": "azure-cosmos-nosql",
-  "description": "Versioned Cosmos DB schema for the Playbook Forge API. No records are inserted.",
-  "database": "coaches-playboard",
+  "description": "Versioned Cosmos DB schema for the Blitzboard Studio API. No records are inserted.",
+  "database": "blitzboard-studio",
   "container": {
     "id": "playboard",
     "partitionKeyPath": "/partitionKey",

@@ -18,7 +18,7 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 COSMOS_ENDPOINT = os.getenv("COSMOS_ENDPOINT") or os.getenv("COSMOSDB_ENDPOINT")
 COSMOS_KEY = os.getenv("COSMOS_KEY") or os.getenv("COSMOSDB_KEY")
-COSMOS_DATABASE = os.getenv("COSMOS_DATABASE", "coaches-playboard")
+COSMOS_DATABASE = os.getenv("COSMOS_DATABASE", "blitzboard-studio")
 COSMOS_CONTAINER = os.getenv("COSMOS_CONTAINER", "playboard")
 AUTH_MODE = os.getenv("AUTH_MODE", "").lower()
 DEV_AUTH_SECRET = os.getenv("DEV_AUTH_SECRET", "")
