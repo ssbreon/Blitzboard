@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, GripVertical, LoaderCircle, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Trash2, Trophy, Users, X } from 'lucide-react'
+import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { DataGrid } from './DataGrid'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Other']
+const EVENT_TYPE_ICONS = {
+  Game: Trophy,
+  Practice: Dumbbell,
+  'Film Review': ClipboardList,
+  'Team Meeting': Users,
+  Other: CalendarDays,
+}
 const pad = (value) => String(value).padStart(2, '0')
 const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 const parseDate = (value) => {
@@ -33,6 +42,14 @@ const calendarTime = (event) => {
     hour12: true,
   })
 }
+const scheduleGridColumns = [
+  { key: 'eventDate', header: 'Date', render: (value) => value ? parseDate(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
+  { key: 'startTime', header: 'Time', render: (value) => value ? calendarTime({ startTime: value }) : '—' },
+  { key: 'name', header: 'Event', render: (value, event) => event.kind === 'game' ? gameEventLabel(event) : value },
+  { key: 'eventType', header: 'Type', render: renderCategoryBadge },
+  { key: 'location', header: 'Location', render: (value) => value || '—' },
+  { key: 'gameSite', header: 'Site', render: (value) => value || '—' },
+]
 
 function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame, canDelete, onCancel, onSave, onDelete }) {
   const defaultEventDate = initialEvent?.eventDate || initialEvent?.gameDate || initialDate || dateKey(new Date())
@@ -85,7 +102,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
             {isGame && <label className="schedule-field"><span>Game Site</span><select value={gameSite} onChange={(event) => setGameSite(event.target.value)} disabled={!canEdit || saving}><option value="">Select game site</option><option value="Home">Home</option><option value="Away">Away</option><option value="Neutral">Neutral</option></select></label>}
           </div>
           <div className="schedule-field-row">
-            <label className="schedule-field"><span>Date</span><input type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} required disabled={!canEdit || saving} /></label>
+            <label className="schedule-field"><span>Date</span><input className="date-picker" type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} required disabled={!canEdit || saving} /></label>
             <label className="schedule-field"><span>Start</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={!canEdit || saving} /></label>
             {!isGame && <label className="schedule-field"><span>End</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={!canEdit || saving} /></label>}
           </div>
@@ -116,9 +133,10 @@ function buildCalendarDays(date, mode) {
   return Array.from({ length: weekCount * 7 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index))
 }
 
-export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated }) {
+export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated }) {
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState('month')
+  const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -128,6 +146,26 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
+  const viewMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (!viewMenuOpen) return undefined
+    function handleOutsideClick(event) {
+      if (!viewMenuRef.current?.contains(event.target)) setViewMenuOpen(false)
+    }
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setViewMenuOpen(false)
+        viewMenuRef.current?.querySelector('button')?.focus()
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [viewMenuOpen])
 
   useEffect(() => {
     let active = true
@@ -145,6 +183,21 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
   }, [api, refresh])
 
   const days = buildCalendarDays(calendarDate, mode)
+  const periodStart = mode === 'week'
+    ? dateKey(days[0])
+    : `${monthKey(calendarDate)}-01`
+  const periodEnd = mode === 'week'
+    ? dateKey(days[days.length - 1])
+    : dateKey(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0))
+  const todayKey = dateKey(new Date())
+  const periodEvents = events
+    .filter((event) => event.eventDate >= periodStart && event.eventDate <= periodEnd)
+    .sort((left, right) => right.eventDate.localeCompare(left.eventDate))
+
+  function openEvent(event) {
+    if (event.kind === 'game') onOpenGame(event)
+    else setDialog({ event })
+  }
 
   function moveCalendar(direction) {
     setCalendarDate((current) => mode === 'week'
@@ -223,21 +276,39 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
       <header className="schedule-toolbar">
         <div className="schedule-subtoolbar-actions">
           <button type="button" className="schedule-primary-button" disabled={!canEdit} onClick={() => setDialog({ date: dateKey(calendarDate) })}><Plus size={18} /> New Event</button>
-          <label className="schedule-jump-picker" htmlFor="jump-to-date"><span>Jump to</span><input id="jump-to-date" aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
+          <label className="schedule-jump-picker" htmlFor="jump-to-date"><span>Jump to</span><input className="date-picker" id="jump-to-date" aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
         </div>
         <div className="schedule-toolbar-controls">
           <button type="button" className="schedule-secondary-button" onClick={() => setCalendarDate(new Date())}>Today</button>
           <button type="button" className="schedule-icon-button" aria-label="Previous period" onClick={() => moveCalendar(-1)}><ChevronLeft size={20} /></button>
           <label className="schedule-month-picker"><span className="sr-only">Choose month</span><input type="month" value={monthKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(`${event.target.value}-01`)) }} /></label>
           <button type="button" className="schedule-icon-button" aria-label="Next period" onClick={() => moveCalendar(1)}><ChevronRight size={20} /></button>
-          <div className="schedule-view-switch" role="group" aria-label="Calendar view">
-            <button type="button" aria-pressed={mode === 'month'} onClick={() => setMode('month')}>Month</button>
-            <button type="button" aria-pressed={mode === 'week'} onClick={() => setMode('week')}>Week</button>
+          <div className="schedule-view-actions">
+            <div className="schedule-view-switch" role="group" aria-label="Calendar view">
+              <button type="button" aria-pressed={mode === 'month'} onClick={() => setMode('month')}>Month</button>
+              <button type="button" aria-pressed={mode === 'week'} onClick={() => setMode('week')}>Week</button>
+            </div>
+            <div className="schedule-view-menu" ref={viewMenuRef}>
+              <button type="button" className="hamburger-button" aria-label="Schedule view options" aria-haspopup="true" aria-expanded={viewMenuOpen} title="Schedule view options" onClick={() => setViewMenuOpen((open) => !open)}>
+                <Menu size={19} aria-hidden="true" />
+              </button>
+              {viewMenuOpen && <div className="toolbar-dropdown schedule-view-dropdown" role="menu" aria-label="Schedule view">
+                {[
+                  { id: 'calendar', label: 'Calendar View' },
+                  { id: 'grid', label: 'Grid View' },
+                ].map((option) => (
+                  <button key={option.id} type="button" role="menuitemradio" aria-checked={displayMode === option.id} onClick={() => { onDisplayModeChange(option.id); setViewMenuOpen(false) }}>
+                    <Check size={16} className="schedule-view-check" aria-hidden="true" />
+                    {option.label}
+                  </button>
+                ))}
+              </div>}
+            </div>
           </div>
         </div>
       </header>
       {error && <p className="schedule-error schedule-page-error" role="alert">{error}</p>}
-      <div className={`schedule-calendar schedule-${mode}${mode === 'month' ? ` schedule-month-${days.length / 7}-weeks` : ''}`}>
+      {displayMode === 'calendar' ? <div className={`schedule-calendar schedule-${mode}${mode === 'month' ? ` schedule-month-${days.length / 7}-weeks` : ''}`}>
         <div className="schedule-weekdays" aria-hidden="true">{(mode === 'month' ? WEEKDAYS : days.map((day) => WEEKDAYS[day.getDay()])).map((label, index) => <div key={`${label}-${index}`}>{label}</div>)}</div>
         {loading ? <div className="schedule-loading" role="status">Loading schedule…</div> : <div className="schedule-days">
           {days.map((date) => {
@@ -263,7 +334,7 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
                 const eventTitle = `${calendarTime(event)} ${event.name}`
                 const isMoving = movingEventKey === eventKey
                 return <div key={eventKey} className={eventClass}>
-                  <button type="button" className="schedule-event-content" onClick={() => event.kind === 'game' ? onOpenGame(event) : setDialog({ event })} title={eventTitle}>
+                  <button type="button" className="schedule-event-content" onClick={() => openEvent(event)} title={eventTitle}>
                     {event.kind === 'game' ? <><span className="schedule-football" aria-hidden="true">🏈</span>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{gameEventLabel(event)}</span></> : <>{event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{event.name}</span></>}
                   </button>
                   {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
@@ -276,7 +347,19 @@ export function TeamSchedule({ api, canEdit, canDelete, canCreateGame, onCreateG
             </section>
           })}
         </div>}
-      </div>
+      </div> : <section className="schedule-grid-view" aria-label="Schedule events">
+        {loading ? <div className="schedule-loading" role="status">Loading schedule…</div> : !error && <DataGrid
+          title="Schedule Events"
+          columns={scheduleGridColumns}
+          items={periodEvents}
+          compact
+          rowType="Event"
+          getRowIcon={(event) => EVENT_TYPE_ICONS[event.eventType] || Clock3}
+          rowClassName={(event) => event.eventDate < todayKey ? 'schedule-grid-row-past' : undefined}
+          onRowDoubleClick={openEvent}
+          rowActions={(event) => [{ label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) }]}
+        />}
+      </section>}
       {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
       {eventToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}

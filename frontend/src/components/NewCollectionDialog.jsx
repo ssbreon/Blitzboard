@@ -2,12 +2,10 @@ import { useState } from 'react'
 
 export const COLLECTION_CATEGORIES = ['Offense', 'Defense', 'Special Teams']
 
-export function NewCollectionDialog({ title, titleIcon: TitleIcon, isPlaybook = false, onCancel, onCreate }) {
+export function NewCollectionDialog({ title, titleIcon: TitleIcon, onCancel, onCreate }) {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('Defense')
   const [year, setYear] = useState(String(new Date().getFullYear()))
-  const [opponent, setOpponent] = useState('')
-  const [gameDate, setGameDate] = useState('')
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -22,7 +20,6 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, isPlaybook = 
         name: trimmedName,
         category,
         year: Number(year),
-        ...(!isPlaybook && { opponent: opponent.trim(), gameDate }),
       })
     } catch (saveError) {
       setError(saveError.message)
@@ -65,18 +62,6 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, isPlaybook = 
             required
           />
         </label>
-        {!isPlaybook && (
-          <>
-            <label className="dialog-field">
-              <span>Opponent</span>
-              <input type="text" value={opponent} onChange={(event) => setOpponent(event.target.value)} />
-            </label>
-            <label className="dialog-field">
-              <span>Game Date</span>
-              <input type="date" value={gameDate} onChange={(event) => setGameDate(event.target.value)} />
-            </label>
-          </>
-        )}
         {error && <p role="alert" className="data-grid-status data-grid-error">{error}</p>}
         <div className="dialog-actions">
           <button type="button" className="dialog-cancel" onClick={onCancel}>Cancel</button>

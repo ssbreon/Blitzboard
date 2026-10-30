@@ -13,6 +13,11 @@ const CATEGORY_COLORS = {
   RPO: { hue: 35, saturation: '78%' },
   Gadget: { hue: 275, saturation: '62%' },
   Generic: { hue: 220, saturation: '8%' },
+  Game: { hue: 2, saturation: '70%' },
+  Practice: { hue: 142, saturation: '58%' },
+  'Film Review': { hue: 215, saturation: '72%' },
+  'Team Meeting': { hue: 275, saturation: '62%' },
+  Other: { hue: 220, saturation: '8%' },
 }
 
 export function getCategoryBadgeStyle(category) {

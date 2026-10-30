@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -31,20 +31,6 @@ const GRID_COLUMNS = [
 const ADJUSTMENTS_COLUMN = { key: 'adjustments', header: 'Adjustments', render: (value) => value?.length ? value.join(', ') : '—' }
 
 const PLAYBOOK_GRID_COLUMNS = [GRID_COLUMNS[0], { key: 'year', header: 'Year' }, ...GRID_COLUMNS.slice(1), { key: 'ownerName', header: 'Owner' }, STATUS_COLUMN]
-function formatGameDate(value) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString() : '—'
-}
-
-const GAME_PLAN_GRID_COLUMNS = [
-  GRID_COLUMNS[0],
-  { key: 'year', header: 'Year' },
-  { key: 'opponent', header: 'Opponent' },
-  { key: 'gameDate', header: 'Game Date', render: formatGameDate },
-  ...GRID_COLUMNS.slice(1),
-  { key: 'ownerName', header: 'Owner' },
-  STATUS_COLUMN,
-]
-
 const PLAY_GRID_COLUMNS = [
   { key: 'name', header: 'Name' },
   ADJUSTMENTS_COLUMN,
@@ -110,7 +96,7 @@ function gameBreadcrumbLabel(game) {
   return `Game vs. ${opponent}${date ? ` - ${date}` : ''}`
 }
 
-const ROOT_VIEWS = ['playbooks', 'gamePlans', 'teamSchedule']
+const ROOT_VIEWS = ['playbooks', 'teamSchedule']
 
 function readStoredBreadcrumb(key) {
   try { return JSON.parse(sessionStorage.getItem(key)) } catch { return null }
@@ -835,7 +821,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
                 <div className="dialog-field-row">
                   <label className="dialog-field">
                     <span>Game Date</span>
-                    <input type="date" value={draftGameDate} onChange={(event) => setDraftGameDate(event.target.value)} />
+                    <input className="date-picker" type="date" value={draftGameDate} onChange={(event) => setDraftGameDate(event.target.value)} />
                   </label>
                   <label className="dialog-field">
                     <span>Start Time</span>
@@ -1068,6 +1054,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [storedBreadcrumb] = useState(() => readStoredBreadcrumb(breadcrumbKey))
   const [restoring, setRestoring] = useState(Boolean(storedBreadcrumb?.parent?.id))
   const [view, setView] = useState(ROOT_VIEWS.includes(storedBreadcrumb?.view) ? storedBreadcrumb.view : 'playbooks')
+  const [scheduleDisplayMode, setScheduleDisplayMode] = useState('calendar')
   const [accountDialog, setAccountDialog] = useState(null)
   const [parent, setParent] = useState(null)
   const [gameCard, setGameCard] = useState(null)
@@ -1080,11 +1067,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     : parent?.kind === 'gamePlan' ? 'Game' : 'Playbook'
   const [newDialog, setNewDialog] = useState(null)
   const [groupingDialog, setGroupingDialog] = useState(null)
-  const [newCollection, setNewCollection] = useState(null)
+  const [showNewPlaybookDialog, setShowNewPlaybookDialog] = useState(false)
   const [printPlay, setPrintPlay] = useState(null)
   const [printCollection, setPrintCollection] = useState(null)
   const [playbooksReloadToken, setPlaybooksReloadToken] = useState(0)
-  const [gamePlansReloadToken, setGamePlansReloadToken] = useState(0)
   const [playsReloadToken, setPlaysReloadToken] = useState(0)
   const [scoutPlaysReloadToken, setScoutPlaysReloadToken] = useState(0)
   const [statusSaving, setStatusSaving] = useState(false)
@@ -1094,30 +1080,21 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const writable = workspace.capabilities.edit
   const defaults = { ...workspace.defaults, ...authUser.preferences }
   const fetchPlaybooks = useCallback(({ namePrefix }) => api.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [api])
-  const fetchGamePlans = useCallback(({ namePrefix }) => api.listGamePlans(undefined, namePrefix, true).then((result) => result.items), [api])
-
   const parentId = parent?.id
   const fetchPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, parentId, (await api.listPlaybookRows(parentId, namePrefix, true)).items), [api, parentId])
   const fetchScoutPlays = useCallback(({ namePrefix }) => api.listScoutPlays(parentId, undefined, namePrefix, true).then((result) => result.items), [api, parentId])
   const cardPlaybookId = cardPlaybook?.id
   const fetchCardPlaybookPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, cardPlaybookId, (await api.listPlays(cardPlaybookId, undefined, namePrefix, true, true)).items), [api, cardPlaybookId])
 
-  async function handleCreateCollection(payload) {
-    if (newCollection === 'playbook') {
-      await api.createPlaybook(payload)
-      setPlaybooksReloadToken((t) => t + 1)
-    } else {
-      await api.createGamePlan(payload)
-      setGamePlansReloadToken((t) => t + 1)
-    }
-    setNewCollection(null)
+  async function handleCreatePlaybook(payload) {
+    await api.createPlaybook(payload)
+    setPlaybooksReloadToken((token) => token + 1)
+    setShowNewPlaybookDialog(false)
     onWorkspaceUpdated(await api.workspace())
   }
 
   async function handleCreateScheduleGame(payload) {
-    const game = await api.createGamePlan(payload)
-    setGamePlansReloadToken((token) => token + 1)
-    return game
+    return api.createGamePlan(payload)
   }
 
   async function handleCreateGameCardItem(name) {
@@ -1178,23 +1155,17 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     onWorkspaceUpdated(await api.workspace())
   }
 
-  async function handleCopyCollection(kind, row) {
+  async function handleCopyCollection(row) {
     const payload = {
       name: `${row.name} (Copy)`,
       category: row.category,
       year: row.year,
-      ...(kind === 'gamePlan' && { opponent: row.opponent, gameDate: row.gameDate }),
     }
-    if (kind === 'playbook') {
-      await api.createPlaybook(payload)
-      setPlaybooksReloadToken((t) => t + 1)
-    } else {
-      await api.createGamePlan(payload)
-      setGamePlansReloadToken((t) => t + 1)
-    }
+    await api.createPlaybook(payload)
+    setPlaybooksReloadToken((token) => token + 1)
   }
 
-  function handleDeleteCollection(kind, row) {
+  function handleDeleteCollection(row) {
     const selectedRows = Array.isArray(row) ? row : [row]
     const message = selectedRows.length === 1
       ? `Are you sure you want to delete "${selectedRows[0].name}"? This cannot be undone.`
@@ -1204,15 +1175,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       onConfirm: async ({ onProgress }) => {
         onProgress(0, selectedRows.length)
         for (const [index, selectedRow] of selectedRows.entries()) {
-          if (kind === 'playbook') await api.deletePlaybook(selectedRow.id)
-          else await api.deleteGamePlan(selectedRow.id)
+          await api.deletePlaybook(selectedRow.id)
           onProgress(index + 1, selectedRows.length)
         }
-        if (kind === 'playbook') {
-          setPlaybooksReloadToken((t) => t + 1)
-        } else {
-          setGamePlansReloadToken((t) => t + 1)
-        }
+        setPlaybooksReloadToken((token) => token + 1)
       },
     })
   }
@@ -1245,9 +1211,6 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       if (kind === 'playbook') {
         await api.updatePlaybook(row.id, payload)
         setPlaybooksReloadToken((token) => token + 1)
-      } else if (kind === 'gamePlan') {
-        await api.updateGamePlan(row.id, payload)
-        setGamePlansReloadToken((token) => token + 1)
       } else if (kind === 'play') {
         await api.updatePlay(parentId, row.id, payload)
         setPlaysReloadToken((token) => token + 1)
@@ -1270,10 +1233,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   function collectionRowActions(kind) {
     return (row) => [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => { setGameCard(null); setParent({ ...item, kind }) } },
-      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (item) => handleCopyCollection(kind, item) }] : []),
+      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: handleCopyCollection }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: (item) => handlePrintCollection(kind, item) },
       ...(writable ? [recordStatusAction(kind, row)] : []),
-      ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeleteCollection(kind, item) }] : []),
+      ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: handleDeleteCollection }] : []),
     ]
   }
 
@@ -1590,8 +1553,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
               </button>
             ) : (
               <span aria-current="page">
-                <BreadcrumbLabel icon={view === 'teamSchedule' ? CalendarDays : view === 'gamePlans' ? ClipboardList : LibraryBig}>
-                  {view === 'teamSchedule' ? 'Team Schedule' : view === 'gamePlans' ? 'Game Plans' : 'Playbooks'}
+                <BreadcrumbLabel icon={view === 'teamSchedule' ? CalendarDays : LibraryBig}>
+                  {view === 'teamSchedule' ? 'Team Schedule' : 'Playbooks'}
                 </BreadcrumbLabel>
               </span>
             )}
@@ -1647,13 +1610,12 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       />
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
       {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
-      {newCollection && (
+      {showNewPlaybookDialog && (
         <NewCollectionDialog
-          title={newCollection === 'playbook' ? 'Add New Playbook' : 'Add New Game Plan'}
-          titleIcon={newCollection === 'playbook' ? BookOpen : ClipboardList}
-          isPlaybook={newCollection === 'playbook'}
-          onCancel={() => setNewCollection(null)}
-          onCreate={handleCreateCollection}
+          title="Add New Playbook"
+          titleIcon={BookOpen}
+          onCancel={() => setShowNewPlaybookDialog(false)}
+          onCreate={handleCreatePlaybook}
         />
       )}
       {printPlay && <PrintPreviewDialog play={printPlay.play} parentCollectionName={printPlay.collectionName} onClose={() => setPrintPlay(null)} />}
@@ -1790,6 +1752,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         <TeamSchedule
           key="teamSchedule"
           api={api}
+          displayMode={scheduleDisplayMode}
+          onDisplayModeChange={setScheduleDisplayMode}
           canEdit={writable}
           canDelete={workspace.capabilities.delete}
           canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
@@ -1812,29 +1776,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           filterRows={(row) => !row.gameCardId}
           statusFilter
           fetchRows={fetchPlaybooks}
-          onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setNewCollection('playbook') : undefined}
+          onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setShowNewPlaybookDialog(true) : undefined}
           newLabel="New Playbook"
           rowActions={collectionRowActions('playbook')}
           onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'playbook' }) }}
-        />
-      )}
-
-      {view === 'gamePlans' && (
-        <DataGrid
-          key="gamePlans"
-          reloadToken={gamePlansReloadToken}
-          busy={statusSaving}
-          title="Game Plans"
-          columns={timezoneColumns(GAME_PLAN_GRID_COLUMNS, authUser.preferences?.timezone)}
-          rowIcon={ClipboardList}
-          rowType="Game Plan"
-          categoryOptions={COLLECTION_CATEGORIES}
-          statusFilter
-          fetchRows={fetchGamePlans}
-          onNew={writable && workspace.usage.gamePlans < workspace.limits.gamePlans ? () => setNewCollection('gamePlan') : undefined}
-          newLabel="New Game Plan"
-          rowActions={collectionRowActions('gamePlan')}
-          onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'gamePlan' }) }}
         />
       )}
 

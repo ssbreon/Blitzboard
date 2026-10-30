@@ -1602,7 +1602,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
     color: var(--text-h);
   }
 
-  input:not([type='checkbox']):not([type='radio']) {
+  input:not([type='checkbox']):not([type='radio']):not(.date-picker) {
     font: inherit;
     font-size: 16px;
     padding: 8px 10px;
@@ -1615,6 +1615,25 @@ button:active:not(:disabled):not([role^='menuitem']) {
       outline: none;
       border-color: var(--accent-border);
     }
+  }
+}
+
+.date-picker {
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid var(--secondary-button-border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: normal;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-border);
+    outline-offset: 1px;
   }
 }
 
@@ -4122,8 +4141,80 @@ button:active:not(:disabled):not([role^='menuitem']) {
   color: white;
 }
 
+.schedule-view-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.schedule-view-menu {
+  position: relative;
+  flex: none;
+}
+
+.schedule-view-menu .hamburger-button {
+  height: 36px;
+  min-width: 38px;
+  border-radius: 4px;
+}
+
+.schedule-view-dropdown {
+  min-width: 170px;
+}
+
+.schedule-view-dropdown button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+
+  &[aria-checked='true'] {
+    border-color: var(--accent-border);
+    background: var(--accent-bg);
+    color: var(--text-h);
+    font-weight: 600;
+  }
+}
+
+.schedule-view-check {
+  color: var(--accent);
+  opacity: 0;
+}
+
+.schedule-view-dropdown [aria-checked='true'] .schedule-view-check {
+  opacity: 1;
+}
+
+.schedule-grid-view {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: var(--input-bg);
+}
+
+.schedule-grid-view > .data-grid-compact {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.schedule-grid-view .data-grid-table-wrap {
+  flex: 1;
+  max-height: none;
+  background: gray;
+
+  @media (prefers-color-scheme: dark) {
+    background: var(--secondary-button);
+  }
+}
+
+.schedule-grid-view .data-grid-table tbody tr.schedule-grid-row-past {
+  opacity: 0.75;
+}
+
 .schedule-month-picker input,
-.schedule-jump-picker input {
+.schedule-jump-picker input:not(.date-picker) {
   min-height: 36px;
   padding: 5px 10px;
   border: 1px solid var(--secondary-button-border);
@@ -4560,7 +4651,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   text-align: left;
 }
 
-.schedule-field input,
+.schedule-field input:not(.date-picker),
 .schedule-field select,
 .schedule-field textarea {
   box-sizing: border-box;
@@ -5704,15 +5795,22 @@ button:active:not(:disabled):not([role^='menuitem']) {
     grid-column: 4;
   }
 
-  .schedule-view-switch button {
-    min-width: 55px;
-    padding-inline: 8px;
+  .schedule-view-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    gap: 8px;
+    margin-top: 3px;
   }
 
   .schedule-view-switch {
-    grid-column: 1 / -1;
-    width: 100%;
-    margin: 3px 0 0;
+    flex: 1;
+    width: auto;
+    margin: 0;
+  }
+
+  .schedule-view-switch button {
+    min-width: 55px;
+    padding-inline: 8px;
   }
 
   .schedule-view-switch button {

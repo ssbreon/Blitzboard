@@ -5,7 +5,7 @@ import { getCategoryBadgeStyle } from './CategoryBadge'
 
 const PAGE_SIZE = 50
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
@@ -171,7 +171,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
   const lastVisibleRow = showAllPages ? visibleRows.length : Math.min(visibleRows.length, (currentPage + 1) * PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
   const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
-  const leadingColumns = (showPage ? 1 : 0) + (RowIcon ? 1 : 0)
+  const hasRowIcons = Boolean(RowIcon || getRowIcon)
+  const leadingColumns = (showPage ? 1 : 0) + (hasRowIcons ? 1 : 0)
 
   async function moveRow(rowId, toIndex) {
     const fromIndex = rows.findIndex((row) => row.id === rowId)
@@ -396,7 +397,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
               <thead>
                 <tr>
                   {showPage && <th className="data-grid-page-header" scope="col">Page</th>}
-                  {RowIcon && <th className="data-grid-type-header" scope="col" aria-label="Type" />}
+                  {hasRowIcons && <th className="data-grid-type-header" scope="col" aria-label="Type" />}
                   {columns.map((column) => (
                     <th key={column.key}>{column.header}</th>
                   ))}
@@ -411,7 +412,9 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                     </td>
                   </tr>
                 )}
-                {pageRows.map((row) => (
+                {pageRows.map((row) => {
+                  const RowIconForRow = getRowIcon?.(row) || RowIcon
+                  return (
                   <tr
                     key={row.id}
                     aria-selected={selectedRowIds.has(row.id)}
@@ -438,6 +441,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                       selectedRowIds.has(row.id) && 'is-selected',
                       dragId === row.id && 'is-dragging',
                       dropTarget?.id === row.id && (dropTarget.after ? 'drop-after' : 'drop-before'),
+                      rowClassName?.(row),
                     ].filter(Boolean).join(' ') || undefined}
                     onDragOver={canReorder && dragId && (!canReorderRows || canReorderRows(rows.find((item) => item.id === dragId), row)) ? (event) => {
                       event.preventDefault()
@@ -473,7 +477,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                       </td>
                     )}
                     {row.rowType === 'grouping' ? (
-                      <td className="data-grid-grouping-cell" colSpan={columns.length + (RowIcon ? 1 : 0)}>
+                      <td className="data-grid-grouping-cell" colSpan={columns.length + (hasRowIcons ? 1 : 0)}>
                         <span className="data-grid-grouping-label">
                           {collapsedGroupingIds.has(row.id)
                             ? <Folder className="data-grid-grouping-icon" size={18} aria-hidden="true" />
@@ -482,9 +486,9 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                         </span>
                       </td>
                     ) : <>
-                      {RowIcon && (
+                      {RowIconForRow && (
                         <td className="data-grid-type-cell" aria-label={rowType} title={rowType}>
-                          <RowIcon size={17} strokeWidth={2} aria-hidden="true" />
+                          <RowIconForRow size={17} strokeWidth={2} aria-hidden="true" />
                         </td>
                       )}
                       {columns.map((column) => (
@@ -572,7 +576,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, rowType, categoryOp
                       </td>
                     )}
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
