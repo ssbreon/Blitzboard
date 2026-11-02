@@ -556,9 +556,12 @@ def dispatch(req, user, workspace, role):
         if len(path) == 3 and path[2] == "groupings" and method == "POST":
             payload = body(req)
             name = payload.get("name")
+            description = payload.get("description", "")
             if not isinstance(name, str) or not name.strip():
                 return response({"error": {"code": "VALIDATION_ERROR", "message": "name is required"}}, 400)
-            return create_record("playGroupings", {"name": name.strip()}, owner_id, playbook_id)
+            if not isinstance(description, str):
+                return response({"error": {"code": "VALIDATION_ERROR", "message": "description must be a string"}}, 400)
+            return create_record("playGroupings", {"name": name.strip(), "description": description.strip()}, owner_id, playbook_id)
 
         if len(path) == 4 and path[2] == "groupings":
             grouping_id = path[3]
@@ -568,9 +571,12 @@ def dispatch(req, user, workspace, role):
             if method == "PATCH":
                 payload = body(req)
                 name = payload.get("name")
+                description = payload.get("description", grouping.get("description", ""))
                 if not isinstance(name, str) or not name.strip():
                     return response({"error": {"code": "VALIDATION_ERROR", "message": "name is required"}}, 400)
-                return update_record("playGroupings", grouping_id, {"name": name.strip()})
+                if not isinstance(description, str):
+                    return response({"error": {"code": "VALIDATION_ERROR", "message": "description must be a string"}}, 400)
+                return update_record("playGroupings", grouping_id, {"name": name.strip(), "description": description.strip()})
             if method == "DELETE":
                 storage.delete("playGroupings", grouping_id)
                 renumber_pages("plays", paged_siblings("plays", playbook_id))

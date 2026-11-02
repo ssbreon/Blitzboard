@@ -179,6 +179,7 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
 
 function GroupingDialog({ grouping, onCancel, onSave }) {
   const [name, setName] = useState(grouping?.name || '')
+  const [description, setDescription] = useState(grouping?.description || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -188,7 +189,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
     setSaving(true)
     setError(null)
     try {
-      await onSave(name.trim())
+      await onSave({ name: name.trim(), description: description.trim() })
     } catch (failure) {
       setError(failure.message)
     } finally {
@@ -198,8 +199,9 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
 
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
-      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Group Name' : 'New Grouping'}</h2>
+      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Grouping' : 'New Grouping'}</h2>
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label className="dialog-field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       {error && <p role="alert" className="data-grid-status data-grid-error">Unable to save grouping: {error}</p>}
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
@@ -644,7 +646,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
         setInstallPickerGroupingId(row.id)
         setInstallPickerOpen(true)
       } }] : []),
-      ...(!readOnly && onEditGrouping ? [{ key: 'edit-group-name', label: 'Edit Group Name', icon: Pencil, onClick: onEditGrouping }] : []),
+      ...(!readOnly && onEditGrouping ? [{ key: 'edit-group-name', label: 'Edit Grouping', icon: Pencil, onClick: onEditGrouping }] : []),
       ...(onDeleteGrouping ? [{ key: 'delete-grouping', label: 'Delete', icon: Trash2, destructive: true, onClick: onDeleteGrouping }] : []),
     ]
     return [
@@ -1316,10 +1318,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     })
   }
 
-  async function handleSaveGrouping(name) {
+  async function handleSaveGrouping(payload) {
     const { parentId, grouping } = groupingDialog
-    if (grouping) await api.updateGrouping(parentId, grouping.id, { name })
-    else await api.createGrouping(parentId, { name })
+    if (grouping) await api.updateGrouping(parentId, grouping.id, payload)
+    else await api.createGrouping(parentId, payload)
     setGroupingDialog(null)
     setPlaysReloadToken((token) => token + 1)
   }
@@ -1486,7 +1488,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     return (row) => row.rowType === 'grouping' ? [
       ...(writable ? [{ key: 'add-play', label: 'Add Play', icon: Plus, onClick: (item) => setNewDialog({ target: 'play', parentId, groupingId: item.id }) }] : []),
       ...(kind === 'play' ? [{ key: 'print-grouping', label: 'Print Grouping', icon: Printer, onClick: (item) => handlePrintGrouping(parentId, item, collection) }] : []),
-      ...(writable ? [{ key: 'edit-group-name', label: 'Edit Group Name', icon: Pencil, onClick: (item) => setGroupingDialog({ parentId, grouping: item }) }] : []),
+      ...(writable ? [{ key: 'edit-group-name', label: 'Edit Grouping', icon: Pencil, onClick: (item) => setGroupingDialog({ parentId, grouping: item }) }] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeletePlay(kind, parentId, item) }] : []),
     ] : [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r, collection) },

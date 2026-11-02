@@ -477,7 +477,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                       </td>
                     )}
                     {row.rowType === 'grouping' ? (
-                      <td className="data-grid-grouping-cell" colSpan={columns.length + (hasRowIcons ? 1 : 0)}>
+                      <>
+                      <td className="data-grid-grouping-cell" colSpan={Math.max(1, columns.length + (hasRowIcons ? 1 : 0) - 1)}>
                         <span className="data-grid-grouping-label">
                           {collapsedGroupingIds.has(row.id)
                             ? <Folder className="data-grid-grouping-icon" size={18} aria-hidden="true" />
@@ -485,6 +486,8 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                           {row.name}
                         </span>
                       </td>
+                      <td className="data-grid-grouping-description-cell">{row.description}</td>
+                      </>
                     ) : <>
                       {RowIconForRow && (
                         <td className="data-grid-type-cell" aria-label={rowType} title={rowType}>
