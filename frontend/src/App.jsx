@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
@@ -16,6 +16,7 @@ import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
 import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
 import { formatDate } from './utils/formatDate'
+import { BreadcrumbCacheContext } from './utils/breadcrumbCacheContext'
 import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
 import './App.css'
 
@@ -425,7 +426,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -550,9 +551,9 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
         if (active) setLoadedPlaybookKey(playbookKey)
       })
     return () => { active = false }
-  }, [api, installMode, isGamePlan, playbookKey])
+  }, [api, installMode, isGamePlan, playbookKey, reloadToken])
 
-  const availablePlays = (playbookPlays[activePlaybookId] || []).filter((play) => play.recordStatus !== 'Archived')
+  const availablePlays = (playbookPlays[activePlaybookId] || []).filter((play) => !play._gridDeleted && play.recordStatus !== 'Archived')
   const selectedInstallSignature = JSON.stringify(selectedInstallPlays)
   const installDirty = selectedInstallSignature !== savedInstallSignature
   const playbooksForInstall = playbooks.filter((playbook) => playbook.category === selectedUnit)
@@ -734,9 +735,16 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   }
 
   useEffect(() => {
+    if (!active) return undefined
     onGuardChange({ dirty: settingsOpen, saving, canSave: false })
     return () => onGuardChange(null)
   })
+
+  useEffect(() => {
+    if (!active || !openSettingsOnMount) return undefined
+    const timeout = setTimeout(() => setSettingsOpen(true), 0)
+    return () => clearTimeout(timeout)
+  }, [active, openSettingsOnMount])
 
   function openSettings() {
     setError(null)
@@ -762,7 +770,7 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
           game={parentRecord} 
         />
       }
-      {breadcrumbSettingsTarget && createPortal(
+      {active && breadcrumbSettingsTarget && createPortal(
         <button
           type="button"
           className="breadcrumb-settings breadcrumb-settings-icon-only"
@@ -1048,7 +1056,22 @@ function PlaysDrillthroughView({ parentRecord, parentLabel, onParentUpdated, upd
   )
 }
 
+function BreadcrumbView({ active, children }) {
+  const scroll = useRef({ x: 0, y: 0 })
+  useLayoutEffect(() => {
+    if (!active) return undefined
+    window.scrollTo(scroll.current.x, scroll.current.y)
+    return () => { scroll.current = { x: window.scrollX, y: window.scrollY } }
+  }, [active])
+  return <div className="breadcrumb-view" hidden={!active}>{children}</div>
+}
+
 function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdated, onWorkspaceUpdated, onGuardChange, onSignOut, requestLeave, busy, switchingSubscription }) {
+  const viewApi = api.breadcrumbs
+  const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
+  useEffect(() => {
+    api.breadcrumbCache.setOwner(authUser.userId, authUser.name)
+  }, [api, authUser.userId, authUser.name])
   const [breadcrumbSettingsTarget, setBreadcrumbSettingsTarget] = useState(null)
   const [designerBreadcrumbSettingsTarget, setDesignerBreadcrumbSettingsTarget] = useState(null)
   const [parentSettingsRequestId, setParentSettingsRequestId] = useState(null)
@@ -1081,12 +1104,12 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
   const writable = workspace.capabilities.edit
   const defaults = { ...workspace.defaults, ...authUser.preferences }
-  const fetchPlaybooks = useCallback(({ namePrefix }) => api.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [api])
+  const fetchPlaybooks = useCallback(({ namePrefix }) => viewApi.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [viewApi])
   const parentId = parent?.id
-  const fetchPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, parentId, (await api.listPlaybookRows(parentId, namePrefix, true)).items), [api, parentId])
-  const fetchScoutPlays = useCallback(({ namePrefix }) => api.listScoutPlays(parentId, undefined, namePrefix, true).then((result) => result.items), [api, parentId])
+  const fetchPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(viewApi, parentId, (await viewApi.listPlaybookRows(parentId, namePrefix, true)).items), [viewApi, parentId])
+  const fetchScoutPlays = useCallback(({ namePrefix }) => viewApi.listScoutPlays(parentId, undefined, namePrefix, true).then((result) => result.items), [viewApi, parentId])
   const cardPlaybookId = cardPlaybook?.id
-  const fetchCardPlaybookPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(api, cardPlaybookId, (await api.listPlays(cardPlaybookId, undefined, namePrefix, true, true)).items), [api, cardPlaybookId])
+  const fetchCardPlaybookPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(viewApi, cardPlaybookId, (await viewApi.listPlays(cardPlaybookId, undefined, namePrefix, true, true)).items), [viewApi, cardPlaybookId])
 
   async function handleCreatePlaybook(payload) {
     await api.createPlaybook(payload)
@@ -1506,7 +1529,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   return (
-    <>
+    <BreadcrumbCacheContext value={api.breadcrumbCache}>
       <AppBar
         activeView={view}
         user={authUser}
@@ -1629,7 +1652,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
 
-      {restoring ? null : designer ? (
+      {!restoring && designer && (
         <PlayDesigner
           key={`${designer.kind}-${designer.id}`}
           record={designer}
@@ -1647,10 +1670,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onNameSaved={(name) => setDesigner((current) => current ? { ...current, name, nameDirty: false } : current)}
           onNameApplied={(name, dirty) => setDesigner((current) => current ? { ...current, name, nameDirty: dirty } : current)}
         />
-      ) : cardPlaybook ? (
+      )}
+      {!restoring && cardPlaybook && (
+        <BreadcrumbView active={!designer}>
         <PlaysDrillthroughView
+          active={!designer}
           key={`card-playbook-${cardPlaybook.id}`}
-          reloadToken={playsReloadToken}
+          reloadToken={playsReloadToken + cacheVersion}
           busy={statusSaving}
           parentRecord={cardPlaybook}
           parentLabel={gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'}
@@ -1663,7 +1689,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           timezone={authUser.preferences?.timezone}
           onGuardChange={onGuardChange}
           updateParent={api.updatePlaybook}
-          api={api}
+          api={viewApi}
           title="Plays"
           rowIcon={PlayDiagramIcon}
           rowType="Play"
@@ -1678,10 +1704,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onPrintAll={() => handlePrintCollection('playbook', cardPlaybook)}
           rowActions={playRowActions('play', cardPlaybook.id)}
         />
-      ) : parent?.kind === 'playbook' ? (
+        </BreadcrumbView>
+      )}
+      {!restoring && parent?.kind === 'playbook' && (
+        <BreadcrumbView active={!designer}>
         <PlaysDrillthroughView
+          active={!designer}
           key={`plays-${parent.id}`}
-          reloadToken={playsReloadToken}
+          reloadToken={playsReloadToken + cacheVersion}
           busy={statusSaving}
           parentRecord={parent}
           parentLabel="Playbook"
@@ -1705,13 +1735,16 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onPrintAll={() => handlePrintCollection('playbook', parent)}
           rowActions={playRowActions('play', parent.id)}
         />
-      ) : parent?.kind === 'gamePlan' ? (
+        </BreadcrumbView>
+      )}
+      {!restoring && parent?.kind === 'gamePlan' && (
+        <BreadcrumbView active={!designer && !cardPlaybook}>
         <PlaysDrillthroughView
+          active={!designer && !cardPlaybook}
           key={`scoutPlays-${parent.id}`}
           busy={statusSaving}
           parentRecord={parent}
           parentLabel="Game"
-          gameCard={gameCard}
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
           onGamePlanSelectionChange={(unit, tab) => { setGamePlanUnit(unit); setGamePlanTab(tab) }}
@@ -1723,7 +1756,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           timezone={authUser.preferences?.timezone}
           onGuardChange={onGuardChange}
           updateParent={api.updateGamePlan}
-          api={api}
+          api={viewApi}
           title="Scout Plays"
           rowIcon={ScanSearch}
           rowType="Scout Play"
@@ -1734,7 +1767,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('scoutPlay', parent.id, row), 'Open scouting play')}
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}
           rowActions={playRowActions('scoutPlay', parent.id)}
-          reloadToken={scoutPlaysReloadToken + playbooksReloadToken}
+          reloadToken={scoutPlaysReloadToken + playbooksReloadToken + cacheVersion}
           onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card) => setNewDialog({ target: 'gameCardItem', card }) : undefined}
           onOpenGameCardItem={(card, item) => {
             setGamePlanUnit(card.unit)
@@ -1748,12 +1781,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           canDuplicateGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
           canDeleteGameCardItem={workspace.capabilities.delete}
         />
-      ) : (
-        <>
+        </BreadcrumbView>
+      )}
+      {!restoring && (
+        <BreadcrumbView active={!parent}>
       {view === 'teamSchedule' && (
         <TeamSchedule
           key="teamSchedule"
-          api={api}
+          api={viewApi}
           displayMode={scheduleDisplayMode}
           onDisplayModeChange={setScheduleDisplayMode}
           canEdit={writable}
@@ -1768,7 +1803,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {view === 'playbooks' && (
         <DataGrid
           key="playbooks"
-          reloadToken={playbooksReloadToken}
+          reloadToken={playbooksReloadToken + cacheVersion}
           busy={statusSaving}
           title="Playbooks"
           columns={timezoneColumns(PLAYBOOK_GRID_COLUMNS, authUser.preferences?.timezone)}
@@ -1785,7 +1820,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
 
-        </>
+        </BreadcrumbView>
       )}
       {accountDialog && <AccountViews
         key={accountDialog}
@@ -1804,7 +1839,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onCancel={() => setDeleteConfirmation(null)}
         onConfirm={deleteConfirmation.onConfirm}
       />}
-    </>
+    </BreadcrumbCacheContext>
   )
 }
 

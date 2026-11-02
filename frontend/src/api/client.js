@@ -1,3 +1,5 @@
+import { createBreadcrumbCache } from '../utils/breadcrumbCache'
+
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const authMode = import.meta.env.VITE_AUTH_MODE || ''
 const signedOutKey = 'blitzboard:signed-out'
@@ -61,17 +63,22 @@ async function sendRequest(path, options = {}, workspaceId) {
   return response.status === 204 ? null : response.json()
 }
 
-export function createApi(workspaceId, onMutationState) {
+export function createApi(workspaceId, onMutationState, sharedCache) {
+  const cache = sharedCache || createBreadcrumbCache()
   const request = async (path, options = {}) => {
     const mutation = ['POST', 'PATCH', 'DELETE'].includes(options.method)
     if (mutation) onMutationState?.(1)
     try {
-      return await sendRequest(path, options, workspaceId)
+      if (!mutation && sharedCache) return await cache.read(path, () => sendRequest(path, options, workspaceId))
+      const result = await sendRequest(path, options, workspaceId)
+      if (mutation) cache.apply(path, options.method, options.body ? JSON.parse(options.body) : {}, result)
+      return result
     } finally {
       if (mutation) onMutationState?.(-1)
     }
   }
-  return {
+  const client = {
+  breadcrumbCache: cache,
   health: () => request('/health'),
   me: () => request('/me'),
   updateProfile: (payload) => request('/me', { method: 'PATCH', body: JSON.stringify(payload) }),
@@ -131,6 +138,8 @@ export function createApi(workspaceId, onMutationState) {
   updateScoutPlay: (gamePlanId, id, payload) => request(`/game-plans/${gamePlanId}/scout-plays/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteScoutPlay: (gamePlanId, id) => request(`/game-plans/${gamePlanId}/scout-plays/${id}`, { method: 'DELETE' }),
   }
+  if (!sharedCache) client.breadcrumbs = createApi(workspaceId, onMutationState, cache)
+  return client
 }
 
 export const api = createApi()

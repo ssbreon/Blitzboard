@@ -151,8 +151,17 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-height: 0;
 }
 
+.breadcrumb-view:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
 #root:has(> .data-grid),
-#root:has(> .plays-drillthrough-view) {
+#root:has(> .plays-drillthrough-view),
+#root:has(> .breadcrumb-view:not([hidden]) > :is(.data-grid, .plays-drillthrough-view)) {
   height: 100svh;
   min-height: 0;
   overflow: hidden;
@@ -2698,6 +2707,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
+  overflow-y: hidden;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -4028,7 +4038,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
   text-align: left;
 }
 
-#root:has(> .team-schedule) {
+#root:has(> .team-schedule),
+#root:has(> .breadcrumb-view:not([hidden]) > .team-schedule) {
   height: 100svh;
 }
 

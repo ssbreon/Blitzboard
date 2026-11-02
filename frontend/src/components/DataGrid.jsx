@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, X } from 'lucide-react'
 import { getCategoryBadgeStyle } from './CategoryBadge'
+import { BreadcrumbCacheContext } from '../utils/breadcrumbCacheContext'
 
 const PAGE_SIZE = 50
 
 export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
+  const breadcrumbCache = useContext(BreadcrumbCacheContext)
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
@@ -41,6 +43,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const rowMenuRef = useRef(null)
   const rowMenuTriggerRef = useRef(null)
   const rowMenuPortalTargetRef = useRef(null)
+  const hasLoadedRows = useRef(false)
 
   function dismissOpenHint() {
     setShowOpenHint(false)
@@ -91,11 +94,14 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   useEffect(() => {
     if (items !== undefined) return undefined
     let cancelled = false
-    setLoading(true)
+    setLoading(!hasLoadedRows.current)
     setError(null)
     fetchRows({ namePrefix })
       .then((items) => {
-        if (!cancelled) setRows(items)
+        if (!cancelled) {
+          hasLoadedRows.current = true
+          setRows(items)
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -124,7 +130,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
       const start = anchorIndex < 0 ? rowIndex : Math.min(anchorIndex, rowIndex)
       const end = anchorIndex < 0 ? rowIndex : Math.max(anchorIndex, rowIndex)
       const next = new Set(modified ? selectedRowIds : [])
-      pageRows.slice(start, end + 1).forEach((item) => next.add(item.id))
+      pageRows.slice(start, end + 1).filter((item) => !item._gridDeleted).forEach((item) => next.add(item.id))
       setSelectedRowIds(next)
       if (anchorIndex < 0) setSelectionAnchorId(row.id)
     } else if (modified) {
@@ -153,7 +159,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const filteredRows = rows.filter((row) => (!filterRows || filterRows(row))
     && (!selectedCategories.length || !row.category || selectedCategories.includes(row.category))
     && (!statusFilter || selectedStatus === (row.recordStatus ?? 'Active')))
-  const selectedRowCount = filteredRows.filter((row) => selectedRowIds.has(row.id)).length
+  const selectedRowCount = filteredRows.filter((row) => !row._gridDeleted && selectedRowIds.has(row.id)).length
   const visibleRows = []
   let followingCollapsedGroup = false
   for (const row of filteredRows) {
@@ -170,7 +176,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const firstVisibleRow = showAllPages ? (visibleRows.length ? 1 : 0) : currentPage * PAGE_SIZE + 1
   const lastVisibleRow = showAllPages ? visibleRows.length : Math.min(visibleRows.length, (currentPage + 1) * PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
-  const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length
+  const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length && !rows.some((row) => row._gridDeleted)
   const hasRowIcons = Boolean(RowIcon || getRowIcon)
   const leadingColumns = (showPage ? 1 : 0) + (hasRowIcons ? 1 : 0)
 
@@ -211,7 +217,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   }
 
   function rowMenuItems(row) {
-    const selectedRows = rows.filter((item) => selectedRowIds.has(item.id))
+    const selectedRows = rows.filter((item) => !item._gridDeleted && selectedRowIds.has(item.id))
     if (selectedRowIds.has(row.id) && selectedRows.length > 1) {
       const deleteActions = selectedRows.map((item) => {
         const actions = rowActions ? rowActions(item) : []
@@ -258,7 +264,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
     return true
   }
 
-  const dropdownItems = [{ label: 'Refresh', icon: RefreshCw, onClick: () => setRefreshToken((t) => t + 1) }, ...menuItems]
+  const dropdownItems = [{ label: 'Refresh', icon: RefreshCw, onClick: () => { breadcrumbCache?.clear(); setRefreshToken((t) => t + 1) } }, ...menuItems]
   const dropdownActions = dropdownItems.map((item) => (
     <button
       key={item.label}
@@ -417,6 +423,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                   return (
                   <tr
                     key={row.id}
+                    hidden={row._gridDeleted || undefined}
                     aria-selected={selectedRowIds.has(row.id)}
                     aria-expanded={row.rowType === 'grouping' ? !collapsedGroupingIds.has(row.id) : undefined}
                     tabIndex={row.rowType === 'grouping' ? 0 : undefined}
@@ -435,7 +442,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                       const trigger = event.currentTarget.querySelector('.row-actions-button')
                       if (openRowMenu(row, trigger, { x: event.clientX, y: event.clientY })) event.preventDefault()
                     } : undefined}
-                    style={row.rowType === 'grouping' || onRowDoubleClick ? { cursor: 'pointer' } : undefined}
+                    style={{ ...(row.rowType === 'grouping' || onRowDoubleClick ? { cursor: 'pointer' } : {}), ...(row._gridDirty ? { fontStyle: 'italic' } : {}) }}
                     className={[
                       row.rowType === 'grouping' && 'is-grouping-row',
                       selectedRowIds.has(row.id) && 'is-selected',

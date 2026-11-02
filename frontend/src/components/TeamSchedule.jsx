@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Trash2, Trophy, Users, X } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
@@ -134,6 +134,7 @@ function buildCalendarDays(date, mode) {
 }
 
 export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated }) {
+  const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState('month')
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
@@ -180,7 +181,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
       .catch((failure) => { if (active) setError(failure.message) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [api, refresh])
+  }, [api, refresh, cacheVersion])
 
   const days = buildCalendarDays(calendarDate, mode)
   const periodStart = mode === 'week'
@@ -328,7 +329,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
                 if (draggedEvent) void moveEventToDate(draggedEvent, dateKey(date))
               }}>
               <header><span>{date.getDate()}</span>{mode === 'week' && <small>{date.toLocaleDateString(undefined, { month: 'short' })}</small>}{canEdit && <button type="button" className="schedule-day-add" aria-label={`Add event ${dateKey(date)}`} onClick={() => setDialog({ date: dateKey(date) })}><Plus size={15} /></button>}</header>
-              <div className="schedule-day-events">{dayEvents.map((event) => {
+              <div className="schedule-day-events">{dayEvents.filter((event) => !event._gridDeleted).map((event) => {
                 const eventKey = `${event.kind}-${event.id}`
                 const eventClass = `schedule-event schedule-event-${event.kind === 'game' ? 'game' : event.eventType.toLowerCase().replaceAll(' ', '-')}`
                 const eventTitle = `${calendarTime(event)} ${event.name}`

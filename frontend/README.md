@@ -58,6 +58,30 @@ available only when every row is visible; mixed Active/Archived libraries cannot
 be reordered while one status is hidden. The schema manifest is
 `api/migrations/004-record-status-schema.json`.
 
+### Breadcrumb View Cache
+
+Drillthrough keeps ancestor React views and their DOM mounted but hidden, preserving
+grid filters, selection, collapsed groups, pagination, and scroll positions when
+returning through breadcrumbs. Inactive ancestors do not register navigation guards
+or render breadcrumb settings controls.
+
+View-only list reads use an in-memory cache scoped to the workspace API client.
+Successful mutations patch matching cached lists: additions append at the bottom,
+edited rows retain their positions, and both display italic cell text. Deleted rows
+are hidden but retain their paging slots and row count until a refresh. Reordering
+is disabled while deleted slots remain. Ancestor play counts and cached adjustment
+titles are updated too. Normal API reads used by copy/reorder operations remain live.
+
+The grid's Refresh command clears cached lists and dirty indicators and reloads
+server data. A browser reload or a new workspace client also starts a fresh cache;
+changes from other sessions require an explicit refresh.
+
+Run the focused regression checks from the workspace root:
+
+```powershell
+node --test frontend/src/utils/breadcrumbCache.test.js
+```
+
 ### Local Configuration
 
 Keep the existing development credentials in the ignored API local settings and
