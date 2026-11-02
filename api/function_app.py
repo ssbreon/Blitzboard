@@ -432,8 +432,32 @@ def dispatch(req, user, workspace, role):
         accounts.require_write(workspace, role, "delete" if method == "DELETE" else "edit")
 
     if path == ["search"] and method == "GET":
-        query = (req.params.get("q") or "").lower()
-        results = [p for p in storage.list("playbooks", owner_id=owner_id) if not query or query in p.get("name", "").lower()]
+        query = (req.params.get("q") or "").strip().casefold()
+        fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "unit", "category", "recordStatus", "workspaceId", "ownerId")
+        books = storage.list("playbooks", owner_id=owner_id, fields=fields)
+        books_by_id = {book["id"]: book for book in books}
+        results = []
+        for entity_type, records in (
+            ("playbooks", books),
+            ("gamePlans", storage.list("gamePlans", owner_id=owner_id, fields=fields)),
+            ("plays", storage.list("plays", owner_id=owner_id, fields=fields)),
+            ("scoutPlays", storage.list("scoutPlays", owner_id=owner_id, fields=fields)),
+        ):
+            for record in records:
+                if query and query not in (record.get("name") or "").casefold():
+                    continue
+                if entity_type == "playbooks":
+                    card_id = record.get("gameCardId") or ""
+                    label = "Install" if card_id.endswith("-installs") else "Practice Script" if card_id.endswith("-scout") else "Playbook"
+                elif entity_type == "plays":
+                    book = books_by_id.get(record.get("parentId"))
+                    if book is None:
+                        continue
+                    label = "Scout Play" if (book.get("gameCardId") or "").endswith("-scout") else "Play"
+                else:
+                    label = "Game" if entity_type == "gamePlans" else "Scouting Report"
+                results.append({**record, "entityType": entity_type, "type": label})
+        results.sort(key=lambda item: ((item.get("name") or "").casefold(), item["type"], item["id"]))
         return response({"items": results, "query": query})
 
     if path == ["schedule-events"]:

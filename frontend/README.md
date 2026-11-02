@@ -58,6 +58,22 @@ available only when every row is visible; mixed Active/Archived libraries cannot
 be reordered while one status is hidden. The schema manifest is
 `api/migrations/004-record-status-schema.json`.
 
+### Global Search
+
+The app-bar Search box searches partial, case-insensitive names across the selected
+workspace's Playbooks, Plays, Games, Installs, Practice Scripts, Scouting Reports,
+and Scout Plays, including archived records. Results appear in a dropdown DataGrid
+anchored to the screen's right edge with record icons, Name, Type, and Year.
+Records without a year display `--`. Double-click a row to open the normal
+drillthrough view with its parent breadcrumbs. This also clears the search text
+and results and closes the dropdown. Navigation uses the same Save/Discard/Cancel
+guard as the rest of the app.
+
+Search waits 250 ms after typing and ignores superseded responses. Escape or an
+outside click dismisses the dropdown; reopening search refreshes its results.
+The workspace-scoped `GET /api/search?q=...` endpoint returns lightweight record
+metadata and parent identifiers, not play diagrams.
+
 ### Breadcrumb View Cache
 
 Drillthrough keeps ancestor React views and their DOM mounted but hidden, preserving

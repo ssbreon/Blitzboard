@@ -49,6 +49,47 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_global_search_matches_partial_names_and_classifies_drillthrough_records(self):
+        book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Falcons Book", "year": 2026}))
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons Game", "year": 2027}))
+        install = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Falcons Install", "year": 2028, "gamePlanId": game["id"], "gameCardId": "offense-installs"}))
+        script = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Falcons Script", "year": 2029, "gamePlanId": game["id"], "gameCardId": "defense-scout"}))
+        play = response_json(call_api("POST", f"playbooks/{book['id']}/plays", "local-coach", {"name": "Falcons Play", "markers": [{"id": "QB"}]}))
+        scout = response_json(call_api("POST", f"playbooks/{script['id']}/plays", "local-coach", {"name": "Falcons Scout"}))
+        report = response_json(call_api("POST", f"game-plans/{game['id']}/scout-plays", "local-coach", {"name": "Falcons Report", "unit": "Defense"}))
+        call_api("POST", "playbooks", "local-coach", {"name": "Unrelated"})
+        call_api("POST", "playbooks", "other-coach", {"name": "Falcons Private"})
+        request = FakeRequest("GET", "search", "local-coach")
+        request.params = {"q": "  LcOn  "}
+        result = response_json(function_app.api(request))
+        rows = {row["id"]: row for row in result["items"]}
+        self.assertEqual(result["query"], "lcon")
+        expected = [(book, "Playbook"), (game, "Game"), (install, "Install"), (script, "Practice Script"), (play, "Play"), (scout, "Scout Play"), (report, "Scouting Report")]
+        self.assertEqual(set(rows), {record["id"] for record, _ in expected})
+        for record, label in expected:
+            self.assertEqual(rows[record["id"]]["type"], label)
+            self.assertEqual(rows[record["id"]]["entityType"], record["entityType"])
+            self.assertEqual(rows[record["id"]].get("year"), record.get("year"))
+            self.assertNotIn("markers", rows[record["id"]])
+        self.assertEqual(rows[play["id"]]["parentId"], book["id"])
+        self.assertEqual(rows[scout["id"]]["parentId"], script["id"])
+        self.assertEqual(rows[install["id"]]["gamePlanId"], game["id"])
+        request.params = {"q": "no such record"}
+        self.assertEqual(response_json(function_app.api(request))["items"], [])
+
+    def test_global_search_is_scoped_to_the_selected_workspace(self):
+        team = self.team_fixture()
+        book = response_json(call_api("POST", "playbooks", "coach-b", {"name": "Team Needle"}, team["id"]))
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Team Needle Game"}, team["id"]))
+        play = response_json(call_api("POST", f"playbooks/{book['id']}/plays", "coach-b", {"name": "Team Needle Play"}, team["id"]))
+        report = response_json(call_api("POST", f"game-plans/{game['id']}/scout-plays", "local-coach", {"name": "Team Needle Report"}, team["id"]))
+        personal = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Personal Needle"}))
+        request = FakeRequest("GET", "search", "local-coach")
+        request.params = {"q": "needle"}
+        self.assertEqual({row["id"] for row in response_json(function_app.api(request))["items"]}, {personal["id"]})
+        request.headers["X-Workspace-Id"] = team["id"]
+        self.assertEqual({row["id"] for row in response_json(function_app.api(request))["items"]}, {book["id"], game["id"], play["id"], report["id"]})
+
     def test_playbook_summary_rows_include_adjustment_titles_without_diagrams(self):
         book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book"}))
         plays_path = f"playbooks/{book['id']}/plays"

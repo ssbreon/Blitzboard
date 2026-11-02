@@ -6,6 +6,7 @@ import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './ap
 import { AccountViews } from './components/AccountViews'
 import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
+import { GlobalSearch } from './components/GlobalSearch'
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog'
 import { COLLECTION_CATEGORIES, NewCollectionDialog } from './components/NewCollectionDialog'
 import { NewPlayDialog, playCategoriesForCollection } from './components/NewPlayDialog'
@@ -227,7 +228,7 @@ function timezoneColumns(columns, timezone) {
   return columns.map((column) => column.render === formatDate ? { ...column, render: (value) => formatDate(value, timezone) } : column)
 }
 
-function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, onSignOut, busy, switchingSubscription }) {
+function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, onSignOut, busy, switchingSubscription, searchApi, onSearchOpen, searchBusy }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -289,6 +290,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
           </>
         )}
       </nav>
+      {user && searchApi && <GlobalSearch api={searchApi} onOpen={onSearchOpen} disabled={busy || switchingSubscription || searchBusy} />}
       {user && <div className="app-bar-account" ref={menuRef} onKeyDown={menuKeys}>
         <div className="app-bar-identity">
           <span className="app-bar-user-name" title={user.name}>{user.name}</span>
@@ -1100,6 +1102,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [scoutPlaysReloadToken, setScoutPlaysReloadToken] = useState(0)
   const [statusSaving, setStatusSaving] = useState(false)
   const [statusError, setStatusError] = useState(null)
+  const [searchOpening, setSearchOpening] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState(null)
 
   const writable = workspace.capabilities.edit
@@ -1403,6 +1406,45 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     })
   }
 
+  function handleSearchOpen(result) {
+    requestLeave(async () => {
+      setSearchOpening(true)
+      setStatusError(null)
+      try {
+        const isPlay = result.entityType === 'plays'
+        const isReport = result.entityType === 'scoutPlays'
+        const collection = isReport || result.entityType === 'gamePlans'
+          ? { ...await api.getGamePlan(isReport ? result.parentId : result.id), kind: 'gamePlan' }
+          : { ...await api.getPlaybook(isPlay ? result.parentId : result.id), kind: 'playbook' }
+        const card = collection.kind === 'playbook' && collection.gamePlanId
+          ? GAME_CARD_VIEWS.find((item) => item.id === collection.gameCardId)
+          : null
+        const root = card ? { ...await api.getGamePlan(collection.gamePlanId), kind: 'gamePlan' } : collection
+        const row = isPlay ? await api.getPlay(collection.id, result.id)
+          : isReport ? await api.getScoutPlay(collection.id, result.id) : null
+        setAccountDialog(null)
+        setParentSettingsRequestId(null)
+        setDesigner(null)
+        setView(root.kind === 'gamePlan' ? 'teamSchedule' : 'playbooks')
+        setParent(root)
+        setGameCard(card || null)
+        setCardPlaybook(card ? collection : null)
+        if (card) {
+          setGamePlanUnit(card.unit)
+          setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
+        } else if (isReport) {
+          setGamePlanUnit(row.unit || root.category || 'Offense')
+          setGamePlanTab('scoutingReports')
+        }
+        if (row) await openDesignerForRow(isReport ? 'scoutPlay' : 'play', collection.id, row, collection, card?.tab === 'installs')
+      } catch (error) {
+        setStatusError(`Unable to open search result: ${error.message}`)
+      } finally {
+        setSearchOpening(false)
+      }
+    }, `Open ${result.name}`)
+  }
+
   async function handleCopyPlay(kind, parentId, row) {
     row = await loadPlayDetails(kind, parentId, row)
     if (!row) return
@@ -1536,6 +1578,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         workspace={workspace}
         busy={busy}
         switchingSubscription={switchingSubscription}
+        searchApi={api}
+        onSearchOpen={handleSearchOpen}
+        searchBusy={searchOpening || restoring}
         onWorkspaceChange={onWorkspaceChange}
         onSignOut={onSignOut}
         onNavigate={(nextView) => requestLeave(() => {
