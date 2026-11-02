@@ -74,6 +74,44 @@ outside click dismisses the dropdown; reopening search refreshes its results.
 The workspace-scoped `GET /api/search?q=...` endpoint returns lightweight record
 metadata and parent identifiers, not play diagrams.
 
+### Search Security
+
+Global and DataGrid searches accept at most 256 characters, enforced by the API
+as well as the inputs. Oversized terms return HTTP 400. SQL-like text, HTML-like
+names, and apostrophes remain literal data: Cosmos filters use parameters and
+React renders result text without interpreting HTML.
+
+Authenticated searches share a fixed-window limit of 60 requests per minute per
+user across workspaces and search routes. Exceeding it returns HTTP 429 with
+`Retry-After`. Counters are stored as `searchRateLimits` records in the existing
+Cosmos container and updated under the shared per-user guard, so the limit is not
+reset by adding API workers. The in-memory test adapter uses the same policy.
+Unfiltered list reads are not counted. This application-level limit supplements,
+but does not replace, production gateway/WAF limits for unauthenticated traffic.
+
+Global search returns at most 100 records, with `total`, `limit`, and `truncated`
+metadata. When capped, the dropdown reports the total and asks for a narrower
+search. Existing DataGrid list/paging behavior is unchanged.
+
+Production response headers are defined in `public/staticwebapp.config.json`,
+copied to the build output for Azure Static Web Apps, and also applied by Vite
+preview. The CSP restricts scripts and API connections to the same origin and
+blocks inline scripts, plugins, framing, and HTML base-URL overrides. Inline
+styles remain allowed because diagrams and printing require them. Vite development
+does not apply this policy so hot reload continues to work.
+
+Other production hosts must apply these headers themselves. A separate API origin
+must be explicitly added to CSP `connect-src`; future identity/payment providers
+will need narrowly scoped policy updates when integrated. Do not loosen
+`script-src` to allow inline scripts or eval.
+
+Run the security regression checks from the workspace root:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s api -p test_auth.py -k search
+npm --prefix frontend run test:security
+```
+
 ### Breadcrumb View Cache
 
 Drillthrough keeps ancestor React views and their DOM mounted but hidden, preserving

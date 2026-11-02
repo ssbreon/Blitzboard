@@ -151,6 +151,11 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-height: 0;
 }
 
+html.is-drilling-through,
+html.is-drilling-through * {
+  cursor: wait !important;
+}
+
 .breadcrumb-view:not([hidden]) {
   display: flex;
   flex-direction: column;

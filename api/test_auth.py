@@ -49,6 +49,74 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_search_rejects_overlong_terms(self):
+        for path, parameter in (("search", "q"), ("playbooks", "namePrefix"), ("game-plans", "namePrefix")):
+            request = FakeRequest("GET", path, "local-coach")
+            request.params = {parameter: "x" * 257}
+            result = function_app.api(request)
+            self.assertEqual(result.status_code, 400)
+            self.assertEqual(response_json(result)["error"]["code"], "VALIDATION_ERROR")
+            request.params = {parameter: "x" * 256}
+            self.assertEqual(function_app.api(request).status_code, 200)
+
+    def test_search_treats_sql_and_html_as_literal_text(self):
+        for term in ("' OR 1=1 --", '<img src=x onerror="alert(1)">', "Coach O'Brien"):
+            record = response_json(call_api("POST", "playbooks", "local-coach", {"name": term}))
+            for path, parameter in (("search", "q"), ("playbooks", "namePrefix")):
+                request = FakeRequest("GET", path, "local-coach")
+                request.params = {parameter: term}
+                result = function_app.api(request)
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual([item["id"] for item in response_json(result)["items"]], [record["id"]])
+                self.assertEqual(response_json(result)["items"][0]["name"], term)
+
+    def test_search_rate_limit_is_shared_across_search_routes_and_resets(self):
+        request = FakeRequest("GET", "search", "local-coach")
+        request.params = {"q": "Book"}
+        grid_request = FakeRequest("GET", "playbooks", "local-coach")
+        grid_request.params = {"namePrefix": "Book"}
+        with patch.object(function_app, "SEARCH_REQUEST_LIMIT", 2), patch.object(function_app, "time", return_value=120):
+            self.assertEqual(function_app.api(request).status_code, 200)
+            self.assertEqual(function_app.api(grid_request).status_code, 200)
+            denied = function_app.api(request)
+            self.assertEqual(denied.status_code, 429)
+            self.assertEqual(response_json(denied)["error"]["code"], "SEARCH_RATE_LIMITED")
+            self.assertGreater(int(denied.headers["Retry-After"]), 0)
+            self.assertEqual(call_api("GET", "search", "other-coach").status_code, 200)
+            self.assertEqual(call_api("GET", "playbooks", "local-coach").status_code, 200)
+        with patch.object(function_app, "time", return_value=181):
+            self.assertEqual(function_app.api(request).status_code, 200)
+
+    def test_search_rate_limit_is_atomic_for_concurrent_requests(self):
+        def search(_):
+            return call_api("GET", "search", "local-coach").status_code
+        with patch.object(function_app, "SEARCH_REQUEST_LIMIT", 2), patch.object(function_app, "time", return_value=120):
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                statuses = list(executor.map(search, range(4)))
+        self.assertEqual(sorted(statuses), [200, 200, 429, 429])
+
+    def test_search_limits_results_and_reports_truncation(self):
+        for name in ("Third", "First", "Second"):
+            call_api("POST", "playbooks", "local-coach", {"name": name})
+        with patch.object(function_app, "SEARCH_RESULT_LIMIT", 2):
+            result = response_json(call_api("GET", "search", "local-coach"))
+        self.assertEqual([item["name"] for item in result["items"]], ["First", "Second"])
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(result["limit"], 2)
+        self.assertTrue(result["truncated"])
+
+    def test_search_uses_cosmos_parameters_for_untrusted_text(self):
+        term = "' OR 1=1 --"
+        adapter = function_app.Storage()
+        adapter.container = Mock()
+        adapter.container.query_items.return_value = []
+        adapter.list("playbooks", name_prefix=term, owner_id="local-coach")
+        query = adapter.container.query_items.call_args.args[0]
+        parameters = adapter.container.query_items.call_args.kwargs["parameters"]
+        self.assertNotIn(term, query)
+        self.assertIn("STARTSWITH(c.name, @namePrefix, true)", query)
+        self.assertIn({"name": "@namePrefix", "value": term}, parameters)
+
     def test_global_search_matches_partial_names_and_classifies_drillthrough_records(self):
         book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Falcons Book", "year": 2026}))
         game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons Game", "year": 2027}))

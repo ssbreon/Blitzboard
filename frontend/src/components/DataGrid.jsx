@@ -54,6 +54,13 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
     }
   }
 
+  function showDrillthroughWaitCursor() {
+    document.documentElement.classList.add('is-drilling-through')
+    window.setTimeout(() => {
+      document.documentElement.classList.remove('is-drilling-through')
+    }, 1000)
+  }
+
   function closeRowMenu() {
     setOpenRowMenuId(null)
     setRowMenuPosition(null)
@@ -298,6 +305,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
             <Search size={17} aria-hidden="true" />
             <input
               type="search"
+              maxLength={256}
               aria-label="Search by name"
               value={searchName}
               onChange={(event) => {
@@ -428,6 +436,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     aria-expanded={row.rowType === 'grouping' ? !collapsedGroupingIds.has(row.id) : undefined}
                     tabIndex={row.rowType === 'grouping' ? 0 : undefined}
                     onDoubleClick={row.rowType === 'grouping' ? () => toggleGrouping(row.id) : onRowDoubleClick ? () => {
+                      showDrillthroughWaitCursor()
                       onRowDoubleClick(row)
                       dismissOpenHint()
                     } : undefined}

@@ -25,8 +25,8 @@ export function GlobalSearch({ api, onOpen, disabled }) {
     const timer = setTimeout(async () => {
       setResult({ query: term, items: [], loading: true, error: null })
       try {
-        const { items } = await api.search(term)
-        if (active) setResult({ query: term, items, loading: false, error: null })
+        const { items, total, limit, truncated } = await api.search(term)
+        if (active) setResult({ query: term, items, total, limit, truncated, loading: false, error: null })
       } catch (error) {
         if (active) setResult({ query: term, items: [], loading: false, error: error.message })
       }
@@ -61,7 +61,7 @@ export function GlobalSearch({ api, onOpen, disabled }) {
   }}>
     <div className="global-search-input">
       <Search size={17} aria-hidden="true" />
-      <input ref={inputRef} type="search" aria-label="Global search" aria-expanded={open && Boolean(term)} aria-controls="global-search-results" aria-haspopup="dialog" placeholder="Search" value={query} disabled={disabled} onFocus={() => { setResult({ query: '', items: [], loading: false, error: null }); setOpen(true) }} onChange={(event) => { setQuery(event.target.value); setOpen(true) }} />
+      <input ref={inputRef} type="search" maxLength={256} aria-label="Global search" aria-expanded={open && Boolean(term)} aria-controls="global-search-results" aria-haspopup="dialog" placeholder="Search" value={query} disabled={disabled} onFocus={() => { setResult({ query: '', items: [], loading: false, error: null }); setOpen(true) }} onChange={(event) => { setQuery(event.target.value); setOpen(true) }} />
       {query && <button type="button" title="Clear search" aria-label="Clear search" onClick={() => { setQuery(''); setOpen(false); inputRef.current?.focus() }}><X size={16} aria-hidden="true" /></button>}
     </div>
     {open && term && <div id="global-search-results" className="global-search-results" role="dialog" aria-label="Search results" tabIndex={-1} aria-busy={loading}>
@@ -69,6 +69,7 @@ export function GlobalSearch({ api, onOpen, disabled }) {
         : result.error ? <p className="data-grid-status data-grid-error" role="alert">Unable to search: {result.error}</p>
           : <>
             <p className="sr-only" role="status">{result.items.length} results</p>
+            {result.truncated && <p className="data-grid-status" role="status">Showing the first {result.limit} of {result.total} matches. Refine your search.</p>}
             <DataGrid key={term} title="Search results" columns={COLUMNS} items={result.items} compact suppressOpenHint getRowIcon={(row) => ICONS[row.type] || BookOpen} onRowDoubleClick={openRow} busy={disabled} />
           </>}
     </div>}

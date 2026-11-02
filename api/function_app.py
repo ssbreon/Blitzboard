@@ -6,6 +6,7 @@ import threading
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from time import time
 from uuid import uuid4
 
 from azure.core import MatchConditions
@@ -26,6 +27,10 @@ DEV_USER_ID = os.getenv("DEV_USER_ID", "local-coach")
 DEV_USER_NAME = os.getenv("DEV_USER_NAME", "Local Coach")
 CONTENT_TYPES = ("playbooks", "plays", "playGroupings", "slides", "exports", "gamePlans", "scoutPlays", "scheduleEvents")
 STATUS_TYPES = {"playbooks", "gamePlans", "plays", "scoutPlays"}
+SEARCH_MAX_LENGTH = 256
+SEARCH_RESULT_LIMIT = 100
+SEARCH_REQUEST_LIMIT = 60
+SEARCH_WINDOW_SECONDS = 60
 request_workspace = ContextVar("request_workspace", default=None)
 accounts.validate_environment(COSMOS_ENDPOINT)
 
@@ -43,7 +48,7 @@ def validate_record_status(entity_type, payload):
 
 class Storage:
     def __init__(self):
-        self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox")}
+        self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits")}
         self.usage = {}
         self.lock = threading.RLock()
         self.container = None
@@ -203,8 +208,23 @@ def response(payload, status=200):
         json.dumps(payload),
         status_code=status,
         mimetype="application/json",
-        headers={"Access-Control-Allow-Origin": "*"},
+        headers={"Access-Control-Allow-Origin": "*", "X-Content-Type-Options": "nosniff"},
     )
+
+
+def check_search_rate(user_id):
+    timestamp = time()
+    window = int(timestamp // SEARCH_WINDOW_SECONDS)
+    counter_id = hashlib.sha256(user_id.encode()).hexdigest()
+    counter = storage.get("searchRateLimits", counter_id) or {"id": counter_id}
+    count = counter.get("count", 0) if counter.get("window") == window else 0
+    if count >= SEARCH_REQUEST_LIMIT:
+        result = response({"error": {"code": "SEARCH_RATE_LIMITED", "message": "Too many searches. Please wait a minute and try again."}}, 429)
+        result.headers["Retry-After"] = str(max(1, int((window + 1) * SEARCH_WINDOW_SECONDS - timestamp) + 1))
+        result.headers["Cache-Control"] = "no-store"
+        return result
+    storage.save("searchRateLimits", {**counter, "window": window, "count": count + 1})
+    return None
 
 
 def body(req):
@@ -387,8 +407,16 @@ def api(req: func.HttpRequest) -> func.HttpResponse:
     user, auth_error = authenticate_request(req)
     if auth_error:
         return auth_error
+    search_term = req.params.get("q") if path == ["search"] else req.params.get("namePrefix") if path[0] in {"playbooks", "game-plans"} else None
+    search_request = req.method == "GET" and (path == ["search"] or bool(search_term))
+    if search_request and (not isinstance(search_term, (str, type(None))) or len(search_term or "") > SEARCH_MAX_LENGTH):
+        return response({"error": {"code": "VALIDATION_ERROR", "message": f"Search text must be at most {SEARCH_MAX_LENGTH} characters"}}, 400)
     try:
         with storage.guard("user:" + user["userId"]):
+            if search_request:
+                limited = check_search_rate(user["userId"])
+                if limited is not None:
+                    return limited
             accounts.ensure_user(storage, user)
         global_route = path[0] in {"me", "workspaces", "invitations"}
         workspace, role = accounts.select_workspace(storage, user, None if global_route else req.headers.get("X-Workspace-Id"))
@@ -458,7 +486,7 @@ def dispatch(req, user, workspace, role):
                     label = "Game" if entity_type == "gamePlans" else "Scouting Report"
                 results.append({**record, "entityType": entity_type, "type": label})
         results.sort(key=lambda item: ((item.get("name") or "").casefold(), item["type"], item["id"]))
-        return response({"items": results, "query": query})
+        return response({"items": results[:SEARCH_RESULT_LIMIT], "query": query, "total": len(results), "limit": SEARCH_RESULT_LIMIT, "truncated": len(results) > SEARCH_RESULT_LIMIT})
 
     if path == ["schedule-events"]:
         if method == "GET":
