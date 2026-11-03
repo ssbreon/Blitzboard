@@ -1,11 +1,24 @@
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, X } from 'lucide-react'
+import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, ThumbsUp, X } from 'lucide-react'
 import { getCategoryBadgeStyle } from './CategoryBadge'
 import { BreadcrumbCacheContext } from '../utils/breadcrumbCacheContext'
 import { ErrorDialog } from './ErrorDialog'
 
 const PAGE_SIZE = 50
+
+function renderGridCell(column, row) {
+  const value = column.render ? column.render(row[column.key], row) : row[column.key]
+  if (column.header !== 'Status' || (value !== 'Active' && value !== 'Archived')) return value
+
+  const archived = value === 'Archived'
+  const StatusIcon = archived ? Archive : ThumbsUp
+  return (
+    <span className={`data-grid-record-status${archived ? ' is-archived' : ' is-active'}`} role="img" aria-label={value} title={value}>
+      <StatusIcon size={17} aria-hidden="true" />
+    </span>
+  )
+}
 
 export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
@@ -363,22 +376,23 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                 <div className="data-grid-menu-panes">
                   <div className="data-grid-status-filter" role="group" aria-label="Filter by status">
                     <div className="account-menu-section-label">View</div>
-                    {['Active', 'Archived'].map((status) => (
+                    {[{ label: 'Active', icon: ThumbsUp }, { label: 'Archived', icon: Archive }].map(({ label, icon: Icon }) => (
                       <button
-                        key={status}
+                        key={label}
                         type="button"
                         role="menuitemradio"
-                        aria-checked={selectedStatus === status}
+                        aria-checked={selectedStatus === label}
                         onClick={() => {
-                          setSelectedStatus(status)
+                          setSelectedStatus(label)
                           setSelectedRowIds(new Set())
                           setSelectionAnchorId(null)
                           setPage(0)
                           setMenuOpen(false)
                         }}
                       >
+                        <Icon size={16} className="data-grid-option-icon" aria-hidden="true" />
+                        <span>{label}</span>
                         <Check size={16} className="data-grid-status-check" aria-hidden="true" />
-                        {status}
                       </button>
                     ))}
                   </div>
@@ -513,7 +527,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                       )}
                       {columns.map((column) => (
                         <td key={column.key} className={column.key === 'name' ? 'data-grid-name-cell' : undefined}>
-                          {column.render ? column.render(row[column.key], row) : row[column.key]}
+                          {renderGridCell(column, row)}
                         </td>
                       ))}
                     </>}

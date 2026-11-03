@@ -33,13 +33,13 @@ const GRID_COLUMNS = [
 
 const ADJUSTMENTS_COLUMN = { key: 'adjustments', header: 'Adjustments', render: (value) => value?.length ? value.join(', ') : '—' }
 
-const PLAYBOOK_GRID_COLUMNS = [GRID_COLUMNS[0], { key: 'year', header: 'Year' }, ...GRID_COLUMNS.slice(1), { key: 'ownerName', header: 'Owner' }, STATUS_COLUMN]
+const PLAYBOOK_GRID_COLUMNS = [GRID_COLUMNS[0], { key: 'year', header: 'Year' }, ...GRID_COLUMNS.slice(1, 3), { key: 'ownerName', header: 'Owner' }, GRID_COLUMNS[3], STATUS_COLUMN]
 const PLAY_GRID_COLUMNS = [
   { key: 'name', header: 'Name' },
   ADJUSTMENTS_COLUMN,
   { key: 'category', header: 'Category', render: renderCategoryBadge },
-  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
   { key: 'ownerName', header: 'Owner' },
+  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
   STATUS_COLUMN,
 ]
 

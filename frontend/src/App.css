@@ -2739,6 +2739,13 @@ html.is-drilling-through * {
   font-size: 12px;
 }
 
+.data-grid-record-status {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  color: var(--text);
+}
+
 .row-actions-dropdown button:disabled {
   opacity: .5;
   cursor: default;
@@ -3018,7 +3025,12 @@ html.is-drilling-through * {
 
 .data-grid-status-check {
   flex-shrink: 0;
+  margin-left: auto;
   visibility: hidden;
+}
+
+.data-grid-option-icon {
+  flex-shrink: 0;
 }
 
 .data-grid-toolbar-dropdown .data-grid-status-filter button[aria-checked='false'] {
@@ -4306,33 +4318,6 @@ html.is-drilling-through * {
   height: 36px;
   min-width: 38px;
   border-radius: 4px;
-}
-
-.schedule-view-dropdown {
-  min-width: 170px;
-}
-
-.schedule-view-dropdown button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-
-  &[aria-checked='true'] {
-    border-color: var(--accent-border);
-    background: var(--accent-bg);
-    color: var(--text-h);
-    font-weight: 600;
-  }
-}
-
-.schedule-view-check {
-  color: var(--accent);
-  opacity: 0;
-}
-
-.schedule-view-dropdown [aria-checked='true'] .schedule-view-check {
-  opacity: 1;
 }
 
 .schedule-grid-view {
@@ -6433,6 +6418,75 @@ html.is-drilling-through * {
 
   #root * {
     visibility: hidden !important;
+  }
+
+  #root .team-schedule,
+  #root .team-schedule * {
+    visibility: visible !important;
+  }
+
+  #root:has(.team-schedule) {
+    height: auto !important;
+    min-height: 0;
+    overflow: visible !important;
+  }
+
+  #root > :not(:has(.team-schedule)) {
+    display: none !important;
+  }
+
+  #root .breadcrumb-view:has(.team-schedule) {
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .team-schedule {
+    display: block;
+    height: auto;
+    min-height: 0;
+    background: white;
+    color: #000;
+  }
+
+  .team-schedule .schedule-toolbar,
+  .team-schedule .schedule-day-add,
+  .team-schedule .schedule-event-drag-handle {
+    display: none !important;
+  }
+
+  .team-schedule .schedule-calendar,
+  .team-schedule .schedule-quarter,
+  .team-schedule .schedule-year {
+    display: block;
+    flex: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: white;
+  }
+
+  .team-schedule .schedule-weekdays,
+  .team-schedule .schedule-days {
+    min-width: 0;
+  }
+
+  .team-schedule .schedule-days {
+    grid-template-rows: none !important;
+    grid-auto-rows: minmax(78px, auto);
+    flex: none;
+  }
+
+  .team-schedule .schedule-quarter > .schedule-calendar {
+    min-width: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .team-schedule .schedule-mini-month {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .schedule-script-overlay,

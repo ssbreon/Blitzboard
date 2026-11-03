@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Trash2, Trophy, Users, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users, X } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DataGrid } from './DataGrid'
@@ -372,16 +372,33 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
               <button type="button" className="hamburger-button" aria-label="Schedule view options" aria-haspopup="true" aria-expanded={viewMenuOpen} title="Schedule view options" onClick={() => setViewMenuOpen((open) => !open)}>
                 <Menu size={19} aria-hidden="true" />
               </button>
-              {viewMenuOpen && <div className="toolbar-dropdown schedule-view-dropdown" role="menu" aria-label="Schedule view">
-                {[
-                  { id: 'calendar', label: 'Calendar View' },
-                  { id: 'grid', label: 'Grid View' },
-                ].map((option) => (
-                  <button key={option.id} type="button" role="menuitemradio" aria-checked={displayMode === option.id} onClick={() => { onDisplayModeChange(option.id); setViewMenuOpen(false) }}>
-                    <Check size={16} className="schedule-view-check" aria-hidden="true" />
-                    {option.label}
-                  </button>
-                ))}
+              {viewMenuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown schedule-view-dropdown" role="menu" aria-label="Schedule options">
+                <div className="data-grid-menu-panes">
+                  <div className="data-grid-status-filter" role="group" aria-label="Schedule view">
+                    <div className="account-menu-section-label">View</div>
+                    {[
+                      { id: 'calendar', label: 'Calendar View', icon: CalendarDays },
+                      { id: 'grid', label: 'Grid View', icon: Table2 },
+                    ].map(({ id, label, icon: Icon }) => (
+                      <button key={id} type="button" role="menuitemradio" aria-checked={displayMode === id} onClick={() => { onDisplayModeChange(id); setViewMenuOpen(false) }}>
+                        <Icon size={16} className="data-grid-option-icon" aria-hidden="true" />
+                        <span>{label}</span>
+                        <Check size={16} className="data-grid-status-check" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="data-grid-menu-actions" role="group" aria-label="Schedule actions">
+                    <div className="account-menu-section-label">Actions</div>
+                    <button type="button" role="menuitem" onClick={() => { api.breadcrumbCache.clear(); setRefresh((value) => value + 1); setViewMenuOpen(false) }}>
+                      <RefreshCw className="menu-item-icon" aria-hidden="true" />
+                      <span className="data-grid-menu-action-label">Refresh</span>
+                    </button>
+                    <button type="button" role="menuitem" onClick={() => { window.print(); setViewMenuOpen(false) }}>
+                      <Printer className="menu-item-icon" aria-hidden="true" />
+                      <span className="data-grid-menu-action-label">Print</span>
+                    </button>
+                  </div>
+                </div>
               </div>}
             </div>
           </div>
