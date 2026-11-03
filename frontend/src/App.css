@@ -1442,6 +1442,49 @@ html.is-drilling-through * {
   }
 }
 
+.error-dialog-overlay {
+  z-index: 10000;
+}
+
+.error-dialog-panel {
+  box-sizing: border-box;
+  width: 480px;
+  color: var(--text);
+
+  h2 {
+    cursor: default;
+    font-size: 18px;
+  }
+
+  > p {
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
+.error-dialog-details {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid goldenrod;
+  border-radius: 6px;
+  background: lightgoldenrodyellow;
+
+  h3 {
+    margin: 0 0 8px;
+    font-size: 13px;
+  }
+
+  pre {
+    margin: 0;
+    max-height: 180px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+}
+
 .new-play-dialog {
   box-sizing: border-box;
   width: min(1120px, calc(100vw - 32px));
@@ -1830,8 +1873,8 @@ html.is-drilling-through * {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 36px;
-  padding: 0 10px;
+  height: 32px;
+  padding: 0 6px;
   border: 1px solid var(--column-header-border);
   border-radius: 6px;
   background: var(--input-bg);
@@ -3398,7 +3441,8 @@ html.is-drilling-through * {
 
 .data-grid-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 15px;
 
   th,
@@ -3459,28 +3503,8 @@ html.is-drilling-through * {
     background: #eaf4fd;
   }
 
-  tbody tr.is-selected,
-  tbody tr.is-selected:hover,
-  tbody tr.is-selected td {
-    background: #dceeff;
-  }
-
   tbody tr.is-selected td:first-child {
     box-shadow: inset 3px 0 #2563eb;
-  }
-
-  tbody tr.is-grouping-row,
-  tbody tr.is-grouping-row:hover {
-    background: aliceblue;
-  }
-
-  tbody tr.is-grouping-row td {
-    background: aliceblue;
-    color: #1f2937;
-  }
-
-  tbody tr.is-grouping-row.is-selected td {
-    background: #dceeff;
   }
 
   tbody tr.is-grouping-row td.data-grid-page-cell {
@@ -3488,13 +3512,15 @@ html.is-drilling-through * {
   }
 
   .data-grid-grouping-cell {
-    padding: 9px 12px;
-    border-left: 4px solid #6b7280;
+    padding: 6px;
     font-weight: 700;
+    font-size: 14px;
+    letter-spacing: .5px;
   }
 
   tbody tr.is-grouping-row {
     cursor: pointer;
+    box-shadow: inset 0px -20px 40px var(--form-bg)
   }
 
   .data-grid-grouping-label {
@@ -3524,12 +3550,12 @@ html.is-drilling-through * {
       background: #29445a;
     }
 
-    tbody tr.is-selected,
+/*     tbody tr.is-selected,
     tbody tr.is-selected:hover,
     tbody tr.is-selected td {
       background: #29445a;
     }
-
+ */
     tbody tr.is-selected td:first-child {
       box-shadow: inset 3px 0 #60a5fa;
     }
@@ -3548,6 +3574,7 @@ html.is-drilling-through * {
   .data-grid-page-cell {
     font-weight: 600;
     background: var(--form-bg);
+    border-right: 1px solid var(--form-border);
 
     @media (prefers-color-scheme: dark) {
       color: var(--text-h);
@@ -3579,6 +3606,15 @@ html.is-drilling-through * {
 
   tbody tr.drop-after td {
     box-shadow: inset 0 -2px 0 var(--accent);
+  }
+
+  &.is-multi-select tbody tr.is-selected td {
+    background: #dbeafe;
+    color: #1e293b;
+  }
+
+  &.is-multi-select tbody tr.is-selected:hover td {
+    background: #bfdbfe;
   }
 }
 

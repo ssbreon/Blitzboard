@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { ErrorDialog } from './ErrorDialog'
 
 export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
   const [deleting, setDeleting] = useState(false)
@@ -24,7 +25,7 @@ export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
       await onConfirm({ onProgress: (completed, total) => setProgress({ completed, total }) })
       onCancel()
     } catch (failure) {
-      setError(failure.message || 'Unable to delete item.')
+      setError(failure)
       setProgress(null)
     } finally {
       setDeleting(false)
@@ -36,7 +37,7 @@ export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
       <section className="dialog-panel delete-confirmation-panel" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirmation-title" aria-describedby="delete-confirmation-message">
         <h2 id="delete-confirmation-title"><Trash2 size={22} aria-hidden="true" />Delete item?</h2>
         <p id="delete-confirmation-message">{message}</p>
-        {error && <p className="delete-confirmation-error" role="alert">{error}</p>}
+        <ErrorDialog error={error} message="We couldn't finish deleting the selected items. Please check the list before trying again." />
         <div className="dialog-actions">
           <button type="button" className="dialog-cancel" autoFocus disabled={deleting} onClick={onCancel}>Cancel</button>
           <button

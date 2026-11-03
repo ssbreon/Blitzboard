@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ErrorDialog } from './ErrorDialog'
 
 export const COLLECTION_CATEGORIES = ['Offense', 'Defense', 'Special Teams']
 
@@ -22,7 +23,7 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, onCancel, onC
         year: Number(year),
       })
     } catch (saveError) {
-      setError(saveError.message)
+      setError(saveError)
     } finally {
       setSubmitting(false)
     }
@@ -62,7 +63,7 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, onCancel, onC
             required
           />
         </label>
-        {error && <p role="alert" className="data-grid-status data-grid-error">{error}</p>}
+        <ErrorDialog error={error} message="We couldn't create this playbook. Your changes are still here so you can try again." />
         <div className="dialog-actions">
           <button type="button" className="dialog-cancel" onClick={onCancel}>Cancel</button>
           <button type="submit" className="dialog-create" disabled={submitting}>Create</button>

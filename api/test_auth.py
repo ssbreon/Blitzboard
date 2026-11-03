@@ -338,7 +338,8 @@ class AuthenticationTests(unittest.TestCase):
                     item_path = f"{path}/{record['id']}"
                     self.assertEqual(record["recordStatus"], "Active")
                     for status in ("Archived", "Active", "Archived"):
-                        updated = call_api("PATCH", item_path, "local-coach", {"recordStatus": status})
+                        current = response_json(call_api("GET", item_path, "local-coach"))
+                        updated = call_api("PATCH", item_path, "local-coach", {"recordStatus": status, "_etag": current.get("_etag")})
                         self.assertEqual(updated.status_code, 200)
                         stored = response_json(call_api("GET", item_path, "local-coach"))
                         self.assertEqual(stored["recordStatus"], status)
@@ -371,7 +372,8 @@ class AuthenticationTests(unittest.TestCase):
         slide = response_json(call_api("POST", slides_path, "local-coach", {"name": "Adjustment"}))
         usage = response_json(call_api("GET", "workspace", "local-coach"))["usage"]
         for path in (f"playbooks/{book['id']}", f"{children_path}/{play['id']}"):
-            self.assertEqual(call_api("PATCH", path, "local-coach", {"recordStatus": "Archived"}).status_code, 200)
+            current = response_json(call_api("GET", path, "local-coach"))
+            self.assertEqual(call_api("PATCH", path, "local-coach", {"recordStatus": "Archived", "_etag": current.get("_etag")}).status_code, 200)
         self.assertEqual(response_json(call_api("GET", "workspace", "local-coach"))["usage"], usage)
         self.assertEqual(call_api("GET", f"{slides_path}/{slide['id']}", "local-coach").status_code, 200)
         self.assertEqual(call_api("DELETE", f"playbooks/{book['id']}", "local-coach").status_code, 204)
@@ -653,6 +655,52 @@ class AuthenticationTests(unittest.TestCase):
         result = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book", "_etag": "forged"}))
         self.assertNotIn("_etag", result)
 
+    def test_play_updates_require_the_loaded_etag(self):
+        for collection, children in (("playbooks", "plays"), ("game-plans", "scout-plays")):
+            parent = response_json(call_api("POST", collection, "local-coach", {"name": "Collection"}))
+            path = f"{collection}/{parent['id']}/{children}"
+            original = response_json(call_api("POST", path, "local-coach", {"name": "Original"}))
+            item_path = f"{path}/{original['id']}"
+            self.assertTrue(original.get("_etag"))
+            for invalid in (None, "", "*", 123, {}):
+                missing = call_api("PATCH", item_path, "local-coach", {"name": "Missing token", "_etag": invalid})
+                self.assertEqual(missing.status_code, 428)
+            updated = call_api("PATCH", item_path, "local-coach", {"name": "First save", "_etag": original["_etag"]})
+            self.assertEqual(updated.status_code, 200)
+            latest = response_json(updated)
+            self.assertNotEqual(latest["_etag"], original["_etag"])
+            stale = call_api("PATCH", item_path, "local-coach", {"name": "Stale save", "_etag": original["_etag"]})
+            self.assertEqual(stale.status_code, 412)
+            self.assertEqual(response_json(stale)["error"]["code"], "RECORD_CHANGED")
+            self.assertEqual(response_json(call_api("GET", item_path, "local-coach"))["name"], "First save")
+            self.assertEqual(call_api("PATCH", item_path, "local-coach", {"name": "Second save", "_etag": latest["_etag"]}).status_code, 200)
+
+    def test_play_cosmos_write_checks_the_original_etag_atomically(self):
+        for entity in ("plays", "scoutPlays"):
+            store = function_app.Storage()
+            store.container = Mock()
+            store.container.read_item.return_value = {"id": "play", "_etag": '"loaded-version"', "name": "Original"}
+            changed = function_app.HttpResponseError("Changed after read")
+            changed.status_code = 412
+            store.container.replace_item.side_effect = changed
+            with patch.object(function_app, "storage", store):
+                with self.assertRaises(function_app.accounts.AccountError) as error:
+                    function_app.update_record(entity, "play", {"name": "My edit", "_etag": '"loaded-version"'})
+            self.assertEqual(error.exception.status, 412)
+            self.assertEqual(error.exception.code, "RECORD_CHANGED")
+            self.assertEqual(store.container.replace_item.call_args.kwargs["etag"], '"loaded-version"')
+            self.assertEqual(store.container.replace_item.call_args.kwargs["match_condition"], function_app.MatchConditions.IfNotModified)
+
+    def test_concurrent_play_saves_accept_only_one_loaded_version(self):
+        for collection, children in (("playbooks", "plays"), ("game-plans", "scout-plays")):
+            parent = response_json(call_api("POST", collection, "local-coach", {"name": "Collection"}))
+            path = f"{collection}/{parent['id']}/{children}"
+            original = response_json(call_api("POST", path, "local-coach", {"name": "Original"}))
+            item_path = f"{path}/{original['id']}"
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda name: call_api("PATCH", item_path, "local-coach", {"name": name, "_etag": original["_etag"]}), ("First editor", "Second editor")))
+            self.assertEqual(sorted(result.status_code for result in results), [200, 412])
+
     def test_storage_refreshes_etag_after_writes(self):
         store = function_app.Storage()
         store.container = Mock()
@@ -726,7 +774,8 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(call_api("POST", f"{path}/reorder", "coach-a", {"ids": [ids[2], ids[0], ids[1]]}).status_code, 200)
             self.assertEqual(pages(), [("C", 1), ("A", 2), ("B", 3)])
 
-            call_api("PATCH", f"{path}/{ids[1]}", "coach-a", {"page": 1})
+            current = response_json(call_api("GET", f"{path}/{ids[1]}", "coach-a"))
+            self.assertEqual(call_api("PATCH", f"{path}/{ids[1]}", "coach-a", {"page": 1, "_etag": current["_etag"]}).status_code, 200)
             call_api("DELETE", f"{path}/{ids[2]}", "coach-a")
             self.assertEqual(pages(), [("A", 1), ("B", 2)])
 

@@ -8,6 +8,7 @@ import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { GlobalSearch } from './components/GlobalSearch'
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog'
+import { ErrorDialog, ErrorDialogProvider, ErrorDialogScope } from './components/ErrorDialog'
 import { COLLECTION_CATEGORIES, NewCollectionDialog } from './components/NewCollectionDialog'
 import { NewPlayDialog, playCategoriesForCollection } from './components/NewPlayDialog'
 import { PlayDiagramIcon } from './components/PlayDiagramIcon'
@@ -160,7 +161,7 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
     try {
       await onCreate(name.trim())
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSaving(false)
     }
@@ -170,7 +171,7 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
       <h2><Plus size={22} aria-hidden="true" />Add {card.tab === 'installs' ? 'Install' : 'Practice Script'}</h2>
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
-      {error && <p role="alert" className="data-grid-status data-grid-error">Unable to create item: {error}</p>}
+      <ErrorDialog error={error} message="We couldn't create this item. Please try again." />
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
         <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Creating...' : 'Create'}</button>
@@ -193,7 +194,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
     try {
       await onSave({ name: name.trim(), description: description.trim() })
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSaving(false)
     }
@@ -204,7 +205,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
       <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Grouping' : 'New Grouping'}</h2>
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
       <label className="dialog-field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
-      {error && <p role="alert" className="data-grid-status data-grid-error">Unable to save grouping: {error}</p>}
+      <ErrorDialog error={error} message="We couldn't save this grouping. Please try again." />
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
         <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Saving...' : grouping ? 'Save' : 'Add'}</button>
@@ -285,7 +286,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
           onClick={(event) => navigate(event, 'teamSchedule')}
         >
           <CalendarDays size={17} strokeWidth={1.8} aria-hidden="true" />
-          Team Schedule
+          Schedule
         </a>
           </>
         )}
@@ -358,7 +359,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
         setPlaybooks(available)
         setPlaybookId(available[0]?.id || '')
       })
-      .catch((failure) => { if (active) setError(failure.message) })
+      .catch((failure) => { if (active) setError(failure) })
       .finally(() => { if (active) setLoadingPlaybooks(false) })
     return () => { active = false }
   }, [api, category])
@@ -368,7 +369,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
     let active = true
     api.listPlays(playbookId)
       .then((result) => { if (active) setPlays(result.items.filter((play) => play.recordStatus !== 'Archived')) })
-      .catch((failure) => { if (active) { setPlays([]); setError(failure.message) } })
+      .catch((failure) => { if (active) { setPlays([]); setError(failure) } })
       .finally(() => { if (active) setLoadedPlaybookId(playbookId) })
     return () => { active = false }
   }, [api, playbookId])
@@ -392,7 +393,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
     try {
       await onAdd(selections)
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSubmitting(false)
     }
@@ -419,7 +420,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
         })}
         {!loadingPlays && playbookId && !visiblePlays.length && <p className="schedule-muted">No matching plays.</p>}
       </div>
-      {error && <p role="alert" className="data-grid-status data-grid-error">Unable to add plays: {error}</p>}
+      <ErrorDialog error={error} message="We couldn't load or add the plays. Please try again." />
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={submitting} onClick={onCancel}>Cancel</button>
         <button type="submit" className="dialog-create" disabled={submitting || !selectedIds.length}>{submitting ? 'Adding...' : 'Add Selected Plays'}</button>
@@ -476,6 +477,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [installPickerGroupingId, setInstallPickerGroupingId] = useState(null)
   const [gameCardActionBusy, setGameCardActionBusy] = useState(false)
   const [gameCardToast, setGameCardToast] = useState('')
+  const [gameCardError, setGameCardError] = useState(null)
   const selectedGameCardItems = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === selectedGameCard?.id)
 
   useEffect(() => {
@@ -488,7 +490,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           setInstallGroupingsError(null)
         }
       })
-      .catch((failure) => { if (active) setInstallGroupingsError(failure.message) })
+      .catch((failure) => { if (active) setInstallGroupingsError(failure) })
     return () => { active = false }
   }, [api, installMode, parentRecord.id, reloadToken])
 
@@ -503,7 +505,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         }
       })
       .catch((failure) => {
-        if (active) setPlaybooksError(failure.message)
+        if (active) setPlaybooksError(failure)
       })
       .finally(() => {
         if (active) setPlaybooksLoading(false)
@@ -547,7 +549,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         setPlaybookPlaysError(null)
       })
       .catch((failure) => {
-        if (active) setPlaybookPlaysError(failure.message)
+        if (active) setPlaybookPlaysError(failure)
       })
       .finally(() => {
         if (active) setLoadedPlaybookKey(playbookKey)
@@ -608,7 +610,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
       setSelectedInstallPlays(savedPlays)
       setSavedInstallSignature(JSON.stringify(savedPlays))
     } catch (failure) {
-      setInstallError(failure.message)
+      setInstallError(failure)
       throw failure
     } finally {
       setInstallSaving(false)
@@ -687,6 +689,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
       return
     }
     setGameCardActionBusy(true)
+    setGameCardError(null)
     try {
       if (action === 'duplicate') {
         await onDuplicateGameCardItem(item)
@@ -696,7 +699,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         setGameCardToast(selectedItems.length === 1 ? `Deleted ${selectedItems[0].name}` : `Deleted ${selectedItems.length} items`)
       }
     } catch (failure) {
-      setGameCardToast(`Unable to ${action} ${selectedItems.length === 1 ? selectedItems[0].name : `${selectedItems.length} items`}: ${failure.message}`)
+      setGameCardError(failure)
     } finally {
       setGameCardActionBusy(false)
       window.setTimeout(() => setGameCardToast(''), 4000)
@@ -730,7 +733,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
       onParentUpdated(updated)
       closeSettings()
     } catch (err) {
-      setError(err.message)
+      setError(err)
     } finally {
       setSaving(false)
     }
@@ -767,6 +770,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
 
   return (
     <main className="plays-drillthrough-view">
+      <ErrorDialog error={gameCardError} message="We couldn't complete the game plan action. Please check the list before trying again." />
       {isGamePlan && 
         <GamePlanBanner 
           game={parentRecord} 
@@ -842,7 +846,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
                 </div>
               </>
             )}
-            {error && <p className="data-grid-status data-grid-error" role="alert">Unable to save: {error}</p>}
+            <ErrorDialog error={error} message="We couldn't save your settings. Your changes are still here so you can try again." />
             <div className="dialog-actions">
               <button type="button" className="dialog-cancel" disabled={saving} onClick={closeSettings}>
                 Cancel
@@ -898,7 +902,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           <header className="game-plan-content-heading">
             <h2>{GAME_PLAN_TABS.find((tab) => tab.id === gameTab)?.label}<ChevronRight size={18} aria-hidden="true" />{selectedUnit}</h2>
           </header>
-          {playbooksError && gameTab !== 'scoutingReports' && <p className="schedule-error" role="alert">Unable to load game plan items: {playbooksError}</p>}
+          {gameTab !== 'scoutingReports' && <ErrorDialog error={playbooksError} message="We couldn't load the game plan items. Please try again." />}
           {gameTab === 'scoutingReports' ? <DataGrid
             key={`game-reports-${parentRecord.id}-${selectedUnit}`}
             title={`${selectedUnit} Scouting Reports`}
@@ -933,8 +937,8 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
       {isGamePlan && gameTab === 'installs' ? <section className="schedule-install-page">
         <header><h2>{gameCard?.title || `${selectedUnit} - Installs`}</h2><p>Select plays from your <strong>Playbooks</strong> to install for this game.</p></header>
-        {playbooksError && <p className="schedule-error" role="alert">Unable to load playbooks: {playbooksError}</p>}
-        {playbookPlaysError && <p className="schedule-error" role="alert">Unable to load plays: {playbookPlaysError}</p>}
+        <ErrorDialog error={playbooksError} message="We couldn't load your playbooks. Please try again." />
+        <ErrorDialog error={playbookPlaysError} message="We couldn't load the plays. Please try again." />
         <form className="schedule-install-filters" onSubmit={(event) => { event.preventDefault(); setPlaySearchTerm(playSearchDraft.trim()) }}>
           <label><span className="sr-only">Playbook</span><select aria-label="Playbook" value={activePlaybookId} onChange={(event) => setSelectedPlaybookId(event.target.value)} disabled={playbooksLoading || !playbooksForInstall.length}>
             {playbooksLoading && <option value="">Loading playbooks...</option>}
@@ -989,12 +993,12 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           </div>
           <button type="button" className="schedule-primary-button" disabled={readOnly || installSaving || !installDirty} onClick={saveInstall}>{installSaving ? 'Saving...' : 'Save Install'}</button>
         </section>
-        {installError && <p className="schedule-error" role="alert">{installError}</p>}
+        <ErrorDialog error={installError} message="We couldn't save the install. Please try again." />
       </section> : installMode ? <section className="schedule-install-library">
-        {playbooksError && <p className="schedule-error" role="alert">Unable to load playbooks: {playbooksError}</p>}
-        {playbookPlaysError && <p className="schedule-error" role="alert">Unable to load selected plays: {playbookPlaysError}</p>}
-        {installGroupingsError && <p className="schedule-error" role="alert">Unable to load install groupings: {installGroupingsError}</p>}
-        {installError && <p className="schedule-error" role="alert">Unable to update install: {installError}</p>}
+        <ErrorDialog error={playbooksError} message="We couldn't load your playbooks. Please try again." />
+        <ErrorDialog error={playbookPlaysError} message="We couldn't load the selected plays. Please try again." />
+        <ErrorDialog error={installGroupingsError} message="We couldn't load the install groupings. Please try again." />
+        <ErrorDialog error={installError} message="We couldn't update the install. Please try again." />
         {playbooksLoading || playsLoading ? <p className="schedule-muted" role="status">Loading installed plays...</p> : <DataGrid
           key={`install-library-${parentRecord.id}`}
           title={`${parentRecord.name} plays`}
@@ -1065,7 +1069,7 @@ function BreadcrumbView({ active, children }) {
     window.scrollTo(scroll.current.x, scroll.current.y)
     return () => { scroll.current = { x: window.scrollX, y: window.scrollY } }
   }, [active])
-  return <div className="breadcrumb-view" hidden={!active}>{children}</div>
+  return <div className="breadcrumb-view" hidden={!active}><ErrorDialogScope active={active}>{children}</ErrorDialogScope></div>
 }
 
 function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdated, onWorkspaceUpdated, onGuardChange, onSignOut, requestLeave, busy, switchingSubscription }) {
@@ -1225,7 +1229,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       const endIndex = nextGroupingIndex < 0 ? items.length : nextGroupingIndex
       setPrintCollection({ collection: { ...collection, kind: 'playbook' }, plays: items.slice(groupingIndex, endIndex) })
     } catch (error) {
-      setStatusError(`Unable to load grouping: ${error.message}`)
+      setStatusError({ ...error, message: `Unable to load grouping: ${error.message}` })
     }
   }
 
@@ -1240,14 +1244,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         await api.updatePlaybook(row.id, payload)
         setPlaybooksReloadToken((token) => token + 1)
       } else if (kind === 'play') {
-        await api.updatePlay(parentId, row.id, payload)
+        await api.updatePlay(parentId, row.id, { ...payload, _etag: row._etag })
         setPlaysReloadToken((token) => token + 1)
       } else {
-        await api.updateScoutPlay(parentId, row.id, payload)
+        await api.updateScoutPlay(parentId, row.id, { ...payload, _etag: row._etag })
         setScoutPlaysReloadToken((token) => token + 1)
       }
     } catch (error) {
-      setStatusError(`Unable to ${restoring ? 'restore' : 'archive'} "${row.name}": ${error.message}`)
+      setStatusError({ ...error, message: `Unable to ${restoring ? 'restore' : 'archive'} "${row.name}": ${error.message}` })
     } finally {
       setStatusSaving(false)
     }
@@ -1292,7 +1296,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     const initialMarkers = buildMarkersFromTemplate(template).map((marker) =>
       perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
     )
-    const record =
+    let record =
       target === 'play'
         ? await api.createPlay(parentId, {
             name,
@@ -1320,12 +1324,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           })
     if (target === 'play' && groupingId) {
           await appendPlayToGrouping(parentId, groupingId, record.id)
+      record = await api.getPlay(parentId, record.id)
       setPlaysReloadToken((token) => token + 1)
     }
     setDesigner({
       kind: target,
       parentId,
       id: record.id,
+      _etag: record._etag,
       name: record.name,
       gameType: record.gameType || template.gameType,
       initialMarkers: record.markers || initialMarkers,
@@ -1370,11 +1376,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function loadPlayDetails(kind, parentId, row) {
-    if (kind !== 'play' || (row.markers !== undefined && row.theme !== undefined)) return row
     try {
-      return await api.getPlay(parentId, row.id)
+      return kind === 'play' ? await api.getPlay(parentId, row.id) : await api.getScoutPlay(parentId, row.id)
     } catch (error) {
-      setStatusError(`Unable to load play: ${error.message}`)
+      setStatusError({ ...error, message: `Unable to load play: ${error.message}` })
       return null
     }
   }
@@ -1387,6 +1392,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       kind,
       parentId,
       id: row.id,
+      _etag: row._etag,
       name: row.name,
       gameType: row.gameType || template.gameType,
       readOnly,
@@ -1438,7 +1444,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         }
         if (row) await openDesignerForRow(isReport ? 'scoutPlay' : 'play', collection.id, row, collection, card?.tab === 'installs')
       } catch (error) {
-        setStatusError(`Unable to open search result: ${error.message}`)
+        setStatusError({ ...error, message: `Unable to open search result: ${error.message}` })
       } finally {
         setSearchOpening(false)
       }
@@ -1663,7 +1669,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       </nav>
 
       {!writable && <div className="workspace-read-only" role="status">{workspace.name}: read-only</div>}
-      {statusError && <p className="data-grid-status data-grid-error" role="alert">{statusError}</p>}
+      <ErrorDialog error={statusError} message="We couldn't complete that action. Please try again." />
 
       <NewPlayDialog
         key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : ''}:${defaults.theme}:${defaults.fieldOrientation}`}
@@ -1888,7 +1894,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   )
 }
 
-function App() {
+function AppContent() {
   const [signedOut, setSignedOut] = useState(isSignedOut)
   const [user, setUser] = useState(null)
   const [entry, setEntry] = useState(null)
@@ -1924,7 +1930,7 @@ function App() {
       try { sessionStorage.setItem('blitzboard:workspace', id) } catch { return }
     } catch (failure) {
       if (current === generation.current) {
-        setError(failure.message)
+        setError(failure)
         if (failure.status === 403) await recoverWorkspace(id)
       }
     } finally {
@@ -1954,7 +1960,7 @@ function App() {
       const workspace = identity.workspaces.find((item) => item.id === stored) || identity.workspaces[0]
       if (!workspace) throw new Error('No accessible workspace')
       return loadWorkspace(workspace.id)
-    }).catch((failure) => { if (active) { setError(failure.message); setLoading(false) } })
+    }).catch((failure) => { if (active) { setError(failure); setLoading(false) } })
     return () => { active = false; generation.current += 1 }
   }, [signedOut])
 
@@ -2004,9 +2010,9 @@ function App() {
       if (entryRef.current?.api === selected.api) updateWorkspace(workspace)
     } catch (failure) {
       if (entryRef.current?.api === selected.api) {
-        setError(failure.message)
+        setError(failure)
         if (failure.status === 403) {
-          try { await recoverWorkspace(selected.workspace.id) } catch (recoveryFailure) { setError(recoveryFailure.message) }
+          try { await recoverWorkspace(selected.workspace.id) } catch (recoveryFailure) { setError(recoveryFailure) }
         }
       }
     }
@@ -2047,7 +2053,7 @@ function App() {
       history.replaceState(null, '', location.pathname + location.search)
       await loadWorkspace(workspace.id)
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSavingLeave(false)
     }
@@ -2062,7 +2068,7 @@ function App() {
       onSignOut={handleSignOut}
       requestLeave={requestLeave} busy={loading || mutations > 0 || savingLeave} switchingSubscription={loading} />
       : <><AppBar user={null} /><main className="auth-state"><h1>{error ? 'Unable to sign in' : 'Signing in...'}</h1></main></>}
-    {error && <p className="account-error" role="alert">{error}</p>}
+    <ErrorDialog error={error} message="We couldn't access your account or subscription. Please try again." />
     {leave && <div className="dialog-overlay leave-confirmation-overlay"><section className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="leave-title">
       <h2 id="leave-title"><Save size={22} aria-hidden="true" />{leave.title}</h2><p>Save your changes before leaving?</p>
       <div className="dialog-actions">
@@ -2074,4 +2080,6 @@ function App() {
   </>
 }
 
-export default App
+export default function App() {
+  return <ErrorDialogProvider><AppContent /></ErrorDialogProvider>
+}

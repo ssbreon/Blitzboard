@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, X } from 'lucide-react'
 import { getCategoryBadgeStyle } from './CategoryBadge'
 import { BreadcrumbCacheContext } from '../utils/breadcrumbCacheContext'
+import { ErrorDialog } from './ErrorDialog'
 
 const PAGE_SIZE = 50
 
@@ -111,7 +112,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message)
+        if (!cancelled) setError(err)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -202,7 +203,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
       await onReorder(next.map((row) => row.id))
     } catch (err) {
       setRows(previous)
-      setReorderError(err.message)
+      setReorderError(err)
     } finally {
       setPendingPageIds([])
       setReordering(false)
@@ -402,12 +403,12 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
         </div>
       )}
       {isLoading && <p className="data-grid-status data-grid-loading" role="status">Loading {title.toLowerCase()}...</p>}
-      {error && <p className="data-grid-status data-grid-error">Unable to load {title.toLowerCase()}: {error}</p>}
-      {reorderError && <p className="data-grid-status data-grid-error" role="alert">Unable to reorder {title.toLowerCase()}: {reorderError}</p>}
+      <ErrorDialog error={error} message={`We couldn't load ${title.toLowerCase()}. Please refresh the list to try again.`} />
+      <ErrorDialog error={reorderError} message={`We couldn't save the new order of ${title.toLowerCase()}. Please try again.`} />
       {!isLoading && !error && (
         <>
           <div className="data-grid-table-wrap">
-            <table className="data-grid-table">
+            <table className={`data-grid-table${selectedRowIds.size > 1 ? ' is-multi-select' : ''}`}>
               <thead>
                 <tr>
                   {showPage && <th className="data-grid-page-header" scope="col">Page</th>}
@@ -494,7 +495,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     )}
                     {row.rowType === 'grouping' ? (
                       <>
-                      <td className="data-grid-grouping-cell" colSpan={Math.max(1, columns.length + (hasRowIcons ? 1 : 0) - 1)}>
+                      <td className="data-grid-grouping-cell" colSpan={hasRowIcons ? 2 : 1} >
                         <span className="data-grid-grouping-label">
                           {collapsedGroupingIds.has(row.id)
                             ? <Folder className="data-grid-grouping-icon" size={18} aria-hidden="true" />
@@ -502,7 +503,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                           {row.name}
                         </span>
                       </td>
-                      <td className="data-grid-grouping-description-cell">{row.description}</td>
+                      <td className="data-grid-grouping-description-cell" colSpan={Math.max(1, columns.length + (hasRowIcons ? 1 : 0) - 2)}>{row.description}</td>
                       </>
                     ) : <>
                       {RowIconForRow && (

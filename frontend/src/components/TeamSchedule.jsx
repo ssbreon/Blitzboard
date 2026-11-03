@@ -3,6 +3,7 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, 
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DataGrid } from './DataGrid'
+import { ErrorDialog } from './ErrorDialog'
 import { ScheduleView, buildCalendarDays, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate } from '../utils/scheduleCalendar'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -84,7 +85,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
     try {
       await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }) })
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSaving(false)
     }
@@ -120,7 +121,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
           {!isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
           {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
           </label>}
-          {error && <p className="schedule-error" role="alert">{error}</p>}
+          <ErrorDialog error={error} message="We couldn't save this event. Your changes are still here so you can try again." />
         </div>
         <footer className="schedule-dialog-actions">
           {initialEvent && canDelete && <button type="button" className="schedule-delete-button" onClick={onDelete} disabled={saving}><Trash2 size={16} /> Delete</button>}
@@ -257,7 +258,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         setEvents([...regularEvents, ...games].sort((a, b) => `${a.eventDate} ${eventTime(a)}`.localeCompare(`${b.eventDate} ${eventTime(b)}`)))
         setError(null)
       })
-      .catch((failure) => { if (active) setError(failure.message) })
+      .catch((failure) => { if (active) setError(failure) })
       .finally(() => { if (active) setLoadedRequest(loadRequestKey) })
     return () => { active = false }
   }, [api, loadStart, loadEnd, loadSummary, loadRequestKey])
@@ -316,7 +317,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
       setRefresh((value) => value + 1)
       onWorkspaceUpdated?.()
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setMovingEventKey(null)
       setDraggedEvent(null)
@@ -333,7 +334,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
       setRefresh((value) => value + 1)
       onWorkspaceUpdated?.()
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
       throw failure
     }
   }
@@ -386,7 +387,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           </div>
         </div>
       </header>
-      {error && <p className="schedule-error schedule-page-error" role="alert">{error}</p>}
+      <ErrorDialog error={error} message="We couldn't load or update your schedule. Please try again." />
       {displayMode === 'calendar' ? loading ? <div className="schedule-loading" role="status">Loading schedule…</div>
         : mode === ScheduleView.YEAR ? <YearCalendar date={calendarDate} eventsByDate={eventsByDate} onSelectMonth={(month) => { setCalendarDate(month); setMode(ScheduleView.MONTH) }} />
           : mode === ScheduleView.QUARTER ? <div className="schedule-quarter">{scheduleMonths(calendarDate, mode).map((month, index) => <MonthCalendar key={monthKey(month)} month={month} showHeading highlightCurrent={index === 1} {...calendarProps} />)}</div>

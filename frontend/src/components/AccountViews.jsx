@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
+import { ErrorDialog } from './ErrorDialog'
 import { PLAY_THEMES } from '../utils/themes'
 
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
@@ -42,7 +43,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       if (!active) return
       if (view === 'team') { setMembers(result[0].items); setInvitations(result[1].items); setDeliveryMode(result[1].deliveryMode) }
       else setBilling(result)
-    }).catch((failure) => { if (active) setError(failure.message) })
+    }).catch((failure) => { if (active) setError(failure) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [api, view, workspace.role])
@@ -73,7 +74,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       if (isAccountDialog) onSaved?.()
       return true
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
       return false
     } finally {
       setSaving(false)
@@ -123,7 +124,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       setMembers((await api.members()).items)
       onWorkspaceUpdated(await api.workspace())
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSaving(false)
     }
@@ -144,7 +145,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       setDeliveryMode(result.deliveryMode)
       onWorkspaceUpdated(await api.workspace())
     } catch (failure) {
-      setError(failure.message)
+      setError(failure)
     } finally {
       setSaving(false)
     }
@@ -152,11 +153,12 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
 
   async function copyInvitation(invite) {
     setInvitationCopyFeedback(null)
+    setError(null)
     try {
       await navigator.clipboard.writeText(invite.capturedUrl)
-      setInvitationCopyFeedback({ id: invite.id, message: 'Invitation link copied', failed: false })
-    } catch {
-      setInvitationCopyFeedback({ id: invite.id, message: 'Unable to copy the invitation link', failed: true })
+      setInvitationCopyFeedback({ id: invite.id, message: 'Invitation link copied' })
+    } catch (failure) {
+      setError({ ...failure, message: `Unable to copy the invitation link: ${failure.message}` })
     }
   }
 
@@ -197,7 +199,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           <div><dt>Your role</dt><dd className="account-role account-dialog-role">{workspace.role}</dd></div>
         </dl>
       : <div className="account-view-context"><span>{workspace.name}</span><span className="account-role">{workspace.role}</span></div>}
-    {error && <p className="account-error" role="alert">{error}</p>}
+    <ErrorDialog error={error} message="We couldn't complete the account request. Please try again." />
     {notice && <p className="account-notice" role="status">{notice}</p>}
 
     {['profile', 'settings'].includes(view) && <form className="account-form" onSubmit={save}>
@@ -266,7 +268,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             columns={[
               { key: 'email', header: 'Email', render: (email, invite) => <>
                 <span>{email}</span>
-                {invitationCopyFeedback?.id === invite.id && <span className={`account-invitation-copy-feedback${invitationCopyFeedback.failed ? ' failed' : ''}`} role={invitationCopyFeedback.failed ? 'alert' : 'status'}>{invitationCopyFeedback.message}</span>}
+                {invitationCopyFeedback?.id === invite.id && <span className="account-invitation-copy-feedback" role="status">{invitationCopyFeedback.message}</span>}
               </> },
               { key: 'role', header: 'Role', render: (role) => <span className="account-role">{role}</span> },
               { key: 'status', header: 'Status', render: (status) => <span className="account-invitation-status" data-status={status}>{status}</span> },

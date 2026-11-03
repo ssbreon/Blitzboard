@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ErrorDialog } from './ErrorDialog'
 import { Check, ChevronDown, Circle, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
 import { PlayDiagramIcon } from './PlayDiagramIcon'
@@ -142,6 +143,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const initialTheme = normalizeThemeId(record.initialTheme)
   const [name, setName] = useState(record.name)
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const etagRef = useRef(record._etag)
   const [error, setError] = useState(null)
   const [markers, setMarkers] = useState(record.initialMarkers || [])
   const [drawings, setDrawings] = useState(normalizeDrawings(record.initialDrawings))
@@ -257,7 +260,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       .catch((err) => {
         if (!cancelled) {
           setSlidesLoadError(true)
-          setError(`Unable to load adjustments: ${err.message}`)
+          setError({ ...err, message: `Unable to load adjustments: ${err.message}` })
         }
       })
       .finally(() => {
@@ -417,7 +420,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   async function handleSave() {
-    if (readOnly) return false
+    if (readOnly || savingRef.current) return false
+    savingRef.current = true
     setSaving(true)
     setError(null)
     try {
@@ -441,11 +445,13 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         setActiveSlideTitle(title)
         setSlideDraftTitles((current) => ({ ...current, [activeSlideId]: title }))
       } else {
-        const payload = { ...designPayload, name, gameType }
+        const payload = { ...designPayload, name, gameType, _etag: etagRef.current }
         if (record.kind === 'play') {
-          await api.updatePlay(record.parentId, record.id, payload)
+          const updated = await api.updatePlay(record.parentId, record.id, payload)
+          etagRef.current = updated._etag
         } else {
-          await api.updateScoutPlay(record.parentId, record.id, payload)
+          const updated = await api.updateScoutPlay(record.parentId, record.id, payload)
+          etagRef.current = updated._etag
         }
         setSavedName(name)
         onNameSaved?.(name)
@@ -465,9 +471,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       delete slideDraftsRef.current[activeSlideId || 'base']
       return true
     } catch (err) {
-      setError(`Unable to save: ${err.message}`)
+      setError({ ...err, message: `Unable to save: ${err.message}` })
       return false
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -484,7 +491,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   async function saveNavigationDrafts() {
-    if (readOnly || settingsOpen) return false
+    if (readOnly || settingsOpen || savingRef.current) return false
+    savingRef.current = true
     setSaving(true)
     setError(null)
     const drafts = { ...slideDraftsRef.current, [activeSlideId || 'base']: captureCurrentDraft() }
@@ -494,8 +502,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         const { templateId: draftTemplate, name: draftName, title: draftTitle, ...design } = draft
         const payload = { ...design, template: draftTemplate }
         if (slideId === 'base') {
-          if (record.kind === 'play') await api.updatePlay(record.parentId, record.id, { ...payload, name: draftName })
-          else await api.updateScoutPlay(record.parentId, record.id, { ...payload, name: draftName })
+          const versionedPayload = { ...payload, name: draftName, _etag: etagRef.current }
+          const updated = record.kind === 'play'
+            ? await api.updatePlay(record.parentId, record.id, versionedPayload)
+            : await api.updateScoutPlay(record.parentId, record.id, versionedPayload)
+          etagRef.current = updated._etag
         } else {
           await api.updateSlide(record.parentId, record.id, slideId, { ...payload, title: draftTitle || 'Adjustment' })
         }
@@ -503,9 +514,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       slideDraftsRef.current = {}
       return true
     } catch (failure) {
-      setError(`Unable to save: ${failure.message}`)
+      setError({ ...failure, message: `Unable to save: ${failure.message}` })
       return false
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -568,7 +580,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       setActiveSlideTitle(created.title || title)
       restoreDesign(adjustmentDesign(created, currentDesign))
     } catch (err) {
-      setError(`Unable to add adjustment: ${err.message}`)
+      setError({ ...err, message: `Unable to add adjustment: ${err.message}` })
     } finally {
       setSaving(false)
     }
@@ -597,7 +609,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         delete slideDraftsRef.current.base
       }
     } catch (err) {
-      setError(`Unable to delete adjustment: ${err.message}`)
+      setError({ ...err, message: `Unable to delete adjustment: ${err.message}` })
       throw err
     } finally {
       setRemovingSlideId(null)
@@ -1398,7 +1410,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </button>,
         breadcrumbSettingsTarget,
       )}
-      {error && <p className="data-grid-status data-grid-error">{error}</p>}
+      <ErrorDialog error={error} message="We couldn't complete the play request. Please try again before leaving this play." />
       {slideToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${slideToDelete.title || 'Adjustment'}"? This cannot be undone.`}
         onCancel={() => setSlideToDelete(null)}

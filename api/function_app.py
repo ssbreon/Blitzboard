@@ -144,9 +144,18 @@ class Storage:
                 record.update(saved)
                 return record
             except HttpResponseError as error:
+                if error.status_code == 412 and entity_type in {"plays", "scoutPlays"}:
+                    raise accounts.AccountError("RECORD_CHANGED", "This record has been changed by another person or process. Your changes have not been saved. Reopen the record to load the latest version before trying again.", 412) from None
                 if isinstance(error, ResourceExistsError) or error.status_code == 412:
                     raise accounts.AccountError("RECORD_CHANGED", "This record changed during the operation; reload and retry", 409) from None
                 raise
+        if entity_type in {"plays", "scoutPlays"}:
+            previous = self.memory[entity_type].get(record["id"])
+            if previous is not None and record.get("_etag") != previous.get("_etag"):
+                raise accounts.AccountError("RECORD_CHANGED", "This record has been changed by another person or process. Your changes have not been saved. Reopen the record to load the latest version before trying again.", 412)
+            record["_etag"] = '"' + str(uuid4()) + '"'
+            self.memory[entity_type][record["id"]] = dict(record)
+            return record
         self.memory[entity_type][record["id"]] = record
         return record
 
@@ -357,7 +366,7 @@ def list_playbook_rows(parent_id, name_prefix, summary=False):
                               fields=("id", "parentId", "title", "workspaceId", "ownerId"), parent_ids=adjustments)
         for slide in slides:
             adjustments[slide["parentId"]].append(slide.get("title") or "Adjustment")
-    omitted = {"markers", "drawings", "textAnnotations", "zones", "createdAt", "theme", "_etag", "_rid", "_self", "_ts", "_attachments"}
+    omitted = {"markers", "drawings", "textAnnotations", "zones", "createdAt", "theme", "_rid", "_self", "_ts", "_attachments"}
     return [{**{key: value for key, value in row.items() if key not in omitted},
              **({"adjustments": adjustments[row["id"]]} if row.get("rowType") != "grouping" else {})} for row in rows]
 
@@ -397,6 +406,13 @@ def update_record(entity_type, item_id, payload):
     record = storage.get(entity_type, item_id)
     if record is None:
         return None
+    if entity_type in {"plays", "scoutPlays"}:
+        expected_etag = payload.get("_etag")
+        if not isinstance(expected_etag, str) or not expected_etag.strip() or expected_etag == "*":
+            raise accounts.AccountError("ETAG_REQUIRED", "Reopen this record to load its version before saving. Your changes have not been saved.", 428)
+        if expected_etag != record.get("_etag"):
+            raise accounts.AccountError("RECORD_CHANGED", "This record has been changed by another person or process. Your changes have not been saved. Reopen the record to load the latest version before trying again.", 412)
+        record["_etag"] = expected_etag
     immutable_fields = {"id", "ownerId", "workspaceId", "createdBy", "parentId", "entityType", "partitionKey", "createdAt", "page", "_etag", "_rid", "_self", "_ts", "_attachments"}
     record.update({key: value for key, value in payload.items() if key not in immutable_fields})
     record["updatedAt"] = now()
