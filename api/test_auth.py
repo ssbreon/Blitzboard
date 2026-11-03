@@ -49,6 +49,58 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_schedule_range_filters_dates_inclusively_and_preserves_scope(self):
+        for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {})):
+            for date in ("2025-12-31", "2026-01-01", "2026-02-28", "2026-03-01"):
+                self.assertEqual(call_api("POST", path, "local-coach", {"name": date, date_field: date, **extra}).status_code, 201)
+            call_api("POST", path, "other-coach", {"name": "Private", date_field: "2026-01-15", **extra})
+            request = FakeRequest("GET", path, "local-coach")
+            request.params = {"start": "2026-01-01", "end": "2026-02-28"}
+            result = function_app.api(request)
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(sorted(item[date_field] for item in response_json(result)["items"]), ["2026-01-01", "2026-02-28"])
+            self.assertEqual(len(response_json(call_api("GET", path, "local-coach"))["items"]), 4)
+            request.params = {"end": "2026-01-01"}
+            self.assertEqual(len(response_json(function_app.api(request))["items"]), 2)
+
+    def test_schedule_range_rejects_invalid_dates_and_reversed_bounds(self):
+        for path in ("schedule-events", "game-plans"):
+            for params in ({"start": "2026-02-30"}, {"end": "2026-1-1"}, {"start": ""}, {"start": "2026-03-01", "end": "2026-02-01"}, {"start": "' OR 1=1 --"}):
+                request = FakeRequest("GET", path, "local-coach")
+                request.params = params
+                result = function_app.api(request)
+                self.assertEqual(result.status_code, 400)
+                self.assertEqual(response_json(result)["error"]["code"], "VALIDATION_ERROR")
+
+    def test_schedule_summary_omits_expanded_data_and_child_queries(self):
+        for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {"opponent": "Falcons"})):
+            call_api("POST", path, "local-coach", {"name": "Summary", date_field: "2026-01-15", "startTime": "16:30", "notes": "Large notes", "installPlaybookIds": ["book"], **extra})
+            request = FakeRequest("GET", path, "local-coach")
+            request.params = {"start": "2026-01-01", "end": "2026-12-31", "scheduleSummary": "true"}
+            with patch.object(function_app, "with_child_count", side_effect=AssertionError("Year summary should not load child counts")):
+                result = function_app.api(request)
+            self.assertEqual(result.status_code, 200)
+            record = response_json(result)["items"][0]
+            self.assertEqual(record[date_field], "2026-01-15")
+            self.assertEqual(record["startTime"], "16:30")
+            self.assertNotIn("notes", record)
+            self.assertNotIn("installPlaybookIds", record)
+            self.assertIn("ownerId", record)
+
+    def test_schedule_range_uses_parameterized_cosmos_query(self):
+        adapter = function_app.Storage()
+        adapter.container = Mock()
+        adapter.container.query_items.return_value = []
+        for entity, field in (("scheduleEvents", "eventDate"), ("gamePlans", "gameDate")):
+            adapter.list(entity, owner_id="local-coach", start="2026-01-01", end="2026-03-31")
+            query = adapter.container.query_items.call_args.args[0]
+            parameters = adapter.container.query_items.call_args.kwargs["parameters"]
+            self.assertIn(f"c.{field} >= @start", query)
+            self.assertIn(f"c.{field} <= @end", query)
+            self.assertNotIn("2026-01-01", query)
+            self.assertIn({"name": "@start", "value": "2026-01-01"}, parameters)
+            self.assertIn({"name": "@end", "value": "2026-03-31"}, parameters)
+
     def test_search_rejects_overlong_terms(self):
         for path, parameter in (("search", "q"), ("playbooks", "namePrefix"), ("game-plans", "namePrefix")):
             request = FakeRequest("GET", path, "local-coach")

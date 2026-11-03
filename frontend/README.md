@@ -136,6 +136,36 @@ Run the focused regression checks from the workspace root:
 node --test frontend/src/utils/breadcrumbCache.test.js
 ```
 
+### Team Schedule
+
+Calendar View supports Week, Month, Quarter, and Year. Month is the initial
+default; the last selection is saved in local storage as `teamScheduleView`.
+Quarter stacks the previous, selected, and next months using the shared month
+renderer and highlights the selected month's heading. Previous/Next shifts the
+window by one month; Today and Jump to Date center it on the selected month.
+Quarter rows grow to fit events and the calendar scrolls internally.
+
+Year shows all twelve months with event-type indicators, using four columns on
+desktop, three on tablet, and one on mobile. Selecting a month opens Month View.
+Year navigation advances one year. The existing Grid View follows the selected
+period and retains full event records. Event dialogs, adding events, drag handles,
+and opening Game Plans use the existing interactions.
+
+Both `GET /api/schedule-events` and `GET /api/game-plans` accept optional inclusive
+`start` and `end` bounds in `YYYY-MM-DD` format. Invalid dates and reversed bounds
+return HTTP 400. Existing unfiltered calls remain supported and workspace
+isolation is unchanged. Month and Quarter calendar requests include their visible
+spillover days. Year Calendar View requests `scheduleSummary=true` to omit notes,
+expanded Game Plan fields, and child-count queries. This is separate from the
+existing grid `summary` parameter; no schema changes are required.
+
+Run the focused schedule checks from the workspace root:
+
+```powershell
+npm --prefix frontend run test:schedule
+.\.venv\Scripts\python.exe -m unittest discover -s api -p test_auth.py -k schedule
+```
+
 ### Local Configuration
 
 Keep the existing development credentials in the ignored API local settings and

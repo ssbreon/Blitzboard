@@ -47,6 +47,14 @@ const listQuery = (category, namePrefix, summary = false, preserveTheme = false)
   return query ? `?${query}` : ''
 }
 
+const scheduleQuery = (range, query = '') => {
+  const params = new URLSearchParams(query)
+  if (range?.start) params.set('start', range.start)
+  if (range?.end) params.set('end', range.end)
+  if (range?.summary) params.set('scheduleSummary', 'true')
+  return params.size ? `?${params}` : ''
+}
+
 async function sendRequest(path, options = {}, workspaceId) {
   const { headers = {}, ...fetchOptions } = options
   const response = await fetch(`${baseUrl}/api${path}`, {
@@ -122,12 +130,12 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   deleteSlide: (bookId, playId, slideId) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`, { method: 'DELETE' }),
   createExport: (payload) => request('/exports', { method: 'POST', body: JSON.stringify(payload) }),
   getExport: (id) => request(`/exports/${id}`),
-  listGamePlans: (category, namePrefix, summary = false) => request(`/game-plans${listQuery(category, namePrefix, summary)}`),
+  listGamePlans: (category, namePrefix, summary = false, range) => request(`/game-plans${scheduleQuery(range, listQuery(category, namePrefix, summary))}`),
   createGamePlan: (payload) => request('/game-plans', { method: 'POST', body: JSON.stringify(payload) }),
   getGamePlan: (id) => request(`/game-plans/${id}`),
   updateGamePlan: (id, payload) => request(`/game-plans/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteGamePlan: (id) => request(`/game-plans/${id}`, { method: 'DELETE' }),
-  listScheduleEvents: () => request('/schedule-events'),
+  listScheduleEvents: (range) => request(`/schedule-events${scheduleQuery(range)}`),
   createScheduleEvent: (payload) => request('/schedule-events', { method: 'POST', body: JSON.stringify(payload) }),
   updateScheduleEvent: (id, payload) => request(`/schedule-events/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteScheduleEvent: (id) => request(`/schedule-events/${id}`, { method: 'DELETE' }),

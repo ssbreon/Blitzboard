@@ -3,8 +3,19 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, 
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DataGrid } from './DataGrid'
+import { ScheduleView, buildCalendarDays, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate } from '../utils/scheduleCalendar'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const SCHEDULE_VIEWS = Object.values(ScheduleView)
+const EVENT_INDICATORS = { Practice: '\u25cf', Game: '\u25a0', 'Team Meeting': '\u25b2', 'Film Review': '\u25c6', Other: '\u25cb' }
+function savedScheduleView() {
+  try {
+    const saved = localStorage.getItem('teamScheduleView')
+    return SCHEDULE_VIEWS.includes(saved) ? saved : ScheduleView.MONTH
+  } catch {
+    return ScheduleView.MONTH
+  }
+}
 const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Other']
 const EVENT_TYPE_ICONS = {
   Game: Trophy,
@@ -121,25 +132,84 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
   )
 }
 
-function buildCalendarDays(date, mode) {
-  if (mode === 'week') {
-    const first = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay())
-    return Array.from({ length: 7 }, (_, index) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + index))
-  }
-  const first = new Date(date.getFullYear(), date.getMonth(), 1)
-  const start = new Date(first.getFullYear(), first.getMonth(), -first.getDay() + 1)
-  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
-  const weekCount = Math.ceil((first.getDay() + daysInMonth) / 7)
-  return Array.from({ length: weekCount * 7 }, (_, index) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + index))
+function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onDragEvent, onDragEnd }) {
+  const eventKey = `${event.kind}-${event.id}`
+  const eventClass = `schedule-event schedule-event-${event.kind === 'game' ? 'game' : event.eventType.toLowerCase().replaceAll(' ', '-')}`
+  const isMoving = movingEventKey === eventKey
+  return <div className={eventClass}>
+    <button type="button" className="schedule-event-content" onClick={() => onOpenEvent(event)} title={`${calendarTime(event)} ${event.name}`}>
+      {event.kind === 'game' ? <><span className="schedule-football" aria-hidden="true">🏈</span>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{gameEventLabel(event)}</span></> : <>{event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{event.name}</span></>}
+    </button>
+    {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
+      dragEvent.dataTransfer.effectAllowed = 'move'
+      dragEvent.dataTransfer.setData('text/plain', eventKey)
+      onDragEvent(event)
+    }} onDragEnd={onDragEnd}>{isMoving ? <LoaderCircle size={15} className="schedule-event-saving-spinner" aria-hidden="true" /> : <GripVertical size={15} aria-hidden="true" />}</button>}
+  </div>
+}
+
+function ScheduleDays({ month, mode, eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey, onDropTarget, onMoveEvent, onAddEvent, ...eventProps }) {
+  const days = buildCalendarDays(month, mode)
+  const today = dateKey(new Date())
+  return <>
+    <div className="schedule-weekdays" aria-hidden="true">{WEEKDAYS.map((label) => <div key={label}>{label}</div>)}</div>
+    <div className="schedule-days">{days.map((date) => {
+      const key = dateKey(date)
+      return <section key={key} className={`schedule-day${date.getMonth() !== month.getMonth() && mode === 'month' ? ' outside-month' : ''}${key === today ? ' today' : ''}${dropTargetDate === key ? ' schedule-drop-target' : ''}`} aria-label={displayDate(date)}
+        onDragOver={(dragEvent) => {
+          if (!canEdit || !draggedEvent || draggedEvent.eventDate === key || movingEventKey) return
+          dragEvent.preventDefault()
+          dragEvent.dataTransfer.dropEffect = 'move'
+          onDropTarget(key)
+        }}
+        onDragLeave={(dragEvent) => { if (!dragEvent.currentTarget.contains(dragEvent.relatedTarget)) onDropTarget(null) }}
+        onDrop={(dropEvent) => {
+          dropEvent.preventDefault()
+          onDropTarget(null)
+          if (draggedEvent) void onMoveEvent(draggedEvent, key)
+        }}>
+        <header><span>{date.getDate()}</span>{mode === 'week' && <small>{date.toLocaleDateString(undefined, { month: 'short' })}</small>}{canEdit && <button type="button" className="schedule-day-add" aria-label={`Add event ${key}`} onClick={() => onAddEvent(key)}><Plus size={15} /></button>}</header>
+        <div className="schedule-day-events">{(eventsByDate.get(key) || []).map((event) => <CalendarEventPill key={`${event.kind}-${event.id}`} event={event} canEdit={canEdit} movingEventKey={movingEventKey} {...eventProps} />)}</div>
+      </section>
+    })}</div>
+  </>
+}
+
+export function MonthCalendar({ month, showHeading = false, highlightCurrent = false, ...props }) {
+  const weeks = buildCalendarDays(month, 'month').length / 7
+  return <section className={`schedule-calendar schedule-month schedule-month-${weeks}-weeks${highlightCurrent ? ' schedule-centered-month' : ''}`} aria-label={month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}>
+    {showHeading && <h2 className="schedule-calendar-heading">{month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h2>}
+    <ScheduleDays month={month} mode="month" {...props} />
+  </section>
+}
+
+export function YearCalendar({ date, eventsByDate, onSelectMonth }) {
+  const today = dateKey(new Date())
+  return <div className="schedule-year">
+    <div className="schedule-year-legend" aria-label="Event types">{Object.entries(EVENT_INDICATORS).map(([type, symbol]) => <span key={type}><span className={`schedule-indicator schedule-indicator-${type.toLowerCase().replaceAll(' ', '-')}`} aria-hidden="true">{symbol}</span>{type}</span>)}</div>
+    <div className="schedule-year-months">{scheduleMonths(date, ScheduleView.YEAR).map((month) => <button key={monthKey(month)} type="button" className="schedule-mini-month" aria-label={`Open ${month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}`} onClick={() => onSelectMonth(month)}>
+      <span className="schedule-mini-heading">{month.toLocaleDateString(undefined, { month: 'long' })}</span>
+      <span className="schedule-mini-weekdays" aria-hidden="true">{WEEKDAYS.map((day) => <span key={day}>{day.slice(0, 2)}</span>)}</span>
+      <span className="schedule-mini-days">{buildCalendarDays(month, 'month').map((day) => {
+        const key = dateKey(day)
+        const inMonth = day.getMonth() === month.getMonth()
+        const dayEvents = inMonth ? eventsByDate.get(key) || [] : []
+        const types = [...new Set(dayEvents.map((event) => event.eventType))]
+        return <span key={key} className={`schedule-mini-day${key === today ? ' today' : ''}`} title={inMonth ? `${displayDate(day)}${dayEvents.length ? `: ${dayEvents.map((event) => `${calendarTime(event)} ${event.name}`).join(', ')}` : ''}` : undefined}>
+          {inMonth && <><span>{day.getDate()}</span><span className="schedule-mini-indicators">{types.map((type) => <span key={type} className={`schedule-indicator schedule-indicator-${type.toLowerCase().replaceAll(' ', '-')}`} aria-label={`${dayEvents.filter((event) => event.eventType === type).length} ${type}`}>{EVENT_INDICATORS[type] || EVENT_INDICATORS.Other}</span>)}</span></>}
+        </span>
+      })}</span>
+    </button>)}</div>
+  </div>
 }
 
 export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated }) {
   const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
-  const [mode, setMode] = useState('month')
+  const [mode, setMode] = useState(savedScheduleView)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const [events, setEvents] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loadedRequest, setLoadedRequest] = useState(null)
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
@@ -148,6 +218,14 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
   const viewMenuRef = useRef(null)
+  const { start: loadStart, end: loadEnd } = scheduleLoadPeriod(calendarDate, mode, displayMode)
+  const loadSummary = mode === ScheduleView.YEAR && displayMode === 'calendar'
+  const loadRequestKey = `${loadStart}/${loadEnd}/${loadSummary}/${refresh}/${cacheVersion}`
+  const loading = loadedRequest !== loadRequestKey
+
+  useEffect(() => {
+    try { localStorage.setItem('teamScheduleView', mode) } catch { return }
+  }, [mode])
 
   useEffect(() => {
     if (!viewMenuOpen) return undefined
@@ -170,7 +248,8 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
 
   useEffect(() => {
     let active = true
-    Promise.all([api.listScheduleEvents(), api.listGamePlans()])
+    const range = { start: loadStart, end: loadEnd, summary: loadSummary }
+    Promise.all([api.listScheduleEvents(range), api.listGamePlans(undefined, undefined, false, range)])
       .then(([eventResult, gameResult]) => {
         if (!active) return
         const regularEvents = eventResult.items.map((event) => ({ ...event, kind: 'event', eventDate: event.eventDate }))
@@ -179,17 +258,11 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         setError(null)
       })
       .catch((failure) => { if (active) setError(failure.message) })
-      .finally(() => { if (active) setLoading(false) })
+      .finally(() => { if (active) setLoadedRequest(loadRequestKey) })
     return () => { active = false }
-  }, [api, refresh, cacheVersion])
+  }, [api, loadStart, loadEnd, loadSummary, loadRequestKey])
 
-  const days = buildCalendarDays(calendarDate, mode)
-  const periodStart = mode === 'week'
-    ? dateKey(days[0])
-    : `${monthKey(calendarDate)}-01`
-  const periodEnd = mode === 'week'
-    ? dateKey(days[days.length - 1])
-    : dateKey(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 0))
+  const { start: periodStart, end: periodEnd } = schedulePeriod(calendarDate, mode)
   const todayKey = dateKey(new Date())
   const periodEvents = events
     .filter((event) => event.eventDate >= periodStart && event.eventDate <= periodEnd)
@@ -201,9 +274,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }
 
   function moveCalendar(direction) {
-    setCalendarDate((current) => mode === 'week'
-      ? new Date(current.getFullYear(), current.getMonth(), current.getDate() + direction * 7)
-      : new Date(current.getFullYear(), current.getMonth() + direction, 1))
+    setCalendarDate((current) => shiftScheduleDate(current, mode, direction))
   }
 
   async function saveEvent(values) {
@@ -267,9 +338,17 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     }
   }
 
-  function eventsForDay(date) {
-    const key = dateKey(date)
-    return events.filter((event) => event.eventDate === key)
+  const eventsByDate = new Map()
+  for (const event of events) {
+    if (event._gridDeleted) continue
+    if (!eventsByDate.has(event.eventDate)) eventsByDate.set(event.eventDate, [])
+    eventsByDate.get(event.eventDate).push(event)
+  }
+  const calendarProps = {
+    eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey,
+    onDropTarget: setDropTargetDate, onMoveEvent: moveEventToDate,
+    onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent,
+    onDragEvent: setDraggedEvent, onDragEnd: () => { setDraggedEvent(null); setDropTargetDate(null) },
   }
 
   return (
@@ -286,8 +365,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           <button type="button" className="schedule-icon-button" aria-label="Next period" onClick={() => moveCalendar(1)}><ChevronRight size={20} /></button>
           <div className="schedule-view-actions">
             <div className="schedule-view-switch" role="group" aria-label="Calendar view">
-              <button type="button" aria-pressed={mode === 'month'} onClick={() => setMode('month')}>Month</button>
-              <button type="button" aria-pressed={mode === 'week'} onClick={() => setMode('week')}>Week</button>
+              {SCHEDULE_VIEWS.map((view) => <button key={view} type="button" aria-pressed={mode === view} onClick={() => setMode(view)}>{view[0].toUpperCase() + view.slice(1)}</button>)}
             </div>
             <div className="schedule-view-menu" ref={viewMenuRef}>
               <button type="button" className="hamburger-button" aria-label="Schedule view options" aria-haspopup="true" aria-expanded={viewMenuOpen} title="Schedule view options" onClick={() => setViewMenuOpen((open) => !open)}>
@@ -309,46 +387,12 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         </div>
       </header>
       {error && <p className="schedule-error schedule-page-error" role="alert">{error}</p>}
-      {displayMode === 'calendar' ? <div className={`schedule-calendar schedule-${mode}${mode === 'month' ? ` schedule-month-${days.length / 7}-weeks` : ''}`}>
-        <div className="schedule-weekdays" aria-hidden="true">{(mode === 'month' ? WEEKDAYS : days.map((day) => WEEKDAYS[day.getDay()])).map((label, index) => <div key={`${label}-${index}`}>{label}</div>)}</div>
-        {loading ? <div className="schedule-loading" role="status">Loading schedule…</div> : <div className="schedule-days">
-          {days.map((date) => {
-            const dayEvents = eventsForDay(date)
-            const outsideMonth = date.getMonth() !== calendarDate.getMonth()
-            return <section key={dateKey(date)} className={`schedule-day${outsideMonth && mode === 'month' ? ' outside-month' : ''}${dateKey(date) === dateKey(new Date()) ? ' today' : ''}${dropTargetDate === dateKey(date) ? ' schedule-drop-target' : ''}`} aria-label={displayDate(date)}
-              onDragOver={(dragEvent) => {
-                if (!canEdit || !draggedEvent || draggedEvent.eventDate === dateKey(date) || movingEventKey) return
-                dragEvent.preventDefault()
-                dragEvent.dataTransfer.dropEffect = 'move'
-                setDropTargetDate(dateKey(date))
-              }}
-              onDragLeave={(dragEvent) => { if (!dragEvent.currentTarget.contains(dragEvent.relatedTarget)) setDropTargetDate(null) }}
-              onDrop={(dropEvent) => {
-                dropEvent.preventDefault()
-                setDropTargetDate(null)
-                if (draggedEvent) void moveEventToDate(draggedEvent, dateKey(date))
-              }}>
-              <header><span>{date.getDate()}</span>{mode === 'week' && <small>{date.toLocaleDateString(undefined, { month: 'short' })}</small>}{canEdit && <button type="button" className="schedule-day-add" aria-label={`Add event ${dateKey(date)}`} onClick={() => setDialog({ date: dateKey(date) })}><Plus size={15} /></button>}</header>
-              <div className="schedule-day-events">{dayEvents.filter((event) => !event._gridDeleted).map((event) => {
-                const eventKey = `${event.kind}-${event.id}`
-                const eventClass = `schedule-event schedule-event-${event.kind === 'game' ? 'game' : event.eventType.toLowerCase().replaceAll(' ', '-')}`
-                const eventTitle = `${calendarTime(event)} ${event.name}`
-                const isMoving = movingEventKey === eventKey
-                return <div key={eventKey} className={eventClass}>
-                  <button type="button" className="schedule-event-content" onClick={() => openEvent(event)} title={eventTitle}>
-                    {event.kind === 'game' ? <><span className="schedule-football" aria-hidden="true">🏈</span>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{gameEventLabel(event)}</span></> : <>{event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{event.name}</span></>}
-                  </button>
-                  {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
-                    dragEvent.dataTransfer.effectAllowed = 'move'
-                    dragEvent.dataTransfer.setData('text/plain', eventKey)
-                    setDraggedEvent(event)
-                  }} onDragEnd={() => { setDraggedEvent(null); setDropTargetDate(null) }}>{isMoving ? <LoaderCircle size={15} className="schedule-event-saving-spinner" aria-hidden="true" /> : <GripVertical size={15} aria-hidden="true" />}</button>}
-                </div>
-              })}</div>
-            </section>
-          })}
-        </div>}
-      </div> : <section className="schedule-grid-view" aria-label="Schedule events">
+      {displayMode === 'calendar' ? loading ? <div className="schedule-loading" role="status">Loading schedule…</div>
+        : mode === ScheduleView.YEAR ? <YearCalendar date={calendarDate} eventsByDate={eventsByDate} onSelectMonth={(month) => { setCalendarDate(month); setMode(ScheduleView.MONTH) }} />
+          : mode === ScheduleView.QUARTER ? <div className="schedule-quarter">{scheduleMonths(calendarDate, mode).map((month, index) => <MonthCalendar key={monthKey(month)} month={month} showHeading highlightCurrent={index === 1} {...calendarProps} />)}</div>
+            : mode === ScheduleView.MONTH ? <MonthCalendar month={calendarDate} {...calendarProps} />
+              : <div className="schedule-calendar schedule-week"><ScheduleDays month={calendarDate} mode="week" {...calendarProps} /></div>
+        : <section className="schedule-grid-view" aria-label="Schedule events">
         {loading ? <div className="schedule-loading" role="status">Loading schedule…</div> : !error && <DataGrid
           title="Schedule Events"
           columns={scheduleGridColumns}

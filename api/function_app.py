@@ -46,6 +46,22 @@ def validate_record_status(entity_type, payload):
         raise accounts.AccountError("VALIDATION_ERROR", "recordStatus must be Active or Archived")
 
 
+def schedule_range(req):
+    bounds = {key: req.params.get(key) for key in ("start", "end")}
+    for key, value in bounds.items():
+        if value is None:
+            continue
+        try:
+            parsed = datetime.strptime(value, "%Y-%m-%d").date()
+            if parsed.isoformat() != value:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise accounts.AccountError("VALIDATION_ERROR", f"{key} must be a valid date in YYYY-MM-DD format") from None
+    if bounds["start"] and bounds["end"] and bounds["start"] > bounds["end"]:
+        raise accounts.AccountError("VALIDATION_ERROR", "start must not be after end")
+    return bounds
+
+
 class Storage:
     def __init__(self):
         self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits")}
@@ -67,8 +83,9 @@ class Storage:
                 partition_key={"paths": ["/partitionKey"], "kind": "Hash"},
             )
 
-    def list(self, entity_type, parent_id=None, category=None, name_prefix=None, owner_id=None, workspace_id=None, fields=None, parent_ids=None):
+    def list(self, entity_type, parent_id=None, category=None, name_prefix=None, owner_id=None, workspace_id=None, fields=None, parent_ids=None, start=None, end=None):
         scope = workspace_id or (request_workspace.get()["id"] if owner_id and request_workspace.get() else None)
+        date_field = {"scheduleEvents": "eventDate", "gamePlans": "gameDate"}.get(entity_type)
         if self.container:
             selection = ", ".join(f"c.{field}" for field in fields) if fields else "*"
             query = f"SELECT {selection} FROM c WHERE c.entityType = @entityType"
@@ -85,6 +102,12 @@ class Storage:
             if name_prefix:
                 query += " AND STARTSWITH(c.name, @namePrefix, true)"
                 parameters.append({"name": "@namePrefix", "value": name_prefix})
+            if date_field and start:
+                query += f" AND c.{date_field} >= @start"
+                parameters.append({"name": "@start", "value": start})
+            if date_field and end:
+                query += f" AND c.{date_field} <= @end"
+                parameters.append({"name": "@end", "value": end})
             if owner_id and not scope:
                 query += " AND c.ownerId = @ownerId"
                 parameters.append({"name": "@ownerId", "value": owner_id})
@@ -96,6 +119,8 @@ class Storage:
             and (parent_ids is None or record.get("parentId") in parent_ids)
                 and (category is None or record.get("category") == category)
                 and (not name_prefix or (record.get("name") or "").casefold().startswith(name_prefix.casefold()))
+                and (not date_field or not start or (record.get(date_field) or "") >= start)
+                and (not date_field or not end or bool(record.get(date_field)) and record[date_field] <= end)
                 and (accounts.belongs(record, workspace) if workspace else (not scope and (not owner_id or record.get("ownerId") == owner_id)))]
         return [{key: record[key] for key in fields if key in record} for record in records] if fields else records
 
@@ -490,7 +515,8 @@ def dispatch(req, user, workspace, role):
 
     if path == ["schedule-events"]:
         if method == "GET":
-            records = storage.list("scheduleEvents", owner_id=owner_id)
+            fields = ("id", "name", "eventType", "eventDate", "startTime", "workspaceId", "ownerId") if req.params.get("scheduleSummary") == "true" else None
+            records = storage.list("scheduleEvents", owner_id=owner_id, fields=fields, **schedule_range(req))
             return response({"items": records})
         if method == "POST":
             payload = body(req)
@@ -533,7 +559,11 @@ def dispatch(req, user, workspace, role):
 
     if path == ["game-plans"]:
         if method == "GET":
-            records = storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id)
+            bounds = schedule_range(req)
+            if req.params.get("scheduleSummary") == "true":
+                fields = ("id", "name", "opponent", "gameDate", "startTime", "gameSite", "recordStatus", "workspaceId", "ownerId")
+                return response({"items": storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, fields=fields, **bounds)})
+            records = storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, **bounds)
             items = [with_owner_name(with_child_count(record, "scoutPlays", owner_id)) for record in records]
             if req.params.get("summary") == "true":
                 items = [without_grid_only_fields(record) for record in items]
