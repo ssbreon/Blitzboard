@@ -4161,6 +4161,123 @@ html.is-drilling-through * {
   border-top: 1px solid var(--border);
 }
 
+#root:has(> .playbook-slideshow) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.playbook-slideshow {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--primary-tab);
+  text-align: left;
+}
+
+.slideshow-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: none;
+  padding: 10px 16px;
+  background: var(--navy-light);
+  color: #fff;
+}
+
+.slideshow-nav {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--secondary-button-border);
+  border-radius: 6px;
+  background: var(--secondary-button);
+  color: var(--text-h);
+}
+
+.slideshow-nav:disabled {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.3);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.slideshow-heading {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
+  text-align: center;
+}
+
+.slideshow-heading h1 {
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+.slideshow-heading span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
+.slideshow-tabs {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  gap: 4px;
+  padding: 2px;
+  overflow-x: auto;
+}
+
+.slideshow-tabs button {
+  flex: none;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 12px;
+  background: var(--secondary-button);
+  color: var(--text-h);
+}
+
+.slideshow-tabs button[aria-selected='true'] {
+  background: var(--navy-light);
+  color: #fff;
+}
+
+.slideshow-canvas {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.slideshow-canvas .play-field-view {
+  width: 100%;
+  min-height: 0;
+  touch-action: auto;
+}
+
+.slideshow-status {
+  margin: auto;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+}
+
 .play-field-view {
   cursor: default;
 

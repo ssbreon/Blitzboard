@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -14,6 +14,7 @@ import { NewPlayDialog, playCategoriesForCollection } from './components/NewPlay
 import { PlayDiagramIcon } from './components/PlayDiagramIcon'
 import { PlayFieldView } from './components/PlayFieldView'
 import { PlayDesigner } from './components/PlayDesigner'
+import { PlaybookSlideshow } from './components/PlaybookSlideshow'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
 import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
@@ -429,7 +430,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -927,6 +928,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
             onRowDoubleClick={(item) => onOpenGameCardItem(selectedGameCard, item)}
             rowActions={() => [
               { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => handleGameCardItemAction('open', selectedGameCard, item) },
+              { key: 'slideshow', label: 'Slideshow', icon: Presentation, onClick: (item) => onSlideshow(selectedGameCard, item) },
               ...(canDuplicateGameCardItem ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy, onClick: (item) => handleGameCardItemAction('duplicate', selectedGameCard, item) }] : []),
               ...(canDeleteGameCardItem ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleGameCardItemAction('delete', selectedGameCard, item) }] : []),
             ]}
@@ -1053,7 +1055,10 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         newLabel={isGamePlan ? 'Add Play' : newLabel}
         onSecondaryNew={!isGamePlan ? onNewGrouping : undefined}
         secondaryNewLabel="New Grouping"
-        menuItems={[{ label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll }]}
+        menuItems={[
+          ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
+          { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll },
+        ]}
         onRowDoubleClick={onOpenPlay}
         rowActions={rowActions}
       />}
@@ -1093,6 +1098,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [gamePlanTab, setGamePlanTab] = useState(storedBreadcrumb?.gamePlanTab || 'practiceScripts')
   const [cardPlaybook, setCardPlaybook] = useState(null)
   const [designer, setDesigner] = useState(null)
+  const [slideshow, setSlideshow] = useState(false)
+  const slideshowCollection = slideshow && (slideshow === true ? cardPlaybook || parent : slideshow)
   const parentSettingsLabel = cardPlaybook
     ? gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'
     : parent?.kind === 'gamePlan' ? 'Game' : 'Playbook'
@@ -1218,6 +1225,17 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   async function handlePrintCollection(kind, row) {
     const result = kind === 'playbook' ? await api.listPlaybookRows(row.id) : await api.listScoutPlays(row.id)
     setPrintCollection({ collection: { ...row, kind }, plays: result.items })
+  }
+
+  function handleOpenGameCardItem(card, item, present = false) {
+    requestLeave(() => {
+      setDesigner(null)
+      setGamePlanUnit(card.unit)
+      setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
+      setGameCard(card)
+      setCardPlaybook({ ...item, kind: 'playbook' })
+      setSlideshow(present)
+    }, present ? 'Open slideshow' : 'Open game item')
   }
 
   async function handlePrintGrouping(parentId, grouping, collection) {
@@ -1387,6 +1405,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   async function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
     row = await loadPlayDetails(kind, parentId, row)
     if (!row) return
+    setSlideshow(false)
     const template = findPlayTemplate(row.template) || DEFAULT_PLAY_TEMPLATE
     setDesigner({
       kind,
@@ -1430,6 +1449,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           : isReport ? await api.getScoutPlay(collection.id, result.id) : null
         setAccountDialog(null)
         setParentSettingsRequestId(null)
+        setSlideshow(false)
         setDesigner(null)
         setView(root.kind === 'gamePlan' ? 'teamSchedule' : 'playbooks')
         setParent(root)
@@ -1519,6 +1539,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         setGameCard(card)
         setCardPlaybook(collection)
       }
+      if (storedBreadcrumb.slideshow) setSlideshow(storedBreadcrumb.slideshow)
       if (storedDesigner?.id) {
         const row = storedDesigner.kind === 'scoutPlay'
           ? await api.getScoutPlay(storedDesigner.parentId, storedDesigner.id)
@@ -1546,6 +1567,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     parent: parent ? { kind: parent.kind, id: parent.id } : null,
     gameCardId: gameCard?.id ?? null,
     cardPlaybookId: cardPlaybook?.id ?? null,
+    slideshow,
     designer: designer ? { kind: designer.kind, parentId: designer.parentId, id: designer.id, readOnly: Boolean(designer.readOnly) } : null,
   })
 
@@ -1563,6 +1585,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleDeletePlay(kind, parentId, item) }] : []),
     ] : [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (r) => openDesignerForRow(kind, parentId, r, collection) },
+      ...(kind === 'scoutPlay' ? [{ key: 'slideshow', label: 'Slideshow', icon: Presentation, onClick: (item) => requestLeave(() => {
+        setDesigner(null)
+        setSlideshow({ kind: 'scoutPlay', parentId, id: item.id, name: item.name, category: 'Offense' })
+      }, 'Open slideshow') }] : []),
       ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: async (r) => {
         const play = await loadPlayDetails(kind, parentId, r)
@@ -1590,6 +1616,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onWorkspaceChange={onWorkspaceChange}
         onSignOut={onSignOut}
         onNavigate={(nextView) => requestLeave(() => {
+          setSlideshow(false)
           if (['settings', 'profile', 'billing', 'team'].includes(nextView)) {
             setDesigner(null)
             setParent(null)
@@ -1616,6 +1643,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                 type="button"
                 disabled={busy}
                 onClick={() => requestLeave(() => {
+                  setSlideshow(false)
                   setDesigner(null)
                   setParent(null)
                   setGameCard(null)
@@ -1637,11 +1665,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           </li>
           {parent && <li>
             {parent.kind === 'gamePlan' && gameCard ? (
-              <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
+              <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
                 <BreadcrumbLabel icon={CalendarDays}>{gameBreadcrumbLabel(parent)}</BreadcrumbLabel>
               </button>
-            ) : designer ? (
-              <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}>
+            ) : designer || slideshow ? (
+              <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false) }, parent.kind === 'gamePlan' ? 'Return to game' : 'Return to playbook')}>
                 <BreadcrumbLabel icon={parent.kind === 'gamePlan' ? CalendarDays : BookOpen}>
                   {parent.kind === 'gamePlan' ? gameBreadcrumbLabel(parent) : parent.name}
                 </BreadcrumbLabel>
@@ -1653,13 +1681,16 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                 </BreadcrumbLabel>
               </span>
             )}
-            {((parent.kind === 'gamePlan' && !gameCard) || (parent.kind === 'playbook' && !parent.gameCardId)) && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
+            {!slideshow && ((parent.kind === 'gamePlan' && !gameCard) || (parent.kind === 'playbook' && !parent.gameCardId)) && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
           </li>}
           {cardPlaybook && <li>
-            {designer
-              ? <button type="button" disabled={busy} onClick={() => requestLeave(() => setDesigner(null), 'Close play')}><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></button>
+            {designer || slideshow
+              ? <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false) }, 'Return to plays')}><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></button>
               : <span aria-current="page"><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></span>}
-            <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />
+            {!slideshow && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
+          </li>}
+          {slideshow && <li>
+            <span aria-current="page"><BreadcrumbLabel icon={Presentation}>{slideshow === true ? 'Slideshow' : `${slideshow.name} Slideshow`}</BreadcrumbLabel></span>
           </li>}
           {designer && <li>
             <span aria-current="page"><BreadcrumbLabel icon={designer.kind === 'scoutPlay' ? ScanSearch : PlayDiagramIcon}>{designer.name}{designer.nameDirty ? '*' : ''}</BreadcrumbLabel></span>
@@ -1703,6 +1734,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
 
+      {!restoring && slideshowCollection && <PlaybookSlideshow key={`${slideshowCollection.kind}-${slideshowCollection.id}`} api={api} collection={slideshowCollection} />}
       {!restoring && designer && (
         <PlayDesigner
           key={`${designer.kind}-${designer.id}`}
@@ -1723,9 +1755,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
       {!restoring && cardPlaybook && (
-        <BreadcrumbView active={!designer}>
+        <BreadcrumbView active={!designer && !slideshow}>
         <PlaysDrillthroughView
-          active={!designer}
+          active={!designer && !slideshow}
           key={`card-playbook-${cardPlaybook.id}`}
           reloadToken={playsReloadToken + cacheVersion}
           busy={statusSaving}
@@ -1758,9 +1790,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         </BreadcrumbView>
       )}
       {!restoring && parent?.kind === 'playbook' && (
-        <BreadcrumbView active={!designer}>
+        <BreadcrumbView active={!designer && !slideshow}>
         <PlaysDrillthroughView
-          active={!designer}
+          active={!designer && !slideshow}
           key={`plays-${parent.id}`}
           reloadToken={playsReloadToken + cacheVersion}
           busy={statusSaving}
@@ -1784,14 +1816,15 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           newLabel="New Play"
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('play', parent.id, row), 'Open play')}
           onPrintAll={() => handlePrintCollection('playbook', parent)}
+          onSlideshow={() => requestLeave(() => { setDesigner(null); setSlideshow(true) }, 'Open slideshow')}
           rowActions={playRowActions('play', parent.id)}
         />
         </BreadcrumbView>
       )}
       {!restoring && parent?.kind === 'gamePlan' && (
-        <BreadcrumbView active={!designer && !cardPlaybook}>
+        <BreadcrumbView active={!designer && !cardPlaybook && !slideshow}>
         <PlaysDrillthroughView
-          active={!designer && !cardPlaybook}
+          active={!designer && !cardPlaybook && !slideshow}
           key={`scoutPlays-${parent.id}`}
           busy={statusSaving}
           parentRecord={parent}
@@ -1820,12 +1853,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowActions={playRowActions('scoutPlay', parent.id)}
           reloadToken={scoutPlaysReloadToken + playbooksReloadToken + cacheVersion}
           onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card) => setNewDialog({ target: 'gameCardItem', card }) : undefined}
-          onOpenGameCardItem={(card, item) => {
-            setGamePlanUnit(card.unit)
-            setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
-            setGameCard(card)
-            setCardPlaybook({ ...item, kind: 'playbook' })
-          }}
+          onOpenGameCardItem={handleOpenGameCardItem}
+          onSlideshow={(card, item) => handleOpenGameCardItem(card, item, true)}
           onDuplicateGameCardItem={handleDuplicateGameCardItem}
           onDeleteGameCardItem={handleDeleteGameCardItem}
           canAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
