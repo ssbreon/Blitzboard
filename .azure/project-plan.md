@@ -45,11 +45,14 @@ Authentication uses an external OIDC provider, with Microsoft Entra External ID 
 
 **Core entities**: User, Playbook, Membership, Play, Slide, Revision, Annotation, ExportJob, and Asset.
 
-**Authorization roles**: Coordinator/owner manages the playbook and membership; assistant/editor can edit permitted content; viewer can read and export according to policy.
+**Alpha authorization roles**: Owner can manage the workspace and membership; Coach can manage plays, schedules, and game plans within the workspace.
+
+**Workspace ownership invariant**: Every workspace must always have at least one active Owner. The API must reject removal or demotion of the last Owner. Ownership transfer must establish the successor as an Owner before demoting the current Owner, and membership changes must be serialized or conditional so concurrent requests cannot violate the invariant.
 
 **API groups**:
 
 - `GET/POST/PATCH/DELETE /api/playbooks` and nested play/slide routes for CRUD and revisions.
+- `POST /api/workspace/ownership/transfer` lets the current Team Owner promote an existing member; the current Owner remains an Owner until choosing to demote themselves.
 - `GET /api/search` for playbook and metadata search foundations.
 - `POST /api/exports` and `GET /api/exports/{id}` for export requests and status/data retrieval.
 - `GET /api/health` for local and deployed health checks.
@@ -80,6 +83,7 @@ Authentication uses an external OIDC provider, with Microsoft Entra External ID 
 ## 7. Security & Operations
 
 - Validate external OIDC tokens in the Python API and authorize every playbook and export operation by membership and role.
+- Enforce the workspace ownership invariant on the server for all membership changes; never allow a workspace to have zero active Owners.
 - Keep development identity behind an explicit development-only flag and local secret; never ship it enabled in production.
 - Store secrets and connection strings in environment configuration or managed settings, never source files.
 - Use least-privilege storage access and scoped blob download references for exports.

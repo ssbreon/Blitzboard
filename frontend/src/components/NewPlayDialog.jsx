@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
 import { DEFAULT_FIELD_ZONE, FIELD_ZONES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
+import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 
 export const OFFENSE_PLAY_CATEGORIES = ['Formation', 'Shift/Motion', 'Run', 'Pass', 'Play-Action Pass', 'RPO', 'Gadget', 'Generic']
@@ -90,6 +91,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     <div className="dialog-overlay" onClick={handleCancel}>
       <form className="dialog-panel new-play-dialog" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
         <h2>{TitleIcon && <TitleIcon size={26} strokeWidth={1.8} aria-hidden="true" />}{titleLabel}</h2>
+        <DialogCloseButton onClick={handleCancel} />
         <div className="new-play-steps" aria-label={`Step ${step} of 2`}>
           <span className={step === 1 ? 'active' : 'complete'}><b>1</b> Play setup</span>
           <span className={step === 2 ? 'active' : ''}><b>2</b> Appearance</span>

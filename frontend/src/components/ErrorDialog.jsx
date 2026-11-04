@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CircleAlert } from 'lucide-react'
+import { DialogCloseButton } from './DialogCloseButton'
 
 const ErrorQueueContext = createContext(null)
 const ErrorVisibilityContext = createContext(true)
@@ -77,6 +78,7 @@ export function ErrorDialogProvider({ children }) {
       <div className="dialog-overlay error-dialog-overlay" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
         <section className="dialog-panel error-dialog-panel" role="alertdialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={messageId}>
           <h2 id={titleId}><CircleAlert size={22} aria-hidden="true" />Unable to complete request</h2>
+          <DialogCloseButton onClick={dismiss} />
           <p id={messageId}>{current.error.code === 'RECORD_CHANGED'
             ? 'This record was changed by someone else. Your edits have not been saved. Reopen the record to load the latest version before trying again.'
             : current.message}</p>

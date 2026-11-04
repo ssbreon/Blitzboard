@@ -125,6 +125,7 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   workspace: () => request('/workspace'),
   updateWorkspace: (payload) => request('/workspace', { method: 'PATCH', body: JSON.stringify(payload) }),
   members: () => request('/workspace/members'),
+  transferOwnership: (userId) => request('/workspace/ownership/transfer', { method: 'POST', body: JSON.stringify({ userId }) }),
   invitations: () => request('/workspace/invitations'),
   invite: (payload) => request('/workspace/invitations', { method: 'POST', body: JSON.stringify(payload) }),
   revokeInvitation: (id) => request(`/workspace/invitations/${encodeURIComponent(id)}`, { method: 'DELETE' }),

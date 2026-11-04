@@ -11,6 +11,7 @@ import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { GlobalSearch } from './components/GlobalSearch'
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog'
+import { DialogCloseButton } from './components/DialogCloseButton'
 import { ErrorDialog, ErrorDialogProvider, ErrorDialogScope } from './components/ErrorDialog'
 import { COLLECTION_CATEGORIES, NewCollectionDialog } from './components/NewCollectionDialog'
 import { NewPlayDialog, playCategoriesForCollection } from './components/NewPlayDialog'
@@ -174,6 +175,7 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
       <h2><Plus size={22} aria-hidden="true" />Add {card.tab === 'installs' ? 'Install' : 'Practice Script'}</h2>
+      <DialogCloseButton onClick={onCancel} disabled={saving} />
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
       <ErrorDialog error={error} message="We couldn't create this item. Please try again." />
       <div className="dialog-actions">
@@ -207,6 +209,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
       <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Grouping' : 'New Grouping'}</h2>
+      <DialogCloseButton onClick={onCancel} disabled={saving} />
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
       <label className="dialog-field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <ErrorDialog error={error} message="We couldn't save this grouping. Please try again." />
@@ -406,6 +409,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !submitting) onCancel() }}>
     <form className="dialog-panel install-play-picker-dialog" onSubmit={submit} aria-busy={submitting}>
       <h2><Plus size={22} aria-hidden="true" />Add Plays</h2>
+      <DialogCloseButton onClick={onCancel} disabled={submitting} />
       <label className="dialog-field"><span>Playbook</span><select value={playbookId} onChange={(event) => { setPlaybookId(event.target.value); setSelectedIds([]); setError(null) }} disabled={loadingPlaybooks || !playbooks.length}>
         {loadingPlaybooks && <option value="">Loading playbooks...</option>}
         {!loadingPlaybooks && !playbooks.length && <option value="">No {category.toLowerCase()} playbooks available</option>}
@@ -797,6 +801,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         <div className="dialog-overlay" onClick={() => { if (!saving) closeSettings() }}>
           <form className="dialog-panel" aria-busy={saving} onClick={(event) => event.stopPropagation()} onSubmit={handleSettingsSave}>
             <h2>{parentRecord.kind === 'playbook' ? <BookOpen size={26} strokeWidth={1.8} aria-hidden="true" /> : <Settings size={26} strokeWidth={1.8} aria-hidden="true" />}{parentLabel} Settings</h2>
+            <DialogCloseButton onClick={closeSettings} disabled={saving} />
             <label className="dialog-field">
               <span>{parentLabel} name</span>
               <input type="text" value={draftName} onChange={(event) => setDraftName(event.target.value)} required />
@@ -2118,7 +2123,9 @@ function AppContent() {
       : <><AppBar user={null} /><main className="auth-state">{error ? <h1>Unable to sign in</h1> : <LoadingIndicator label="Signing in..." />}</main></>}
     <ErrorDialog error={error} message="We couldn't access your account or subscription. Please try again." />
     {leave && <div className="dialog-overlay leave-confirmation-overlay"><section className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="leave-title">
-      <h2 id="leave-title"><Save size={22} aria-hidden="true" />{leave.title}</h2><p>Save your changes before leaving?</p>
+      <h2 id="leave-title"><Save size={22} aria-hidden="true" />{leave.title}</h2>
+      <DialogCloseButton onClick={() => setLeave(null)} disabled={savingLeave} />
+      <p>Save your changes before leaving?</p>
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={savingLeave} autoFocus onClick={() => setLeave(null)}>Cancel</button>
         <button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setLeave(null); leave.action() }}>Discard</button>

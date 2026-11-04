@@ -617,7 +617,36 @@ class AuthenticationTests(unittest.TestCase):
     def test_owner_cannot_be_demoted_or_removed(self):
         team = self.team_fixture()
         for method in ("PATCH", "DELETE"):
-            self.assertEqual(call_api(method, "workspace/members/local-coach", "local-coach", {"role": "coach"}, team["id"]).status_code, 409)
+            response = call_api(method, "workspace/members/local-coach", "local-coach", {"role": "coach"}, team["id"])
+            self.assertEqual(response.status_code, 409)
+            self.assertEqual(response_json(response)["error"]["code"], "OWNER_TRANSFER_REQUIRED")
+            self.assertEqual(function_app.storage.get("memberships", function_app.accounts.membership_id("local-coach", team["id"]))["role"], "owner")
+            owners = [member for member in function_app.storage.list("memberships") if member["workspaceId"] == team["id"] and member["role"] == "owner"]
+            self.assertGreaterEqual(len(owners), 1)
+
+    def test_owner_can_transfer_then_demote_themselves(self):
+        team = self.team_fixture()
+        response = call_api("POST", "workspace/ownership/transfer", "local-coach", {"userId": "coach-b"}, team["id"])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response_json(response), {"userId": "coach-b", "role": "owner"})
+        self.assertEqual(function_app.storage.get("memberships", function_app.accounts.membership_id("local-coach", team["id"]))["role"], "owner")
+        self.assertEqual(function_app.storage.get("memberships", function_app.accounts.membership_id("coach-b", team["id"]))["role"], "owner")
+
+        response = call_api("PATCH", "workspace/members/local-coach", "local-coach", {"role": "coach"}, team["id"])
+        self.assertEqual(response.status_code, 200)
+        memberships = [member for member in function_app.storage.list("memberships") if member["workspaceId"] == team["id"]]
+        self.assertEqual({member["userId"]: member["role"] for member in memberships}, {"local-coach": "coach", "coach-b": "owner"})
+
+        response = call_api("PATCH", "workspace/members/coach-b", "coach-b", {"role": "coach"}, team["id"])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response_json(response)["error"]["code"], "OWNER_TRANSFER_REQUIRED")
+
+    def test_only_owner_can_transfer_to_an_existing_team_member(self):
+        team = self.team_fixture()
+        response = call_api("POST", "workspace/ownership/transfer", "coach-b", {"userId": "coach-b"}, team["id"])
+        self.assertEqual(response.status_code, 403)
+        response = call_api("POST", "workspace/ownership/transfer", "local-coach", {"userId": "outsider"}, team["id"])
+        self.assertEqual(response.status_code, 404)
 
     def test_local_fixture_is_not_reseeded_after_expiry(self):
         first = response_json(call_api("GET", "me", "local-coach"))

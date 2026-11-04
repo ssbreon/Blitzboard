@@ -445,6 +445,23 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 workspace["defaults"].update(validate_preferences(payload["defaults"]))
             storage.save("workspaces", workspace)
             return summary(storage, workspace, role), 200
+    if path == ["workspace", "ownership", "transfer"] and method == "POST":
+        if workspace["kind"] != "team" or role != "owner":
+            raise AccountError("FORBIDDEN", "Only a Team Owner may transfer ownership", 403)
+        require_write(workspace, role, "team")
+        target_user_id = payload.get("userId")
+        if not isinstance(target_user_id, str) or not target_user_id.strip():
+            raise AccountError("VALIDATION_ERROR", "A Team member userId is required")
+        if target_user_id == user_id:
+            raise AccountError("VALIDATION_ERROR", "Choose another Team member to receive ownership")
+        target = storage.get("memberships", membership_id(target_user_id, workspace["id"]))
+        if target is None:
+            raise AccountError("NOT_FOUND", "Team member was not found", 404)
+        if target["role"] == "owner":
+            raise AccountError("ALREADY_OWNER", "This Team member is already an Owner", 409)
+        target["role"] = "owner"
+        storage.save("memberships", target)
+        return {"userId": target_user_id, "role": "owner"}, 200
     if path == ["workspace", "members"] and method == "GET":
         members = []
         for member in storage.list("memberships"):
@@ -458,15 +475,24 @@ def account_route(storage, identity, workspace, role, path, method, payload):
         member = storage.get("memberships", membership_id(path[2], workspace["id"]))
         if not member:
             raise AccountError("NOT_FOUND", "Member was not found", 404)
-        if member["role"] == "owner":
-            raise AccountError("OWNER_TRANSFER_REQUIRED", "Transfer ownership before removing or demoting the Owner", 409)
         if method == "PATCH":
-            if payload.get("role") not in {"coach", "admin"}:
+            target_role = payload.get("role")
+            if member["role"] == "owner":
+                if member["userId"] != user_id:
+                    raise AccountError("OWNER_TRANSFER_REQUIRED", "Transfer ownership before demoting another Owner", 409)
+                if target_role != "coach":
+                    raise AccountError("VALIDATION_ERROR", "An Owner may only demote themselves to Coach")
+                owner_count = sum(item["workspaceId"] == workspace["id"] and item["role"] == "owner" for item in storage.list("memberships"))
+                if owner_count < 2:
+                    raise AccountError("OWNER_TRANSFER_REQUIRED", "Transfer ownership before demoting the last Owner", 409)
+            if target_role not in {"coach", "admin"}:
                 raise AccountError("VALIDATION_ERROR", "Role must be Coach or Admin")
-            member["role"] = payload["role"]
+            member["role"] = target_role
             storage.save("memberships", member)
             return {"userId": member["userId"], "role": member["role"]}, 200
         if method == "DELETE":
+            if member["role"] == "owner":
+                raise AccountError("OWNER_TRANSFER_REQUIRED", "Demote yourself to Coach before leaving the Team", 409)
             storage.delete("memberships", member["id"])
             return None, 204
     if path == ["workspace", "billing"] and method == "GET":

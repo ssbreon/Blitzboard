@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Users, UserRound, Settings } from 'lucide-react'
+import { ArrowRightLeft, Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
+import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 import { PLAY_THEMES } from '../utils/themes'
 
@@ -36,6 +37,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
   const teamEditable = workspace.capabilities.manageTeam
+  const ownerCount = members.filter((member) => member.role === 'owner').length
   const subscriptionPlan = workspace.subscription.kind || workspace.kind
 
   useEffect(() => {
@@ -118,10 +120,13 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
 
   async function memberAction(member, action, role) {
     if (action === 'remove' && !window.confirm(`Remove ${member.name} from ${workspace.name}?`)) return
+    if (action === 'transfer' && !window.confirm(`Transfer ownership of ${workspace.name} to ${member.name}? You will remain an Owner until you demote yourself.`)) return
+    if (action === 'role' && member.role === 'owner' && role === 'coach' && !window.confirm('Demote yourself to Coach? You will lose workspace management access.')) return
     setSaving(true)
     setError(null)
     try {
       if (action === 'remove') await api.removeMember(member.userId)
+      else if (action === 'transfer') await api.transferOwnership(member.userId)
       else await api.updateMember(member.userId, role)
       setMembers((await api.members()).items)
       onWorkspaceUpdated(await api.workspace())
@@ -188,12 +193,15 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     onClick={isAccountDialog ? (event) => event.stopPropagation() : undefined}
   >
     {isAccountDialog
-      ? <h2 id="account-view-title" aria-label={TITLES[view]}>
-          <HeadingIcon size={26} strokeWidth={1.8} aria-hidden="true" />{TITLES[view]}
-          {['team', 'billing'].includes(view) && <span className="account-title-loading" role="status" title={loading ? `Loading ${TITLES[view].toLowerCase()}...` : undefined}>
-            {loading && <><LoaderCircle size={18} aria-hidden="true" /><span className="sr-only">Loading {TITLES[view].toLowerCase()}...</span></>}
-          </span>}
-        </h2>
+      ? <>
+          <h2 id="account-view-title" aria-label={TITLES[view]}>
+            <HeadingIcon size={26} strokeWidth={1.8} aria-hidden="true" />{TITLES[view]}
+            {['team', 'billing'].includes(view) && <span className="account-title-loading" role="status" title={loading ? `Loading ${TITLES[view].toLowerCase()}...` : undefined}>
+              {loading && <><LoaderCircle size={18} aria-hidden="true" /><span className="sr-only">Loading {TITLES[view].toLowerCase()}...</span></>}
+            </span>}
+          </h2>
+          <DialogCloseButton onClick={() => onDismiss?.()} disabled={saving} />
+        </>
       : <header className="account-view-heading"><HeadingIcon size={24} aria-hidden="true" /><h1 id="account-view-title">{TITLES[view]}</h1></header>}
     {isAccountDialog
       ? <dl className="account-view-context account-dialog-context">
@@ -247,8 +255,13 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             <tbody>{members.map((member) => <tr key={member.userId}><td className="data-grid-type-cell" aria-label="Staff member" title="Staff member"><UserRound size={17} strokeWidth={2} aria-hidden="true" /></td><td>{member.name}</td><td>{member.coachingTitle || ''}</td><td>
               {teamEditable && member.role !== 'owner' ? <select aria-label={`Role for ${member.name}`} value={member.role} disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
                 <option value="coach">Coach</option><option value="admin">Admin</option>
+              </select> : teamEditable && workspace.role === 'owner' && member.userId === user.userId && ownerCount > 1 ? <select aria-label={`Role for ${member.name}`} value="owner" disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
+                <option value="owner">Owner</option><option value="coach">Coach</option>
               </select> : <span className="account-role">{member.role}</span>}
-            </td><td>{teamEditable && member.role !== 'owner' && <button type="button" className="account-icon-button" title={`Remove ${member.name}`} aria-label={`Remove ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'remove')}><Trash2 size={16} /></button>}</td></tr>)}</tbody>
+            </td><td><div className="account-member-actions">
+              {teamEditable && workspace.role === 'owner' && member.role !== 'owner' && <button type="button" className="account-member-transfer" title={`Transfer ownership to ${member.name}`} aria-label={`Transfer ownership to ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'transfer')}><ArrowRightLeft size={15} aria-hidden="true" /><span>Transfer</span></button>}
+              {teamEditable && member.role !== 'owner' && <button type="button" className="account-icon-button" title={`Remove ${member.name}`} aria-label={`Remove ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'remove')}><Trash2 size={16} /></button>}
+            </div></td></tr>)}</tbody>
           </table></div>}
         </section>
       </div>

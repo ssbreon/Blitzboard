@@ -1676,6 +1676,7 @@ html.is-drilling-through * {
 }
 
 .dialog-panel {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -1713,6 +1714,26 @@ html.is-drilling-through * {
       flex: none;
     }
   }
+}
+
+.schedule-icon-button.dialog-close-button {
+  border-color: transparent;
+  color: #fff;
+}
+
+.dialog-panel > .dialog-close-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.dialog-panel:has(> .dialog-close-button) > h2 {
+  padding-right: 62px;
+}
+
+.print-dialog-header > .dialog-close-button {
+  align-self: center;
+  margin: -8px -12px -8px auto;
 }
 
 .error-dialog-overlay {
@@ -2779,6 +2800,32 @@ html.is-drilling-through * {
   background: var(--input-bg);
   color: var(--text-h);
   cursor: pointer;
+}
+
+.account-member-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-member-transfer {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-h);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.account-member-transfer:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .account-details {
@@ -5597,7 +5644,6 @@ html.is-drilling-through * {
   gap: 9px;
 }
 
-.schedule-dialog-header .schedule-icon-button,
 .schedule-game-header .schedule-icon-button {
   border-color: transparent;
   color: white;

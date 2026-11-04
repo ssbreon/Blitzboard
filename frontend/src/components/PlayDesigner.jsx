@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 import { Check, ChevronDown, ChevronUp, Circle, ExternalLink, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
@@ -1515,6 +1516,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         <div className="dialog-overlay" onClick={() => setSettingsOpen(false)}>
           <form className="dialog-panel" onClick={(event) => event.stopPropagation()} onSubmit={handleSettingsSave}>
             <h2><PlayDiagramIcon size={26} strokeWidth={1.8} aria-hidden="true" />Play Settings</h2>
+            <DialogCloseButton onClick={() => setSettingsOpen(false)} />
             <label className="dialog-field">
               <span>Play name</span>
               <input type="text" value={draftName} onChange={(event) => setDraftName(event.target.value)} readOnly={Boolean(activeSlideId)} required />
@@ -1567,6 +1569,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         <div className="dialog-overlay" onClick={() => setEditingSlideId(null)}>
           <form className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="adjustment-rename-title" onClick={(event) => event.stopPropagation()} onSubmit={handleAdjustmentRename}>
             <h2 id="adjustment-rename-title"><Pencil size={24} aria-hidden="true" />Edit Adjustment</h2>
+            <DialogCloseButton onClick={() => setEditingSlideId(null)} />
             <label className="dialog-field">
               <span>Adjustment name</span>
               <input type="text" value={adjustmentTitleDraft} maxLength={80} autoFocus required onChange={(event) => setAdjustmentTitleDraft(event.target.value)} />

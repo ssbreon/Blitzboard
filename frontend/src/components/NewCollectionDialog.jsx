@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 
 export const COLLECTION_CATEGORIES = ['Offense', 'Defense', 'Special Teams']
@@ -33,6 +34,7 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, onCancel, onC
     <div className="dialog-overlay" onClick={onCancel}>
       <form className="dialog-panel" onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
         <h2>{TitleIcon && <TitleIcon size={26} strokeWidth={1.8} aria-hidden="true" />}{title}</h2>
+        <DialogCloseButton onClick={onCancel} />
         <label className="dialog-field">
           <span>Name</span>
           <input

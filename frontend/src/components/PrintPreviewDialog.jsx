@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Printer } from 'lucide-react'
+import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 import { defaultPlayPerspective } from '../utils/playGeometry'
 import { assignmentPlayers, assignmentPrintPages } from '../utils/playerAssignments'
@@ -147,6 +148,7 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
           <div className="print-dialog-chrome print-dialog-header">
             <h2><Printer size={20} aria-hidden="true" />Print Preview</h2>
             <span className="print-dialog-subject">{collection ? collection.name : items[0]?.name}</span>
+            <DialogCloseButton onClick={onClose} />
           </div>
           <div className="print-dialog-body">
             <div className="print-dialog-chrome print-options" aria-label="Print options">

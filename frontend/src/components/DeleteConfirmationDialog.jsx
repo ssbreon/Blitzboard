@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
+import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 
 export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
@@ -36,6 +37,7 @@ export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
     <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !deleting) onCancel() }}>
       <section className="dialog-panel delete-confirmation-panel" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirmation-title" aria-describedby="delete-confirmation-message">
         <h2 id="delete-confirmation-title"><Trash2 size={22} aria-hidden="true" />Delete item?</h2>
+        <DialogCloseButton onClick={onCancel} disabled={deleting} />
         <p id="delete-confirmation-message">{message}</p>
         <ErrorDialog error={error} message="We couldn't finish deleting the selected items. Please check the list before trying again." />
         <div className="dialog-actions">

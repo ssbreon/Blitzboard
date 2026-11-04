@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users, X } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { DialogCloseButton } from './DialogCloseButton'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -97,7 +98,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
       <form className="schedule-dialog" onSubmit={submit} aria-busy={saving}>
         <header className="schedule-dialog-header">
           <div><CalendarDays size={20} aria-hidden="true" /><h2>{initialEvent ? 'Edit Event' : 'Add Event'}</h2></div>
-          <button type="button" className="schedule-icon-button" aria-label="Close" onClick={onCancel} disabled={saving}><X size={20} /></button>
+          <DialogCloseButton onClick={onCancel} disabled={saving} />
         </header>
         <div className="schedule-dialog-body">
           <label className="schedule-field">
