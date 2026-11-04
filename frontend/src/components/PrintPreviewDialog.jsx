@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Printer } from 'lucide-react'
 import { PlayFieldView } from './PlayFieldView'
 import { defaultPlayPerspective } from '../utils/playGeometry'
+import { assignmentPlayers, assignmentPrintPages } from '../utils/playerAssignments'
 
 const DPI = 96
 const PAGE_MARGIN_IN = 0.5
@@ -86,6 +87,7 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
   const [titlePage, setTitlePage] = useState(Boolean(collection))
   const [perPage, setPerPage] = useState(collection ? 2 : 1)
   const [includeGroupings, setIncludeGroupings] = useState(true)
+  const [includeAssignments, setIncludeAssignments] = useState(true)
   const [scale, setScale] = useState(1)
   const stageRef = useRef(null)
 
@@ -94,7 +96,13 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
   const columns = gridColumns(perPage, orientation)
   const drawingSizeScale = PRINT_MARKER_SIZES[perPage] / DESIGNER_MARKER_SIZE
   const fieldHeight = printFieldHeight(sheet, orientation, perPage, showTitle)
+  const assignmentsCategory = (item) => item.parentCategory || item.unit || collection?.category
+  const hasAssignments = items.some((item) => assignmentPlayers(item.markers, assignmentsCategory(item))
+    .some((marker) => typeof marker.assignment === 'string' && marker.assignment.trim()))
   const printPages = buildPrintPages(items, perPage, Boolean(collection?.kind === 'playbook' && includeGroupings))
+    .flatMap((page) => page.type !== 'plays' || !includeAssignments ? [page] : [page, ...page.plays.flatMap((item) =>
+      assignmentPrintPages(item.markers, assignmentsCategory(item), sheet).map((rows) => ({ type: 'assignments', play: item, rows })),
+    )])
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -200,6 +208,12 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
                 <input type="checkbox" checked={showTitle} onChange={(event) => setShowTitle(event.target.checked)} />
                 <span>{items.length > 1 ? 'Include play names' : 'Include play name'}</span>
               </label>
+              {hasAssignments && (
+                <label className="dialog-field dialog-checkbox">
+                  <input type="checkbox" checked={includeAssignments} onChange={(event) => setIncludeAssignments(event.target.checked)} />
+                  <span>Include assignments</span>
+                </label>
+              )}
             </div>
             <div className="print-stage" ref={stageRef}>
               <div className="print-pages">
@@ -224,7 +238,24 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
                     </div>,
                   )}
                 {printPages.map((page, index) =>
-                  page.type === 'grouping'
+                  page.type === 'assignments'
+                    ? renderPage(
+                        `assignments-${index}`,
+                        <div className="print-assignments">
+                          {showTitle && <h1 className="print-sheet-title">{page.play.name}</h1>}
+                          <table className="print-assignments-table">
+                            <caption>Player Assignments</caption>
+                            <thead><tr><th scope="col">Position</th><th scope="col">Assignment</th></tr></thead>
+                            <tbody>{page.rows.map((row) => (
+                              <tr key={row.id}>
+                                <th scope="row">{row.label}{row.continued && <span className="print-assignment-continued"> (cont.)</span>}</th>
+                                <td>{row.text}</td>
+                              </tr>
+                            ))}</tbody>
+                          </table>
+                        </div>,
+                      )
+                    : page.type === 'grouping'
                     ? renderPage(
                         `grouping-${page.grouping.id}`,
                         <div className="print-grouping-page">
