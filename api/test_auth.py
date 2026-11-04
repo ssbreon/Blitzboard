@@ -441,6 +441,27 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "First"}).status_code, 201)
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Over limit"}).status_code, 409)
 
+    def test_archived_records_count_toward_limits_and_permanent_deletion_frees_capacity(self):
+        with patch.dict(function_app.accounts.FREE_LIMITS, {"playbooks": 5}):
+            books = [
+                response_json(call_api("POST", "playbooks", "free-coach", {"name": f"Book {index}"}))
+                for index in range(5)
+            ]
+            for book in books[3:]:
+                archived = call_api("PATCH", f"playbooks/{book['id']}", "free-coach", {"recordStatus": "Archived"})
+                self.assertEqual(archived.status_code, 200)
+
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Still full"}).status_code, 409)
+
+            for book in books[3:]:
+                self.assertEqual(call_api("DELETE", f"playbooks/{book['id']}", "free-coach").status_code, 204)
+            usage = response_json(call_api("GET", "workspace", "free-coach"))["usage"]
+            self.assertEqual(usage["playbooks"], 3)
+
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Replacement 1"}).status_code, 201)
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Replacement 2"}).status_code, 201)
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Over limit again"}).status_code, 409)
+
     def test_affiliate_recommendations_are_free_only_and_clicks_store_minimal_data(self):
         with patch.dict(os.environ, {"AFFILIATE_URL_HUDL": "https://partners.example/hudl"}):
             free_user = response_json(call_api("GET", "me", "free-coach"))
