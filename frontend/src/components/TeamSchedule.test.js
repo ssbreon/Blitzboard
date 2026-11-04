@@ -7,7 +7,7 @@ import { createServer } from 'vite'
 import { ScheduleView, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate, buildCalendarDays } from '../utils/scheduleCalendar.js'
 
 test('schedule periods, navigation and shared calendar rendering', async () => {
-  const server = await createServer({ root: fileURLToPath(new URL('../../', import.meta.url)), optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
+  const server = await createServer({ root: fileURLToPath(new URL('../../', import.meta.url)), define: { 'import.meta.env.DEV': true, 'import.meta.env.VITE_AUTH_MODE': JSON.stringify('development'), 'import.meta.env.VITE_DEV_AUTH_SECRET': JSON.stringify('test-secret') }, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
   try {
     const { MonthCalendar, YearCalendar } = await server.ssrLoadModule('/src/components/TeamSchedule.jsx')
     assert.deepEqual(Object.values(ScheduleView), ['week', 'month', 'quarter', 'year'])
@@ -42,7 +42,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(year.includes('aria-label="1 Practice"'))
     assert.ok(year.includes('aria-label="1 Game"'))
     assert.ok(!year.includes('schedule-event-content'))
-    const { createApi } = await server.ssrLoadModule('/src/api/client.js')
+    const { createApi, signIn, signOut } = await server.ssrLoadModule('/src/api/client.js')
     const originalFetch = globalThis.fetch
     const paths = []
     globalThis.fetch = async (path) => {
@@ -50,6 +50,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
       return { ok: true, status: 200, json: async () => ({ items: [] }) }
     }
     try {
+      signIn('free')
       const api = createApi()
       await api.listScheduleEvents({ start: '2026-01-01', end: '2026-12-31', summary: true })
       await api.listGamePlans('Offense', 'Falcons', true, { start: '2026-01-01', end: '2026-12-31', summary: true })
@@ -65,6 +66,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
       assert.equal(gameQuery.get('scheduleSummary'), 'true')
       assert.equal(new URL(paths[2], 'http://localhost').search, '')
     } finally {
+      signOut()
       globalThis.fetch = originalFetch
     }
   } finally {

@@ -2,8 +2,11 @@ import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useSta
 import { createPortal } from 'react-dom'
 import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
-import { createApi, isDevelopmentAuth, isSignedOut, signIn, signOut } from './api/client'
+import { createApi, isDevelopmentAuth, isSignedOut, selectedDevelopmentPlan, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
+import { StartupPage } from './components/StartupPage'
+import { LoadingIndicator } from './components/LoadingIndicator'
+import { AffiliateRecommendations } from './components/AffiliateRecommendations'
 import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { GlobalSearch } from './components/GlobalSearch'
@@ -410,7 +413,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
       </select></label>
       <label className="dialog-field"><span>Search plays</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by name" /></label>
       <div className="install-play-picker-list" aria-label="Available plays">
-        {loadingPlays ? <p className="schedule-muted">Loading plays...</p> : visiblePlays.map((play) => {
+        {loadingPlays ? <LoadingIndicator compact className="schedule-muted" label="Loading plays..." /> : visiblePlays.map((play) => {
           const key = `${playbookId}:${play.id}`
           const alreadyAdded = installedIds.has(key)
           return <label key={play.id} className="install-play-picker-item">
@@ -917,7 +920,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
             newLabel="New Scouting Report"
             onRowDoubleClick={onOpenPlay}
             rowActions={rowActions}
-          /> : playbooksLoading ? <p className="schedule-muted" role="status">Loading {gameTab === 'installs' ? 'installs' : 'practice scripts'}...</p> : <DataGrid
+          /> : playbooksLoading ? <LoadingIndicator compact className="schedule-muted" label={`Loading ${gameTab === 'installs' ? 'installs' : 'practice scripts'}...`} /> : <DataGrid
             key={`game-items-${parentRecord.id}-${selectedUnit}-${gameTab}`}
             title={`${selectedUnit} ${gameTab === 'installs' ? 'Installs' : 'Practice Scripts'}`}
             columns={GAME_PLAN_ITEM_COLUMNS}
@@ -962,9 +965,9 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           <label className="schedule-install-search"><span className="sr-only">Search plays</span><input type="search" aria-label="Search plays" placeholder="Search plays" value={playSearchDraft} onChange={(event) => setPlaySearchDraft(event.target.value)} /></label>
           <button type="submit" className="schedule-install-search-button" disabled={!activePlaybookId}>Search Plays</button>
         </form>
-        {playbooksLoading ? <p className="schedule-muted">Loading playbooks...</p>
+        {playbooksLoading ? <LoadingIndicator compact className="schedule-muted" label="Loading playbooks..." />
           : !playbooksForInstall.length ? <p className="schedule-muted">No {selectedUnit.toLowerCase()} playbooks available.</p>
-            : playsLoading ? <p className="schedule-muted">Loading plays...</p>
+            : playsLoading ? <LoadingIndicator compact className="schedule-muted" label="Loading plays..." />
               : <DataGrid
                 key={`install-grid-${activePlaybookId}`}
                 title={`${selectedUnit} install plays`}
@@ -1001,7 +1004,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         <ErrorDialog error={playbookPlaysError} message="We couldn't load the selected plays. Please try again." />
         <ErrorDialog error={installGroupingsError} message="We couldn't load the install groupings. Please try again." />
         <ErrorDialog error={installError} message="We couldn't update the install. Please try again." />
-        {playbooksLoading || playsLoading ? <p className="schedule-muted" role="status">Loading installed plays...</p> : <DataGrid
+        {playbooksLoading || playsLoading ? <LoadingIndicator compact className="schedule-muted" label="Loading installed plays..." /> : <DataGrid
           key={`install-library-${parentRecord.id}`}
           title={`${parentRecord.name} plays`}
           columns={[
@@ -1117,6 +1120,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [deleteConfirmation, setDeleteConfirmation] = useState(null)
 
   const writable = workspace.capabilities.edit
+  const showAffiliateRecommendations = workspace.subscription.kind === 'free' && !parent && !designer && !slideshow && !cardPlaybook
   const defaults = { ...workspace.defaults, ...authUser.preferences }
   const fetchPlaybooks = useCallback(({ namePrefix }) => viewApi.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [viewApi])
   const parentId = parent?.id
@@ -1866,38 +1870,44 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {!restoring && (
         <BreadcrumbView active={!parent}>
       {view === 'teamSchedule' && (
-        <TeamSchedule
-          key="teamSchedule"
-          api={viewApi}
-          displayMode={scheduleDisplayMode}
-          onDisplayModeChange={setScheduleDisplayMode}
-          canEdit={writable}
-          canDelete={workspace.capabilities.delete}
-          canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
-          onCreateGame={handleCreateScheduleGame}
-          onOpenGame={(game) => { setGameCard(null); setParent({ ...game, kind: 'gamePlan' }) }}
-          onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}
-        />
+        <>
+          {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={() => setAccountDialog('billing')} />}
+          <TeamSchedule
+            key="teamSchedule"
+            api={viewApi}
+            displayMode={scheduleDisplayMode}
+            onDisplayModeChange={setScheduleDisplayMode}
+            canEdit={writable}
+            canDelete={workspace.capabilities.delete}
+            canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
+            onCreateGame={handleCreateScheduleGame}
+            onOpenGame={(game) => { setGameCard(null); setParent({ ...game, kind: 'gamePlan' }) }}
+            onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}
+          />
+        </>
       )}
 
       {view === 'playbooks' && (
-        <DataGrid
-          key="playbooks"
-          reloadToken={playbooksReloadToken + cacheVersion}
-          busy={statusSaving}
-          title="Playbooks"
-          columns={timezoneColumns(PLAYBOOK_GRID_COLUMNS, authUser.preferences?.timezone)}
-          rowIcon={BookOpen}
-          rowType="Playbook"
-          categoryOptions={COLLECTION_CATEGORIES}
-          filterRows={(row) => !row.gameCardId}
-          statusFilter
-          fetchRows={fetchPlaybooks}
-          onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setShowNewPlaybookDialog(true) : undefined}
-          newLabel="New Playbook"
-          rowActions={collectionRowActions('playbook')}
-          onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'playbook' }) }}
-        />
+        <>
+          {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={() => setAccountDialog('billing')} />}
+          <DataGrid
+            key="playbooks"
+            reloadToken={playbooksReloadToken + cacheVersion}
+            busy={statusSaving}
+            title="Playbooks"
+            columns={timezoneColumns(PLAYBOOK_GRID_COLUMNS, authUser.preferences?.timezone)}
+            rowIcon={BookOpen}
+            rowType="Playbook"
+            categoryOptions={COLLECTION_CATEGORIES}
+            filterRows={(row) => !row.gameCardId}
+            statusFilter
+            fetchRows={fetchPlaybooks}
+            onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setShowNewPlaybookDialog(true) : undefined}
+            newLabel="New Playbook"
+            rowActions={collectionRowActions('playbook')}
+            onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'playbook' }) }}
+          />
+        </>
       )}
 
         </BreadcrumbView>
@@ -1986,10 +1996,12 @@ function AppContent() {
       setUser(identity)
       let stored
       try { stored = sessionStorage.getItem('blitzboard:workspace') } catch { stored = null }
-      const workspace = identity.workspaces.find((item) => item.id === stored) || identity.workspaces[0]
+      const workspace = identity.workspaces.find((item) => item.id === stored)
+        || identity.workspaces.find((item) => item.subscription.kind === selectedDevelopmentPlan())
+        || identity.workspaces[0]
       if (!workspace) throw new Error('No accessible workspace')
       return loadWorkspace(workspace.id)
-    }).catch((failure) => { if (active) { setError(failure); setLoading(false) } })
+    }).catch((failure) => { if (active) { signOut(); setSignedOut(true); setError(failure); setLoading(false) } })
     return () => { active = false; generation.current += 1 }
   }, [signedOut])
 
@@ -2010,11 +2022,16 @@ function AppContent() {
     }, 'Sign Out')
   }
 
-  function handleSignIn() {
-    signIn()
-    setError(null)
-    setLoading(true)
-    setSignedOut(false)
+  function handleSignIn(plan) {
+    try {
+      signIn(plan)
+      if (!isDevelopmentAuth) return
+      setError(null)
+      setLoading(true)
+      setSignedOut(false)
+    } catch (failure) {
+      setError(failure)
+    }
   }
 
   function requestLeave(action, title) {
@@ -2089,14 +2106,14 @@ function AppContent() {
   }
 
   return <>
-    {signedOut ? <><AppBar user={null} /><main className="auth-state"><h1>Signed out</h1>{isDevelopmentAuth && <button type="button" className="dialog-create" onClick={handleSignIn}>Sign In</button>}</main></> : inviteToken && user ? <><AppBar user={null} /><main className="account-view"><div className="account-view-heading"><Users size={24} /><h1>Team Invitation</h1></div>
+    {signedOut ? <StartupPage development={isDevelopmentAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><main className="account-view"><div className="account-view-heading"><Users size={24} /><h1>Team Invitation</h1></div>
       <div className="account-section"><p>{user.email || user.name}</p><div className="account-form-actions"><button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setInviteToken(null); history.replaceState(null, '', location.pathname + location.search) }}>Cancel</button><button type="button" className="dialog-create" disabled={savingLeave} onClick={acceptInvite}>{savingLeave ? 'Accepting...' : 'Accept Invitation'}</button></div></div>
     </main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
       onWorkspaceChange={(id) => { if (id !== entry.workspace.id) requestLeave(() => loadWorkspace(id), 'Switch subscription') }}
       onUserUpdated={setUser} onWorkspaceUpdated={updateWorkspace} onGuardChange={(value) => { guard.current = value }}
       onSignOut={handleSignOut}
       requestLeave={requestLeave} busy={loading || mutations > 0 || savingLeave} switchingSubscription={loading} />
-      : <><AppBar user={null} /><main className="auth-state"><h1>{error ? 'Unable to sign in' : 'Signing in...'}</h1></main></>}
+      : <><AppBar user={null} /><main className="auth-state">{error ? <h1>Unable to sign in</h1> : <LoadingIndicator label="Signing in..." />}</main></>}
     <ErrorDialog error={error} message="We couldn't access your account or subscription. Please try again." />
     {leave && <div className="dialog-overlay leave-confirmation-overlay"><section className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="leave-title">
       <h2 id="leave-title"><Save size={22} aria-hidden="true" />{leave.title}</h2><p>Save your changes before leaving?</p>

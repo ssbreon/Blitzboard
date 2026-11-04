@@ -12,13 +12,14 @@ from uuid import uuid4
 
 
 DEFAULT_LIMITS = {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}
+FREE_LIMITS = {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500}
 LIMIT_SETTINGS = {
     "playbooks": "CONTENT_LIMIT_PLAYBOOKS",
     "gamePlans": "CONTENT_LIMIT_GAME_PLANS",
     "plays": "CONTENT_LIMIT_PLAYS",
     "scoutPlays": "CONTENT_LIMIT_SCOUT_PLAYS",
 }
-PRICES = {"individual": {"month": 999, "year": 9990}, "team": {"month": 2999, "year": 29990}}
+PRICES = {"free": {"month": 0, "year": 0}, "individual": {"month": 999, "year": 9990}, "team": {"month": 2999, "year": 29990}}
 DEFAULT_PREFERENCES = {"theme": "color", "fieldOrientation": "High School", "timezone": "UTC"}
 
 
@@ -41,6 +42,14 @@ def load_limits(environ=None):
 
 
 LIMITS = load_limits()
+TEAM_LIMITS = {**LIMITS, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000}
+
+
+def limits_for_workspace(workspace):
+    plan = workspace.get("subscription", {}).get("kind", workspace["kind"])
+    if plan == "free":
+        return FREE_LIMITS
+    return TEAM_LIMITS if plan == "team" else LIMITS
 
 
 class AccountError(Exception):
@@ -90,6 +99,11 @@ def validate_environment(endpoint=None):
 
 
 def new_subscription(kind, fixture=False):
+    if kind == "free":
+        return {
+            "status": "free", "interval": None, "source": "free", "periodEndsAt": None,
+            "trialStartedAt": None, "trialEndsAt": None, "cancelAtPeriodEnd": False, "kind": "free",
+        }
     current = timestamp()
     return {
         "status": "active" if fixture else "trialing",
@@ -113,15 +127,16 @@ def ensure_user(storage, identity):
         })
     workspace_id = personal_id(user_id)
     fixture = is_mock() and user_id == os.getenv("DEV_USER_ID", "local-coach")
+    demo_plan = {"local-demo-free": "free", "local-demo-individual": "individual", "local-demo-team": "team"}.get(user_id) if is_mock() and os.getenv("AUTH_MODE") == "development" else None
     if storage.get("workspaces", workspace_id) is None:
         storage.save("workspaces", {
-            "id": workspace_id, "name": "Individual", "kind": "individual", "ownerId": user_id,
-            "defaults": {}, "subscription": new_subscription("individual", fixture),
+            "id": workspace_id, "name": "Individual" if demo_plan == "individual" else "Free" if demo_plan else "Individual", "kind": "individual", "ownerId": user_id,
+            "defaults": {}, "subscription": new_subscription("individual", True) if demo_plan == "individual" else new_subscription("free"),
             "createdAt": timestamp().isoformat(),
         })
     if storage.get("memberships", membership_id(user_id, workspace_id)) is None:
         storage.save("memberships", {"id": membership_id(user_id, workspace_id), "userId": user_id, "workspaceId": workspace_id, "role": "owner"})
-    if fixture:
+    if fixture or demo_plan == "team":
         team_id = "local-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
         if storage.get("workspaces", team_id) is None:
             storage.save("workspaces", {
@@ -155,6 +170,8 @@ def select_workspace(storage, identity, requested=None):
 
 def can_edit(workspace):
     subscription = workspace["subscription"]
+    if subscription.get("kind") == "free":
+        return True
     current = timestamp()
     if subscription["status"] == "trialing":
         end = parse_date(subscription.get("trialEndsAt"))
@@ -207,11 +224,13 @@ def summary(storage, workspace, role):
               "defaults": workspace.get("defaults", {}), "subscription": subscription,
               "capabilities": {"edit": writable, "delete": writable and role in {"owner", "admin"},
                                "manageTeam": writable and workspace["kind"] == "team" and role in {"owner", "admin"}, "billing": role == "owner"}}
-    public["usage"] = {entity: len(storage.list(entity, workspace_id=workspace["id"])) for entity in LIMITS}
-    public["limits"] = dict(LIMITS)
+    limits = limits_for_workspace(workspace)
+    public["usage"] = {entity: len(storage.list(entity, workspace_id=workspace["id"])) for entity in limits}
+    public["limits"] = dict(limits)
     public["seatLimit"] = 10 if workspace["kind"] == "team" else 1
     public["seatsUsed"] = sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships")) + len(pending_invites(storage, workspace["id"]))
-    public["prices"] = dict(PRICES[workspace["kind"]])
+    plan = subscription.get("kind", workspace["kind"])
+    public["prices"] = dict(PRICES[plan])
     deadline = retention_deadline(workspace)
     public["deletionDueAt"] = deadline.isoformat() if deadline else None
     return public
@@ -453,7 +472,9 @@ def account_route(storage, identity, workspace, role, path, method, payload):
     if path == ["workspace", "billing"] and method == "GET":
         if role != "owner":
             return {"managedByTeam": True, "status": summary(storage, workspace, role)["subscription"]["status"]}, 200
-        return {"subscription": summary(storage, workspace, role)["subscription"], "prices": PRICES[workspace["kind"]],
+        plan = workspace["subscription"].get("kind", workspace["kind"])
+        return {"subscription": summary(storage, workspace, role)["subscription"], "prices": PRICES[plan],
+            "plans": {kind: dict(prices) for kind, prices in PRICES.items() if kind != "free"},
                 "taxIncluded": True, "provider": "mock" if is_mock() else "paddle", "connected": False}, 200
     if path[:2] == ["workspace", "billing"] and method == "POST":
         if role != "owner":

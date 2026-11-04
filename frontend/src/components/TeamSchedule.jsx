@@ -4,6 +4,7 @@ import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
+import { LoadingIndicator } from './LoadingIndicator'
 import { ScheduleView, buildCalendarDays, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate } from '../utils/scheduleCalendar'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -405,13 +406,13 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         </div>
       </header>
       <ErrorDialog error={error} message="We couldn't load or update your schedule. Please try again." />
-      {displayMode === 'calendar' ? loading ? <div className="schedule-loading" role="status">Loading schedule…</div>
+      {displayMode === 'calendar' ? loading ? <LoadingIndicator className="schedule-loading" label="Loading schedule..." />
         : mode === ScheduleView.YEAR ? <YearCalendar date={calendarDate} eventsByDate={eventsByDate} onSelectMonth={(month) => { setCalendarDate(month); setMode(ScheduleView.MONTH) }} />
           : mode === ScheduleView.QUARTER ? <div className="schedule-quarter">{scheduleMonths(calendarDate, mode).map((month, index) => <MonthCalendar key={monthKey(month)} month={month} showHeading highlightCurrent={index === 1} {...calendarProps} />)}</div>
             : mode === ScheduleView.MONTH ? <MonthCalendar month={calendarDate} {...calendarProps} />
               : <div className="schedule-calendar schedule-week"><ScheduleDays month={calendarDate} mode="week" {...calendarProps} /></div>
         : <section className="schedule-grid-view" aria-label="Schedule events">
-        {loading ? <div className="schedule-loading" role="status">Loading schedule…</div> : !error && <DataGrid
+        {loading ? <LoadingIndicator className="schedule-loading" label="Loading schedule..." /> : !error && <DataGrid
           title="Schedule Events"
           columns={scheduleGridColumns}
           items={periodEvents}

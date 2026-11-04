@@ -4,6 +4,7 @@ import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } fro
 import { defaultPlayPerspective } from '../utils/playGeometry'
 import { loadSlideshowDetails, loadSlideshowRows } from '../utils/slideshow'
 import { PlayFieldView } from './PlayFieldView'
+import { LoadingIndicator } from './LoadingIndicator'
 
 export function PlaybookSlideshow({ api, collection }) {
   const [plays, setPlays] = useState(null)
@@ -88,7 +89,7 @@ export function PlaybookSlideshow({ api, collection }) {
         <p>We couldn't load this slideshow. Please try again.</p>
         <button type="button" onClick={reload}><RefreshCw size={16} aria-hidden="true" /> Retry</button>
       </div> : plays?.length === 0 ? <p className="slideshow-status" role="status">No active plays to present.</p>
-        : !details ? <p className="slideshow-status" role="status">Loading play...</p>
+        : !details ? <LoadingIndicator className="slideshow-status" label="Loading play..." />
           : <div className="slideshow-canvas" id="slideshow-field" role={details.adjustments.length ? 'tabpanel' : undefined} aria-labelledby={details.adjustments.length ? `slideshow-tab-${adjustment ? details.adjustments.indexOf(adjustment) + 1 : 0}` : undefined}>
             <PlayFieldView play={play} />
           </div>}

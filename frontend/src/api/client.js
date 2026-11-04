@@ -3,36 +3,66 @@ import { createBreadcrumbCache } from '../utils/breadcrumbCache'
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const authMode = import.meta.env.VITE_AUTH_MODE || ''
 const signedOutKey = 'blitzboard:signed-out'
-let signedOut = false
-try { signedOut = sessionStorage.getItem(signedOutKey) === 'true' } catch { signedOut = false }
+const sessionKey = 'blitzboard:sign-in-session'
+const developmentPlanKey = 'blitzboard:development-plan'
+let signedOut = true
+let developmentPlan = null
+try {
+  signedOut = sessionStorage.getItem(signedOutKey) === 'true' || sessionStorage.getItem(sessionKey) !== 'true'
+  developmentPlan = sessionStorage.getItem(developmentPlanKey)
+} catch { signedOut = true }
 
-export const isDevelopmentAuth = authMode === 'development'
+export const isDevelopmentAuth = import.meta.env.DEV && authMode === 'development'
 export function isSignedOut() { return signedOut }
+export function selectedDevelopmentPlan() { return isDevelopmentAuth ? developmentPlan : null }
 
 export function signOut() {
   signedOut = true
   try {
     sessionStorage.setItem(signedOutKey, 'true')
+    sessionStorage.removeItem(sessionKey)
+    sessionStorage.removeItem(developmentPlanKey)
     sessionStorage.removeItem('blitzboard:workspace')
     Object.keys(sessionStorage).filter((key) => key.startsWith('blitzboard:breadcrumb:')).forEach((key) => sessionStorage.removeItem(key))
   } catch { return }
 }
 
-export function signIn() {
-  if (!isDevelopmentAuth) throw new Error('Sign-in provider is not connected')
+export function signIn(plan = 'free') {
+  if (plan !== null && !['free', 'individual', 'team'].includes(plan)) throw new Error('Choose a subscription tier')
+  if (!isDevelopmentAuth) {
+    const configuredUrl = import.meta.env.VITE_SIGN_IN_URL
+    if (!configuredUrl) throw new Error('Production sign-in is not connected. Configure the authentication provider before signing in.')
+    const destination = new URL(configuredUrl, location.origin)
+    if (destination.protocol !== 'https:' && destination.origin !== location.origin) throw new Error('Sign-in requires a secure provider URL')
+    try {
+      sessionStorage.setItem(sessionKey, 'true')
+      sessionStorage.removeItem(signedOutKey)
+      if (plan === null) localStorage.removeItem('blitzboard:requested-plan')
+      else localStorage.setItem('blitzboard:requested-plan', plan)
+    } catch { throw new Error('Browser storage is required to continue signing in') }
+    location.assign(destination.href)
+    return
+  }
+  developmentPlan = plan
   signedOut = false
-  try { sessionStorage.removeItem(signedOutKey) } catch { return }
+  try {
+    sessionStorage.removeItem(signedOutKey)
+    sessionStorage.removeItem('blitzboard:workspace')
+    sessionStorage.setItem(sessionKey, 'true')
+    if (plan === null) sessionStorage.removeItem(developmentPlanKey)
+    else sessionStorage.setItem(developmentPlanKey, plan)
+  } catch { return }
 }
 
 function authenticationHeaders(path) {
   if (path === '/health') return {}
   if (signedOut) throw new Error('You are signed out')
-  if (authMode !== 'development') return {}
+  if (!isDevelopmentAuth) return {}
 
   const secret = import.meta.env.VITE_DEV_AUTH_SECRET
   if (!secret) throw new Error('VITE_DEV_AUTH_SECRET is required in development authentication mode')
   return {
-    'X-Dev-User': import.meta.env.VITE_DEV_USER_ID || 'local-coach',
+    'X-Dev-User': developmentPlan ? `local-demo-${developmentPlan}` : import.meta.env.VITE_DEV_USER_ID || 'local-coach',
     'X-Dev-Auth-Secret': secret,
   }
 }
@@ -103,6 +133,7 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   updateMember: (id, role) => request(`/workspace/members/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeMember: (id) => request(`/workspace/members/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   billing: () => request('/workspace/billing'),
+  affiliateRecommendations: () => request('/affiliate/recommendations'),
   search: (query) => request(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`),
   listPlaybooks: (category, namePrefix, summary = false) => request(`/playbooks${listQuery(category, namePrefix, summary)}`),
   createPlaybook: (payload) => request('/playbooks', { method: 'POST', body: JSON.stringify(payload) }),

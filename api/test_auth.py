@@ -395,10 +395,69 @@ class AuthenticationTests(unittest.TestCase):
         user = response_json(call_api("GET", "me", "local-coach"))
         self.assertEqual(len(user["workspaces"]), 2)
         self.assertEqual({item["kind"] for item in user["workspaces"]}, {"individual", "team"})
-        for workspace in user["workspaces"]:
-            self.assertEqual(workspace["role"], "owner")
-            self.assertEqual(workspace["subscription"]["interval"], "year")
-            self.assertEqual(workspace["subscription"]["source"], "development_fixture")
+        individual = next(item for item in user["workspaces"] if item["kind"] == "individual")
+        team = next(item for item in user["workspaces"] if item["kind"] == "team")
+        self.assertEqual(individual["role"], "owner")
+        self.assertEqual(individual["subscription"]["kind"], "free")
+        self.assertEqual(individual["limits"], {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500})
+        self.assertEqual(team["role"], "owner")
+        self.assertEqual(team["subscription"]["interval"], "year")
+        self.assertEqual(team["subscription"]["source"], "development_fixture")
+
+    def test_development_startup_accounts_have_isolated_plan_fixtures(self):
+        for plan, expected_limits in (
+            ("free", {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500}),
+            ("individual", {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}),
+            ("team", {"playbooks": 100, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000}),
+        ):
+            with self.subTest(plan=plan):
+                user_id = f"local-demo-{plan}"
+                identity = response_json(call_api("GET", "me", user_id))
+                workspace = next(item for item in identity["workspaces"] if item["subscription"]["kind"] == plan)
+                self.assertEqual(workspace["limits"], expected_limits)
+                self.assertTrue(workspace["capabilities"]["edit"])
+                self.assertEqual(workspace["seatLimit"], 10 if plan == "team" else 1)
+                period_end = workspace["subscription"]["periodEndsAt"]
+                repeated = response_json(call_api("GET", "me", user_id))
+                self.assertEqual(next(item for item in repeated["workspaces"] if item["id"] == workspace["id"])["subscription"]["periodEndsAt"], period_end)
+
+        function_app.storage = function_app.Storage()
+        with patch.dict(os.environ, {"AUTH_MODE": "production", "BILLING_MODE": "paddle"}):
+            function_app.accounts.ensure_user(function_app.storage, {"userId": "local-demo-individual", "name": "Coach"})
+            workspace = function_app.storage.get("workspaces", function_app.accounts.personal_id("local-demo-individual"))
+            self.assertEqual(workspace["subscription"]["kind"], "free")
+
+    def test_free_workspace_is_writable_and_enforces_free_caps(self):
+        user = response_json(call_api("GET", "me", "free-coach"))
+        workspace = user["workspaces"][0]
+        self.assertEqual(workspace["subscription"]["status"], "free")
+        self.assertEqual(workspace["subscription"]["kind"], "free")
+        self.assertTrue(workspace["capabilities"]["edit"])
+        self.assertEqual(workspace["prices"], {"month": 0, "year": 0})
+        billing = response_json(call_api("GET", "workspace/billing", "free-coach"))
+        self.assertEqual(billing["plans"], {"individual": {"month": 999, "year": 9990}, "team": {"month": 2999, "year": 29990}})
+
+        with patch.dict(function_app.accounts.FREE_LIMITS, {"playbooks": 1}):
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "First"}).status_code, 201)
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Over limit"}).status_code, 409)
+
+    def test_affiliate_recommendations_are_free_only_and_clicks_store_minimal_data(self):
+        with patch.dict(os.environ, {"AFFILIATE_URL_HUDL": "https://partners.example/hudl"}):
+            free_user = response_json(call_api("GET", "me", "free-coach"))
+            free_workspace = free_user["workspaces"][0]
+            self.assertEqual(free_workspace["subscription"]["kind"], "free")
+            team = self.team_fixture()
+            recommendations = response_json(call_api("GET", "affiliate/recommendations", "free-coach"))
+            self.assertEqual(recommendations["items"][0]["href"], "/api/go/hudl")
+            self.assertEqual(call_api("GET", "affiliate/recommendations", "local-coach", workspace_id=team["id"]).status_code, 403)
+
+            redirect = call_api("GET", "go/hudl")
+            self.assertEqual(redirect.status_code, 302)
+            self.assertEqual(redirect.headers["Location"], "https://partners.example/hudl")
+            click = function_app.storage.list("affiliateClicks")[0]
+            self.assertEqual(set(click), {"id", "partnerId", "clickedAt", "entityType", "partitionKey"})
+            self.assertEqual(click["partnerId"], "hudl")
+            self.assertNotIn("userId", click)
 
     def test_switching_workspace_preserves_private_content(self):
         user = response_json(call_api("GET", "me", "local-coach"))
@@ -491,13 +550,27 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_caps_apply_to_both_collection_and_play_types(self):
         call_api("GET", "me", "local-coach")
-        with patch.dict(function_app.accounts.LIMITS, {"gamePlans": 1, "plays": 1, "scoutPlays": 1}):
+        with patch.dict(function_app.accounts.FREE_LIMITS, {"gamePlans": 1, "plays": 1, "scoutPlays": 1}):
             book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book"}))
             plan = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Plan"}))
             self.assertEqual(call_api("POST", "game-plans", "local-coach", {"name": "Overflow"}).status_code, 409)
             for path in (f"playbooks/{book['id']}/plays", f"game-plans/{plan['id']}/scout-plays"):
                 self.assertEqual(call_api("POST", path, "local-coach", {"name": "First"}).status_code, 201)
                 self.assertEqual(call_api("POST", path, "local-coach", {"name": "Overflow"}).status_code, 409)
+
+    def test_team_quotas_are_higher_and_enforced(self):
+        team = self.team_fixture()
+        self.assertEqual(team["limits"], {"playbooks": 100, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000})
+        individual = next(workspace for workspace in response_json(call_api("GET", "me", "local-coach"))["workspaces"] if workspace["kind"] == "individual")
+        self.assertEqual(individual["limits"], {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500})
+
+        with patch.dict(function_app.accounts.TEAM_LIMITS, {"gamePlans": 1, "plays": 1, "scoutPlays": 1}):
+            plan = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Game"}, team["id"]))
+            self.assertEqual(call_api("POST", "game-plans", "local-coach", {"name": "Overflow"}, team["id"]).status_code, 409)
+            book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book"}, team["id"]))
+            for path in (f"playbooks/{book['id']}/plays", f"game-plans/{plan['id']}/scout-plays"):
+                self.assertEqual(call_api("POST", path, "local-coach", {"name": "First"}, team["id"]).status_code, 201)
+                self.assertEqual(call_api("POST", path, "local-coach", {"name": "Overflow"}, team["id"]).status_code, 409)
 
     def test_collection_deletion_removes_descendants_and_frees_quota(self):
         book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book"}))
@@ -509,6 +582,9 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_trial_starts_once_on_entry_and_expires(self):
         user = response_json(call_api("GET", "me", "trial-coach"))
+        workspace = function_app.storage.get("workspaces", function_app.accounts.personal_id("trial-coach"))
+        workspace["subscription"] = function_app.accounts.new_subscription("individual")
+        function_app.storage.save("workspaces", workspace)
         self.assertIsNone(user["workspaces"][0]["subscription"]["trialStartedAt"])
         first = response_json(call_api("GET", "workspace", "trial-coach"))
         second = response_json(call_api("GET", "workspace", "trial-coach"))
@@ -611,7 +687,8 @@ class AuthenticationTests(unittest.TestCase):
     def test_retention_blocks_content_after_eighteen_months(self):
         user = response_json(call_api("GET", "me", "local-coach"))
         workspace = function_app.storage.get("workspaces", user["workspaces"][0]["id"])
-        workspace["subscription"]["periodEndsAt"] = "2020-01-31T00:00:00+00:00"
+        workspace["subscription"].update({"kind": "individual", "status": "active", "periodEndsAt": "2020-01-31T00:00:00+00:00"})
+        function_app.storage.save("workspaces", workspace)
         self.assertEqual(call_api("GET", "playbooks", "local-coach").status_code, 410)
         self.assertEqual(call_api("GET", "workspace", "local-coach").status_code, 200)
         self.assertEqual(response_json(call_api("GET", "workspace", "local-coach"))["deletionDueAt"], "2021-07-31T00:00:00+00:00")
@@ -620,7 +697,9 @@ class AuthenticationTests(unittest.TestCase):
         user = response_json(call_api("GET", "me", "local-coach"))
         individual = next(item for item in user["workspaces"] if item["kind"] == "individual")
         team = next(item for item in user["workspaces"] if item["kind"] == "team")
-        function_app.storage.get("workspaces", individual["id"])["subscription"]["periodEndsAt"] = "2020-01-01T00:00:00+00:00"
+        workspace = function_app.storage.get("workspaces", individual["id"])
+        workspace["subscription"].update({"kind": "individual", "status": "active", "periodEndsAt": "2020-01-01T00:00:00+00:00"})
+        function_app.storage.save("workspaces", workspace)
         self.assertEqual(call_api("GET", "playbooks", "local-coach", workspace_id=team["id"]).status_code, 200)
 
     def test_invalid_json_shapes_are_rejected(self):
@@ -728,6 +807,7 @@ class AuthenticationTests(unittest.TestCase):
         response = call_api("GET", "health")
 
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response_json(response)["service"], "blitzboard-studio-api")
 
     def test_protected_route_requires_authentication(self):
         response = call_api("GET", "playbooks")

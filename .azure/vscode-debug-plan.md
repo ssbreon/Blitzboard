@@ -37,7 +37,7 @@ Each checked row below produces a VS Code debug configuration in `.vscode/launch
 | Generate | Debug Config Name | Service Label | Service Root | Project Type | Runtime | Version | Azure Dependencies |
 |----------|--------------------|---------------|--------------|--------------|---------|---------|---------------------|
 | [x] | Playbook API (debug) | Playbook API | ./api | functions | Python | 3.11.x | Azure Cosmos DB, Azure Storage |
-| [x] | Playboard web app (debug) | Playboard web app | ./frontend | frontend-spa | Node.js | 24.x | — |
+| [x] | Blitzboard Studio web app (debug) | Blitzboard Studio web app | ./frontend | frontend-spa | Node.js | 24.x | — |
 | [x] | Debug All Services | Debug All Services | | *Compound Config* | | | |
 
 <details>
@@ -80,7 +80,7 @@ During debugging, the compound VS Code configuration starts the Python Functions
 graph LR
     API["Playbook API<br/>Azure Functions :7071"] -->|"azure-cosmos"| COSMOS["Cosmos DB Emulator<br/>localhost:8081"]
     API -->|"AzureWebJobsStorage"| AZ["Azurite<br/>Blob, Queue, Table"]
-    WEB["Playboard web app<br/>Vite :5173"] -->|"/api proxy"| API
+    WEB["Blitzboard Studio web app<br/>Vite :5173"] -->|"/api proxy"| API
 ```
 
 ---
@@ -121,5 +121,5 @@ The existing frontend scripts are retained as the local development entry points
 
 Debug Configuration Checklist:
 ✅ Playbook API (debug) — Functions worker initialized and wildcard `api` route registered; debugpy listened on port 5678; `GET /api/health` returned HTTP 200.
-✅ Playboard web app (debug) — Vite emitted its `Local:` ready signal at `http://localhost:5173`; `GET /` returned HTTP 200.
+✅ Blitzboard Studio web app (debug) — Vite emitted its `Local:` ready signal at `http://localhost:5173`; `GET /` returned HTTP 200.
 ✅ Debug All Services — Sequenced startup launched the API before Vite with one listener each on ports 7071, 5173, and 5678; both HTTP checks returned 200; all application, debugger, and emulator ports were free after teardown.

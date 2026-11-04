@@ -4,6 +4,7 @@ import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, Gri
 import { getCategoryBadgeStyle } from './CategoryBadge'
 import { BreadcrumbCacheContext } from '../utils/breadcrumbCacheContext'
 import { ErrorDialog } from './ErrorDialog'
+import { LoadingIndicator } from './LoadingIndicator'
 
 const PAGE_SIZE = 50
 
@@ -416,7 +417,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
           </button>
         </div>
       )}
-      {isLoading && <p className="data-grid-status data-grid-loading" role="status">Loading {title.toLowerCase()}...</p>}
+      {isLoading && <LoadingIndicator className="data-grid-status data-grid-loading" label={`Loading ${title.toLowerCase()}...`} />}
       <ErrorDialog error={error} message={`We couldn't load ${title.toLowerCase()}. Please refresh the list to try again.`} />
       <ErrorDialog error={reorderError} message={`We couldn't save the new order of ${title.toLowerCase()}. Please try again.`} />
       {!isLoading && !error && (

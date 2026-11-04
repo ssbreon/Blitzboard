@@ -17,6 +17,30 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ## Account Implementation: Local Milestone
 
+### Startup And Sign-In
+
+New browser tabs start on the subscription/sign-in page. The first-visit greeting
+is remembered by `localStorage["blitzboard:welcome-seen"]` after Continue is selected.
+Clearing that key restores the greeting. This preference is not an identity check.
+
+With the Vite development server and `VITE_AUTH_MODE=development`, choose Free,
+Individual, or Team to sign in as `local-demo-free`, `local-demo-individual`, or
+`local-demo-team`. The API creates isolated, idempotent demo fixtures only with
+development authentication and mock billing. Team opens its Team workspace.
+Existing coach accounts and content are not modified. Sign Out returns to the
+startup page; refresh preserves the active account in the current tab.
+
+Production builds never send development authentication headers. Set
+`VITE_SIGN_IN_URL` to the configured identity provider's sign-in entry URL,
+including any provider-required return URL. The startup page remembers the
+chosen tier in `localStorage["blitzboard:requested-plan"]` for future onboarding;
+this never grants paid access. The identity provider must return to this app in
+the same tab. Server-side identity verification and Paddle onboarding remain
+unimplemented: production sign-in will not work until those integrations are
+configured. No credentials are collected by this page.
+
+Startup checks: `node --test --test-force-exit src/components/StartupPage.test.js`.
+
 The local account/workspace foundation is implemented. This is not a production
 Entra, Paddle, or Resend integration yet.
 
@@ -28,7 +52,7 @@ Entra, Paddle, or Resend integration yet.
 - Save/Discard/Cancel navigation, including base-play and adjustment drafts.
 - Account-menu Sign Out uses the same unsaved-change guard, clears the selected
 	workspace, and blocks authenticated frontend requests for this tab. The signed-out
-	state survives reloads; Sign In restores the configured development identity.
+	state survives reloads; the startup page selects the development demo identity.
 	This is local session handling, not production provider logout or token revocation.
 - Team name/defaults, roster roles/removal, seven-day invitations, resend/revoke,
 	reserved seats, and recipient-bound single-use acceptance.
@@ -36,8 +60,9 @@ Entra, Paddle, or Resend integration yet.
 - Annual local Owner fixtures, read-only lifecycle checks, usage/caps and billing summary.
 - Legacy playbooks stay in Individual; they are not moved to the local Team.
 
-Individual and Team each have separate limits: 100 playbooks, 100 game plans,
-5,000 plays across all playbooks, and 5,000 scouting plays across all game plans.
+Free limits are 5 playbooks, 15 games, 500 plays, and 500 scouting plays.
+Individual limits are 100 playbooks, 100 games, 5,000 plays, and 5,000 scouting plays.
+Team limits are 100 playbooks, 200 games, 10,000 plays, and 10,000 scouting plays.
 The ten Team seats include the Owner and pending unexpired invitations.
 
 ### Record Status

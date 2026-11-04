@@ -9,6 +9,7 @@ const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: Cr
 const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
 const TEAM_TABS = [{ id: 'workspace', label: 'Workspace' }, { id: 'staff', label: 'Staff' }, { id: 'invitations', label: 'Invitations' }]
 const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
+const PLAN_LABELS = { free: 'Free', individual: 'Individual', team: 'Team' }
 const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 const date = (value, timeZone) => value ? new Date(value).toLocaleDateString(undefined, timeZone ? { timeZone } : undefined) : 'Not started'
 
@@ -35,6 +36,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
   const teamEditable = workspace.capabilities.manageTeam
+  const subscriptionPlan = workspace.subscription.kind || workspace.kind
 
   useEffect(() => {
     let active = true
@@ -309,15 +311,25 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       >
         <section className="account-section">
           <dl className="account-details">
-            <dt>Membership type</dt><dd>{workspace.kind === 'team' ? 'Team' : 'Individual'}</dd>
+            <dt>Membership type</dt><dd>{PLAN_LABELS[subscriptionPlan] || subscriptionPlan}</dd>
             <dt>Status</dt><dd className="account-role">{workspace.subscription.status}</dd>
-            <dt>Billing interval</dt><dd>{workspace.subscription.interval === 'year' ? 'Annual' : workspace.subscription.interval === 'month' ? 'Monthly' : 'Trial'}</dd>
-            <dt>{workspace.subscription.status === 'trialing' ? 'Trial ends' : 'Paid through'}</dt><dd>{date(workspace.subscription.trialEndsAt || workspace.subscription.periodEndsAt, user.preferences?.timezone)}</dd>
+            <dt>Billing interval</dt><dd>{subscriptionPlan === 'free' ? 'No recurring charge' : workspace.subscription.interval === 'year' ? 'Annual' : workspace.subscription.interval === 'month' ? 'Monthly' : 'Trial'}</dd>
+            <dt>{workspace.subscription.status === 'trialing' ? 'Trial ends' : subscriptionPlan === 'free' ? 'Plan duration' : 'Paid through'}</dt><dd>{subscriptionPlan === 'free' ? 'Ongoing' : date(workspace.subscription.trialEndsAt || workspace.subscription.periodEndsAt, user.preferences?.timezone)}</dd>
             {workspace.deletionDueAt && <><dt>Content retained until</dt><dd>{date(workspace.deletionDueAt, user.preferences?.timezone)}</dd></>}
             {workspace.subscription.source === 'development_fixture' && <><dt>Billing source</dt><dd>Test subscription</dd></>}
             {workspace.kind === 'team' && <><dt>Seats</dt><dd>{workspace.seatsUsed} / {workspace.seatLimit}</dd></>}
           </dl>
-          {billing.managedByTeam ? <p>Managed by Team Owner</p> : <>
+          {billing.managedByTeam ? <p>Managed by Team Owner</p> : subscriptionPlan === 'free' ? <>
+            <div className="account-price-row"><div><strong>Free</strong><span>Current plan</span></div></div>
+            <div className="account-plan-options">
+              {['team', 'individual'].map((planId) => <div key={planId}>
+                <strong>{PLAN_LABELS[planId]}</strong>
+                <span>{money(billing.plans[planId].month)} / month</span>
+                <span>{money(billing.plans[planId].year)} / year</span>
+              </div>)}
+            </div>
+            <button type="button" className="dialog-create" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Upgrade Plan</button>
+          </> : <>
             <div className="account-price-row"><div><strong>{money(billing.prices.month)}</strong><span>Monthly, tax included</span></div><div><strong>{money(billing.prices.year)}</strong><span>Annual, paid upfront, tax included</span></div></div>
             <button type="button" className="dialog-create" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Manage Billing</button>
           </>}
