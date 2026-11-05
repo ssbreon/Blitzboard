@@ -164,7 +164,8 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     setInvitationCopyFeedback(null)
     setError(null)
     try {
-      await navigator.clipboard.writeText(invite.capturedUrl)
+      const url = invite.capturedUrl || (await api.invitationLink(invite.id)).url
+      await navigator.clipboard.writeText(url)
       setInvitationCopyFeedback({ id: invite.id, message: 'Invitation link copied' })
     } catch (failure) {
       setError({ ...failure, message: `Unable to copy the invitation link: ${failure.message}` })
@@ -273,6 +274,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             <button type="submit" className="dialog-create" disabled={saving || workspace.seatsUsed >= workspace.seatLimit}><Mail size={16} aria-hidden="true" />Invite</button>
           </form>}
           {deliveryMode === 'capture' && <p className="account-team-summary">Captured locally</p>}
+          {deliveryMode === 'manual' && <p className="account-team-summary">Manual delivery</p>}
           {!loading && <div className="account-invitations"><DataGrid
             title="Invitations"
             rowIcon={Mail}
@@ -291,7 +293,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             ]}
             rowActionLabel={(invite) => `Invitation actions for ${invite.email}`}
             rowActions={(invite) => [
-              { key: 'copy', label: 'Copy Invitation Link', icon: Copy, disabled: !invite.capturedUrl, onClick: copyInvitation },
+              { key: 'copy', label: 'Copy Invitation Link', icon: Copy, disabled: invite.status !== 'pending' || (deliveryMode === 'capture' && !invite.capturedUrl), onClick: copyInvitation },
               { key: 'resend', label: 'Resend Invitation', icon: Mail, disabled: !canInvite || invite.status !== 'pending', onClick: (row) => inviteAction('resend', row) },
               { key: 'revoke', label: 'Revoke Invitation', icon: Trash2, destructive: true, disabled: !canInvite || invite.status !== 'pending', onClick: (row) => inviteAction('revoke', row) },
             ]}

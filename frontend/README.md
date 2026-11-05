@@ -123,11 +123,16 @@ matching email plus `email_verified: true` or `xms_edov: true` from the signed A
 token. The invitation is single-use, expires after seven days, and reserves one
 of ten seats. Do not copy captured invite links into chat.
 
-This CLI is a local alpha bootstrap only. A production Owner bootstrap and real
-email delivery/provider retrieval still need a separately reviewed operational
-path before deployment. The API's Owner/Coach permission enum remains the source
-of authorization: both roles manage Team content; only Owner manages workspace
-and membership.
+This CLI is a local alpha bootstrap only; a restricted production Owner bootstrap
+is still required before launch. Production alpha invitations use manual delivery:
+configure a trusted HTTPS `APP_PUBLIC_URL` and a secret `EMAIL_OUTBOX_KEY`. The
+Owner's Copy Invitation Link action fetches the URL for one pending invitation
+through `GET /api/workspace/invitations/{id}/link`; the invitation list never
+contains production URLs, and Coaches cannot retrieve them. Deliver copied links
+only through a trusted channel. No email is sent automatically; an email provider
+integration remains deferred. The API's Owner/Coach permission enum remains the
+source of authorization: both roles manage Team content; only Owner manages
+workspace and membership.
 
 Pending invitation tokens are temporarily kept in tab storage for up to 30 minutes
 and removed from the URL before redirect; acceptance/cancel/logout clears them.
@@ -378,10 +383,11 @@ Do not expose the development frontend/API or development secret publicly.
 
 The encrypted local invitation outbox derives its capture key from the backend
 development secret. Rotating that secret makes old captured payloads unreadable;
-revoke/reissue pending test invitations. Production will require an explicit
-`EMAIL_OUTBOX_KEY` and a real Resend sender/dispatcher, not this derived local key.
-Captured links are available only to authenticated Team Admins/Owners and disappear
-after acceptance or revocation. To simulate the invited identity locally, use its
+revoke/reissue pending test invitations. Production requires an explicit
+`EMAIL_OUTBOX_KEY`; the encrypted outbox supports Owner-only manual link retrieval,
+while automatic email delivery remains deferred. Local captured links are
+available only to authenticated Team Owners and disappear after acceptance or
+revocation. To simulate the invited identity locally, use its
 email as `VITE_DEV_USER_ID` in a separate development configuration with the matching
 local secret. This is a dev fixture, not proof of real email verification.
 

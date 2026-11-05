@@ -41,7 +41,7 @@ Playbook records, membership, roles, revisions, slide metadata, and searchable f
 
 Authentication uses an external OIDC provider, with Microsoft Entra External ID and Google federation as the preferred deployment direction. Local development may use an explicit development identity behind a flag and local secret; production API routes must validate the external token and enforce ownership/role rules server-side. No plaintext passwords or Google credentials are stored.
 
-For the invite-only, payment-free alpha, Entra sign-in alone does not grant application access or create a personal Free workspace. An operator bootstraps an `alphaEnabled` Team workspace and its first Owner; Owners invite verified-email Coaches. Alpha access is stored and enforced server-side, independent of Paddle subscription status. The local-only bootstrap CLI is not a production provisioning mechanism.
+For the invite-only, payment-free alpha, Entra sign-in alone does not grant application access or create a personal Free workspace. An operator bootstraps an `alphaEnabled` Team workspace and its first Owner; Owners invite verified-email Coaches. Alpha access is stored and enforced server-side, independent of Paddle subscription status. Production alpha invitations support manual delivery: an Owner can retrieve a single pending invitation link through an authenticated, permission-checked endpoint; list responses never include production links, and Coaches cannot retrieve them. This requires a trusted HTTPS app URL and an explicit encryption key; no email is sent automatically. The local-only bootstrap CLI is not a production provisioning mechanism.
 
 ## 4. Data Model & API
 

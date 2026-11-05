@@ -1190,6 +1190,47 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("POST", "workspace/invitations", "coach-b", {"email": "coach@example.com"}, team["id"]).status_code, 403)
         self.assertEqual(call_api("GET", "workspace/invitations", "coach-b", workspace_id=team["id"]).status_code, 403)
 
+    def test_owner_can_retrieve_pending_invite_link_in_manual_mode(self):
+        from cryptography.fernet import Fernet
+
+        team = self.team_fixture()
+        workspace = function_app.storage.get("workspaces", team["id"])
+        workspace["alphaEnabled"] = True
+        workspace["subscription"]["source"] = "alpha"
+        function_app.storage.save("workspaces", workspace)
+        settings = {
+            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production", "BILLING_MODE": "paddle",
+            "APP_PUBLIC_URL": "https://blitzboard.example", "EMAIL_OUTBOX_KEY": Fernet.generate_key().decode(),
+        }
+        with patch.dict(os.environ, settings):
+            created_response = call_api("POST", "workspace/invitations", "local-coach",
+                                        {"email": "manual-coach@example.com"}, team["id"])
+            self.assertEqual(created_response.status_code, 201, response_json(created_response))
+            created = response_json(created_response)
+            created_token_hash = function_app.storage.get("invitations", created["id"])["tokenHash"]
+            listed = response_json(call_api("GET", "workspace/invitations", "local-coach", workspace_id=team["id"]))
+            link = call_api("GET", f"workspace/invitations/{created['id']}/link", "local-coach", workspace_id=team["id"])
+            denied = call_api("GET", f"workspace/invitations/{created['id']}/link", "coach-b", workspace_id=team["id"])
+            stored = function_app.storage.get("invitations", created["id"])
+            stored["expiresAt"] = (function_app.accounts.timestamp() - timedelta(seconds=1)).isoformat()
+            function_app.storage.save("invitations", stored)
+            expired = call_api("GET", f"workspace/invitations/{created['id']}/link", "local-coach", workspace_id=team["id"])
+            revoked = call_api("DELETE", f"workspace/invitations/{created['id']}", "local-coach", workspace_id=team["id"])
+            revoked_link = call_api("GET", f"workspace/invitations/{created['id']}/link", "local-coach", workspace_id=team["id"])
+
+        self.assertEqual(listed["deliveryMode"], "manual")
+        self.assertNotIn("capturedUrl", listed["items"][0])
+        self.assertEqual(link.status_code, 200)
+        url = response_json(link)["url"]
+        token = parse_qs(urlparse(url).fragment)["invite"][0]
+        self.assertTrue(url.startswith("https://blitzboard.example/#invite="))
+        self.assertEqual(function_app.accounts.hashlib.sha256(token.encode()).hexdigest(),
+                         created_token_hash)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(expired.status_code, 409)
+        self.assertEqual(revoked.status_code, 204)
+        self.assertEqual(revoked_link.status_code, 409)
+
     def test_outbox_does_not_store_plaintext_token(self):
         team = self.team_fixture()
         invite, token = self.invite_token(team["id"], "coach@example.com")

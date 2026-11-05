@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr
 from enum import Enum
 from types import MappingProxyType
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 from uuid import uuid4
 
 
@@ -472,6 +472,32 @@ def queue_invitation(storage, identity, workspace, email, role, existing=None):
     return {key: value for key, value in invite.items() if key != "tokenHash"}
 
 
+def invitation_link(storage, workspace, invite):
+    if invite.get("status") != "pending" or timestamp() >= parse_date(invite.get("expiresAt")):
+        raise AccountError("INVITATION_CLOSED", "Invitation link is no longer available", 409)
+    message = next((entry for entry in storage.list("outbox")
+                    if entry.get("invitationId") == invite["id"]
+                    and entry.get("workspaceId") == workspace["id"]), None)
+    if not message:
+        raise AccountError("INVITATION_LINK_UNAVAILABLE", "Invitation link is unavailable", 503)
+    from cryptography.fernet import InvalidToken
+    try:
+        payload = json.loads(outbox_cipher().decrypt(message["payload"].encode()))
+        url = payload.get("acceptUrl") if isinstance(payload, dict) else None
+        recipient = payload.get("to") if isinstance(payload, dict) else None
+        tokens = parse_qs(urlparse(url).fragment).get("invite", []) if isinstance(url, str) else []
+    except (InvalidToken, ValueError, KeyError, TypeError, AttributeError):
+        raise AccountError("INVITATION_LINK_UNAVAILABLE", "Invitation link is unavailable", 503) from None
+    token_hash = invite.get("tokenHash")
+    if (not isinstance(url, str) or not url.startswith("https://") or len(tokens) != 1
+            or not isinstance(token_hash, str)
+            or not secrets.compare_digest(hashlib.sha256(tokens[0].encode()).hexdigest(), token_hash)
+            or not isinstance(recipient, str)
+            or recipient.casefold() != invite.get("email", "").casefold()):
+        raise AccountError("INVITATION_LINK_UNAVAILABLE", "Invitation link is unavailable", 503)
+    return {"url": url}, 200
+
+
 def accept_invitation(storage, identity, payload):
     token = payload.get("token")
     if not isinstance(token, str) or not 20 <= len(token) <= 200:
@@ -539,7 +565,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                         except InvalidToken:
                             item["captureUnavailable"] = True
                 items.append(item)
-            return {"items": items, "deliveryMode": "capture" if local_invite_capture() else "pending"}, 200
+            return {"items": items, "deliveryMode": "capture" if local_invite_capture() else "manual"}, 200
         require_permission(workspace, role, Permission.MEMBER_INVITE)
         if len(path) == 2 and method == "POST":
             email = payload.get("email", "")
@@ -561,6 +587,11 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             if len(members) + len(pending) >= 10:
                 raise AccountError("SEAT_LIMIT_REACHED", "This Team has reached its ten-seat limit", 409)
             return queue_invitation(storage, identity, workspace, email, assigned_role), 201
+        if len(path) == 4 and path[3] == "link" and method == "GET":
+            invite = storage.get("invitations", path[2])
+            if not invite or invite["workspaceId"] != workspace["id"]:
+                raise AccountError("NOT_FOUND", "Invitation was not found", 404)
+            return invitation_link(storage, workspace, invite)
         if len(path) == 3:
             invite = storage.get("invitations", path[2])
             if not invite or invite["workspaceId"] != workspace["id"]:
