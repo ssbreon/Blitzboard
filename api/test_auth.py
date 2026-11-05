@@ -81,7 +81,12 @@ class EntraAuthenticationTests(unittest.TestCase):
     def test_valid_identity_is_stable_and_not_linked_by_email(self):
         identity = self.authenticate()
         self.assertTrue(identity["userId"].startswith("entra-"))
+        self.assertEqual(identity["email"], "coach@example.com")
         self.assertFalse(identity["emailVerified"])
+        self.assertEqual(self.authenticate({**self.claims, "email": None, "emails": ["coach@example.com"]})["email"], "coach@example.com")
+        self.assertEqual(self.authenticate({**self.claims, "email": ["coach@example.com"]})["email"], "coach@example.com")
+        self.assertTrue(self.authenticate({**self.claims, "xms_edov": True})["emailVerified"])
+        self.assertFalse(self.authenticate({**self.claims, "xms_edov": False})["emailVerified"])
         changed = {**self.claims, "email": "new@example.com", "name": "New name"}
         self.assertEqual(self.authenticate(changed)["userId"], identity["userId"])
         other = {**self.claims, "oid": "55555555-5555-4555-8555-555555555555"}
@@ -168,8 +173,31 @@ class EntraAuthenticationTests(unittest.TestCase):
             second = response_json(function_app.api(request))
         self.assertTrue(first["userId"].startswith("entra-"))
         self.assertEqual(first["userId"], second["userId"])
+        self.assertFalse(first["emailVerified"])
         self.assertEqual(len(function_app.storage.list("profiles")), 1)
         self.assertEqual(len(first["workspaces"]), 1)
+        self.assertEqual(first["email"], "coach@example.com")
+
+        verified_claims = {**self.claims, "xms_edov": True}
+        verified_token = jwt.encode(verified_claims, self.key, algorithm="RS256", headers={"kid": "test-key"})
+        request.headers["Authorization"] = "Bearer " + verified_token
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()), patch.dict(os.environ, {"AUTH_MODE": "entra", "BILLING_MODE": "paddle"}):
+            verified = response_json(function_app.api(request))
+        self.assertTrue(verified["emailVerified"])
+
+    def test_entra_email_claim_repairs_blank_profile_without_overwriting_existing_email(self):
+        accounts = function_app.accounts
+        storage = function_app.Storage()
+        identity = {"userId": "entra-existing", "name": "Coach", "email": "coach@example.com"}
+        storage.save("profiles", {"id": identity["userId"], "name": "Coach", "email": "", "coachingTitle": "Head Coach", "preferences": dict(accounts.DEFAULT_PREFERENCES)})
+        accounts.ensure_user(storage, identity)
+        profile = storage.get("profiles", identity["userId"])
+        self.assertEqual(profile["email"], "coach@example.com")
+        self.assertEqual(profile["coachingTitle"], "Head Coach")
+
+        identity["email"] = "updated@example.com"
+        accounts.ensure_user(storage, identity)
+        self.assertEqual(storage.get("profiles", identity["userId"])["email"], "coach@example.com")
 
 
 class PermissionTests(unittest.TestCase):

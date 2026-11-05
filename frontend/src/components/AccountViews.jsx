@@ -220,6 +220,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           <label className="dialog-field"><span>Display name</span><input required maxLength={120} value={form.name} onChange={(event) => change('name', event.target.value)} /></label>
           <label className="dialog-field"><span>Coaching title</span><input maxLength={120} value={form.coachingTitle} onChange={(event) => change('coachingTitle', event.target.value)} /></label>
           <label className="dialog-field"><span>Email</span><input value={user.email || ''} placeholder="Not configured" readOnly /></label>
+          <label className="dialog-field"><span>Email verification</span><input value={user.email ? (user.emailVerified ? 'Verified' : 'Not verified') : 'Unavailable'} readOnly /></label>
         </>}
         {view === 'settings' && preferences}
       </fieldset>

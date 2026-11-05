@@ -5,6 +5,7 @@ export function createEntraSession(settings, createClient = (config) => new Publ
   const tenantId = settings.VITE_ENTRA_TENANT_ID || ''
   const authority = settings.VITE_ENTRA_AUTHORITY || ''
   const scope = settings.VITE_ENTRA_API_SCOPE || ''
+  const scopes = [scope, 'email']
   const redirectUri = settings.VITE_ENTRA_REDIRECT_URI || `${origin}/`
   const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   let authorityUrl, redirectUrl
@@ -45,14 +46,14 @@ export function createEntraSession(settings, createClient = (config) => new Publ
     initialize,
     async signIn() {
       await initialize()
-      return client.loginRedirect({ scopes: [scope], prompt: 'select_account' })
+      return client.loginRedirect({ scopes, prompt: 'select_account' })
     },
     async accessToken() {
       await initialize()
       const account = client.getActiveAccount()
       if (!account) throw new Error('You are signed out')
       try {
-        const result = await client.acquireTokenSilent({ account, scopes: [scope] })
+        const result = await client.acquireTokenSilent({ account, scopes })
         if (!result.accessToken || result.account?.homeAccountId !== account.homeAccountId) throw new Error('The authentication account changed; sign in again')
         return result.accessToken
       } catch (error) {

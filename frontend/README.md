@@ -50,8 +50,9 @@ Startup checks: `node --test --test-force-exit src/components/StartupPage.test.j
 The customer tenant is Blitzboard Customers, not the original Workforce directory.
 The Web registration has one SPA callback, `http://localhost:5173/`, uses PKCE
 instead of implicit tokens, and requests the API's delegated `access_as_user`
-scope. Admin consent is granted on the Web registration. The email one-time
-passcode user flow is associated with the Web app, not the API.
+scope plus the OpenID Connect `email` scope. Admin consent is granted on the Web
+registration. The email one-time-passcode user flow is associated with the Web
+app, not the API.
 
 Frontend public settings in `.env.local`:
 
@@ -92,10 +93,18 @@ personal workspace. This is not the server-approved, invite-only alpha policy.
 
 Pending invitation tokens are temporarily kept in tab storage for up to 30 minutes
 and removed from the URL before redirect; acceptance/cancel/logout clears them.
-Entra email claims are not automatically treated as verified. Invitation acceptance
-requires a trusted `email_verified: true` claim, otherwise it fails closed. A
-verified-recipient challenge, local Entra invitation capture, alpha workspace
-bootstrap/entitlements, and production delivery are follow-up work.
+Entra email claims are not automatically treated as verified. The API registration's
+**Token configuration → Access → email and xms_edov** claims need the OIDC `email`
+scope requested by the client. The API's Token configuration page may link to API
+permissions when `email` is added; configure the OpenID Connect `email` permission
+there as prompted. The Web client sends `email` alongside its API scope for both
+interactive and silent token requests. Invitation acceptance requires a trusted
+explicit `email_verified: true` or `xms_edov: true` token claim and an email match;
+an email address by itself is insufficient. Verify the real External ID access
+token before relying on invites.
+A verified-recipient challenge is still needed if the tenant doesn't emit an
+appropriate explicit verification claim. Local Entra invitation capture, alpha
+workspace bootstrap/entitlements, and production delivery are follow-up work.
 
 Start the emulators, Functions at port 7071 using the workspace virtual environment,
 and Vite at port 5173. Vite fails if that port is occupied instead of silently

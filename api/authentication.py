@@ -96,12 +96,28 @@ class EntraAuthenticator:
         external_identity = {"issuer": self.issuer, "tenantId": self.tenant_id, "objectId": object_id}
         identity_key = json.dumps(external_identity, sort_keys=True, separators=(",", ":"))
         email = claims.get("email")
+        if isinstance(email, list):
+            email = next((value for value in email if isinstance(value, str) and value.strip()), None)
+        if not isinstance(email, str) or not email.strip():
+            emails = claims.get("emails")
+            if isinstance(emails, str):
+                email = emails
+            elif isinstance(emails, list):
+                email = next((value for value in emails if isinstance(value, str) and value.strip()), None)
+            else:
+                email = None
+        if isinstance(email, str):
+            email = email.strip()
+            if not email or len(email) > 254:
+                email = None
         name = claims.get("name")
         return {
             "userId": "entra-" + hashlib.sha256(identity_key.encode()).hexdigest(),
             "name": name if isinstance(name, str) and name.strip() else "Coach",
             "email": email if isinstance(email, str) else "",
-            "emailVerified": isinstance(email, str) and bool(email) and claims.get("email_verified") is True,
+            "emailVerified": isinstance(email, str) and (
+                claims.get("email_verified") is True or claims.get("xms_edov") is True
+            ),
             "externalIdentity": external_identity,
             "roles": [],
         }

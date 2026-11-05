@@ -14,13 +14,15 @@ const settings = {
 
 function fixture({ accounts = [], callback = null, tokenError = null } = {}) {
   let active = null, config, initializationCount = 0, login, logout
+  const silentRequests = []
   const client = {
     initialize: async () => { initializationCount += 1 },
     handleRedirectPromise: async () => callback,
     getAllAccounts: () => accounts,
     getActiveAccount: () => active,
     setActiveAccount: (account) => { active = account },
-    acquireTokenSilent: async () => {
+    acquireTokenSilent: async (request) => {
+      silentRequests.push(request)
       if (tokenError) throw tokenError
       return { accessToken: 'api-access-token', account: active }
     },
@@ -28,15 +30,16 @@ function fixture({ accounts = [], callback = null, tokenError = null } = {}) {
     logoutRedirect: async (request) => { logout = request; active = null },
   }
   const session = createEntraSession(settings, (value) => { config = value; return client }, 'http://localhost:5173')
-  return { session, client, config, initializationCount: () => initializationCount, login: () => login, logout: () => logout }
+  return { session, client, config, initializationCount: () => initializationCount, login: () => login, logout: () => logout, silentRequests }
 }
 
 test('Entra processes callback once, selects its account, and acquires API tokens silently', async () => {
   const account = { homeAccountId: 'coach' }
-  const { session, config, initializationCount } = fixture({ callback: { account } })
+  const { session, config, initializationCount, silentRequests } = fixture({ callback: { account } })
   assert.deepEqual(await Promise.all([session.initialize(), session.initialize()]), [true, true])
   assert.equal(initializationCount(), 1)
   assert.equal(await session.accessToken(), 'api-access-token')
+  assert.deepEqual(silentRequests[0].scopes, [settings.VITE_ENTRA_API_SCOPE, 'email'])
   assert.equal(config.cache.cacheLocation, 'sessionStorage')
   assert.equal(config.auth.navigateToLoginRequestUrl, false)
   assert.deepEqual(config.auth.knownAuthorities, ['test.ciamlogin.com'])
@@ -46,7 +49,7 @@ test('Entra login and provider logout use registered URLs and the API scope', as
   const account = { homeAccountId: 'coach' }
   const { session, login, logout } = fixture({ accounts: [account] })
   await session.signIn()
-  assert.deepEqual(login().scopes, [settings.VITE_ENTRA_API_SCOPE])
+  assert.deepEqual(login().scopes, [settings.VITE_ENTRA_API_SCOPE, 'email'])
   await session.signOut()
   assert.equal(logout().account, account)
   assert.equal(logout().postLogoutRedirectUri, 'http://localhost:5173/')

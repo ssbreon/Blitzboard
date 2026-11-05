@@ -57,6 +57,13 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(granted.includes('account-invite-form'))
     assert.ok(!granted.includes('<fieldset disabled=""'))
     assert.ok(!granted.includes('value="admin"'))
+    const renderProfile = (emailVerified) => renderToStaticMarkup(createElement(AccountViews, {
+      view: 'profile', user: { userId: 'coach', name: 'Coach', email: 'coach@example.com', emailVerified, preferences: {} },
+      api: {}, workspace: { name: 'Individual', kind: 'individual', role: 'owner', permissions: [], defaults: {}, subscription: {} },
+    }))
+    assert.ok(renderProfile(true).includes('value="Verified"'))
+    assert.ok(renderProfile(false).includes('value="Not verified"'))
+    assert.ok(renderProfile(false).includes('value="coach@example.com"'))
   } finally {
     await server.close()
   }

@@ -191,6 +191,9 @@ def ensure_user(storage, identity):
             "id": user_id, "name": identity["name"], "email": identity.get("email", ""),
             "coachingTitle": "", "preferences": dict(DEFAULT_PREFERENCES),
         })
+    elif not profile.get("email") and identity.get("email"):
+        profile["email"] = identity["email"]
+        profile = storage.save("profiles", profile)
     workspace_id = personal_id(user_id)
     fixture = is_mock() and user_id == os.getenv("DEV_USER_ID", "local-coach")
     demo_plan = {"local-demo-free": "free", "local-demo-individual": "individual", "local-demo-team": "team"}.get(user_id) if is_mock() and os.getenv("AUTH_MODE") == "development" else None
@@ -482,7 +485,9 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             return queue_invitation(storage, identity, workspace, invite["email"], invite["role"], invite), 200
     if path == ["me"]:
         if method == "GET":
-            return {**profile, "userId": user_id, "roles": [role], "workspaces": accessible(storage, user_id)}, 200
+            return {**profile, "userId": user_id, "roles": [role],
+                    "emailVerified": identity.get("emailVerified") is True,
+                    "workspaces": accessible(storage, user_id)}, 200
         if method == "PATCH":
             for key in ("name", "coachingTitle"):
                 if key in payload:
