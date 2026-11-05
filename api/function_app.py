@@ -13,6 +13,7 @@ from uuid import uuid4
 from azure.core import MatchConditions
 from azure.core.exceptions import HttpResponseError, ResourceExistsError, ResourceNotFoundError
 from azure.cosmos import CosmosClient
+from azure.identity import DefaultAzureCredential
 import azure.functions as func
 import accounts
 import authentication
@@ -90,6 +91,14 @@ class Storage:
                 id=COSMOS_CONTAINER,
                 partition_key={"paths": ["/partitionKey"], "kind": "Hash"},
             )
+        elif COSMOS_ENDPOINT:
+            client = CosmosClient(
+                COSMOS_ENDPOINT,
+                credential=DefaultAzureCredential(),
+                enable_endpoint_discovery=False,
+            )
+            database = client.get_database_client(COSMOS_DATABASE)
+            self.container = database.get_container_client(COSMOS_CONTAINER)
 
     def list(self, entity_type, parent_id=None, category=None, name_prefix=None, owner_id=None, workspace_id=None, fields=None, parent_ids=None, start=None, end=None):
         scope = workspace_id or (request_workspace.get()["id"] if owner_id and request_workspace.get() else None)

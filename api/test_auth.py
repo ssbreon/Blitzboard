@@ -1283,6 +1283,51 @@ class AuthenticationTests(unittest.TestCase):
         store.container.replace_item.assert_called_once()
         store.container.create_item.assert_not_called()
 
+    def test_storage_uses_managed_identity_without_provisioning_database_or_container(self):
+        endpoint = "https://example.documents.azure.com:443/"
+        with patch.object(function_app, "COSMOS_ENDPOINT", endpoint), \
+                patch.object(function_app, "COSMOS_KEY", None), \
+                patch.object(function_app, "DefaultAzureCredential") as credential_factory, \
+                patch.object(function_app, "CosmosClient") as cosmos_client:
+            store = function_app.Storage()
+
+        cosmos_client.assert_called_once_with(
+            endpoint,
+            credential=credential_factory.return_value,
+            enable_endpoint_discovery=False,
+        )
+        client = cosmos_client.return_value
+        client.get_database_client.assert_called_once_with(function_app.COSMOS_DATABASE)
+        database = client.get_database_client.return_value
+        database.get_container_client.assert_called_once_with(function_app.COSMOS_CONTAINER)
+        client.create_database_if_not_exists.assert_not_called()
+        database.create_container_if_not_exists.assert_not_called()
+        self.assertIs(store.container, database.get_container_client.return_value)
+
+    def test_storage_keeps_key_based_emulator_provisioning(self):
+        endpoint = "https://localhost:8081/"
+        key = "emulator-key"
+        with patch.object(function_app, "COSMOS_ENDPOINT", endpoint), \
+                patch.object(function_app, "COSMOS_KEY", key), \
+                patch.object(function_app, "CosmosClient") as cosmos_client:
+            store = function_app.Storage()
+
+        cosmos_client.assert_called_once_with(
+            endpoint,
+            key,
+            connection_verify=False,
+            enable_endpoint_discovery=False,
+        )
+        cosmos_client.return_value.create_database_if_not_exists.assert_called_once_with(
+            id=function_app.COSMOS_DATABASE,
+        )
+        database = cosmos_client.return_value.create_database_if_not_exists.return_value
+        database.create_container_if_not_exists.assert_called_once_with(
+            id=function_app.COSMOS_CONTAINER,
+            partition_key={"paths": ["/partitionKey"], "kind": "Hash"},
+        )
+        self.assertIs(store.container, database.create_container_if_not_exists.return_value)
+
     def test_client_cannot_supply_storage_etags_on_creation(self):
         result = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Book", "_etag": "forged"}))
         self.assertNotIn("_etag", result)
