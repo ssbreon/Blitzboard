@@ -3,3 +3,4 @@ azure-cosmos
 debugpy
 cryptography
 tzdata
+PyJWT[crypto]>=2.10.1,<3

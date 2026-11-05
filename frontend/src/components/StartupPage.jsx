@@ -7,7 +7,7 @@ const PLANS = [
   { id: 'team', name: 'Team', price: '$29.99', annual: '$299.90 / year, paid upfront', seats: 'Up to 10 coaches', limits: ['100 playbooks', '200 games', '10,000 plays', '10,000 scouting plays'], detail: '14-day trial. Shared workspace, staff roles and invitations.' },
 ]
 
-export function StartupPage({ development = false, onSignIn, busy = false }) {
+export function StartupPage({ development = false, cloudAuth = false, onSignIn, busy = false }) {
   const [firstVisit] = useState(() => {
     try { return localStorage.getItem('blitzboard:welcome-seen') !== 'true' } catch { return true }
   })
@@ -36,10 +36,10 @@ export function StartupPage({ development = false, onSignIn, busy = false }) {
     </section>
     <section className="startup-membership" aria-labelledby="startup-membership-title">
       <div className="startup-membership-heading">
-        <h2 id="startup-membership-title">{development ? 'Choose a coaching account' : firstVisit ? 'Choose your subscription' : 'Sign in'}</h2>
-        <p>USD. Taxes included in paid plans.</p>
+        <h2 id="startup-membership-title">{cloudAuth ? 'Sign in' : development ? 'Choose a coaching account' : firstVisit ? 'Choose your subscription' : 'Sign in'}</h2>
+        {!cloudAuth && <p>USD. Taxes included in paid plans.</p>}
       </div>
-      <fieldset className="startup-plans" disabled={busy}>
+      {!cloudAuth && <fieldset className="startup-plans" disabled={busy}>
         <legend className="sr-only">Subscription tier</legend>
         {PLANS.map((item) => <label key={item.id} className={`startup-plan${plan === item.id ? ' is-selected' : ''}`}>
           <div className="startup-plan-heading">
@@ -53,9 +53,9 @@ export function StartupPage({ development = false, onSignIn, busy = false }) {
           <ul>{item.limits.map((limit) => <li key={limit}><Check size={15} aria-hidden="true" />{limit}</li>)}</ul>
           <p className="startup-plan-detail">{item.detail}</p>
         </label>)}
-      </fieldset>
+      </fieldset>}
       <div className="startup-sign-in">
-        <button type="button" className="dialog-create" disabled={busy} onClick={() => continueToSignIn()}>
+        <button type="button" className="dialog-create" disabled={busy} onClick={() => continueToSignIn(cloudAuth ? null : plan)}>
           {development ? `Sign in to ${PLANS.find((item) => item.id === plan).name}` : 'Continue to sign in'}<ArrowRight size={18} aria-hidden="true" />
         </button>
       </div>

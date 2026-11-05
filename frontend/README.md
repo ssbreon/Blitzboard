@@ -30,19 +30,96 @@ development authentication and mock billing. Team opens its Team workspace.
 Existing coach accounts and content are not modified. Sign Out returns to the
 startup page; refresh preserves the active account in the current tab.
 
-Production builds never send development authentication headers. Set
-`VITE_SIGN_IN_URL` to the configured identity provider's sign-in entry URL,
-including any provider-required return URL. The startup page remembers the
-chosen tier in `localStorage["blitzboard:requested-plan"]` for future onboarding;
-this never grants paid access. The identity provider must return to this app in
-the same tab. Server-side identity verification and Paddle onboarding remain
-unimplemented: production sign-in will not work until those integrations are
-configured. No credentials are collected by this page.
+Production builds never send development authentication headers. With
+`VITE_AUTH_MODE=entra`, MSAL processes the redirect before the app loads, keeps
+its cache in session storage, and silently acquires API access tokens. The startup
+page offers sign-in without subscription selection. API requests carry bearer
+tokens; browser session flags never establish Entra identity. Sign Out invokes
+provider logout after the existing unsaved-change guard. Interaction-required
+errors do not automatically redirect and discard unsaved work.
+
+The legacy `VITE_SIGN_IN_URL` redirect hook remains for non-Entra configurations;
+it is not a standalone authentication implementation. No credentials are collected
+by the app. Paddle onboarding and production invite-only alpha access remain
+unimplemented.
 
 Startup checks: `node --test --test-force-exit src/components/StartupPage.test.js`.
 
-The local account/workspace foundation is implemented. This is not a production
-Entra, Paddle, or Resend integration yet.
+### Local External ID Configuration
+
+The customer tenant is Blitzboard Customers, not the original Workforce directory.
+The Web registration has one SPA callback, `http://localhost:5173/`, uses PKCE
+instead of implicit tokens, and requests the API's delegated `access_as_user`
+scope. Admin consent is granted on the Web registration. The email one-time
+passcode user flow is associated with the Web app, not the API.
+
+Frontend public settings in `.env.local`:
+
+```dotenv
+VITE_AUTH_MODE=entra
+VITE_ENTRA_TENANT_ID=c6006e69-7941-4e27-9ec0-b7adfca05e67
+VITE_ENTRA_CLIENT_ID=77e53ed3-acc0-49a1-acfa-3a3311002baa
+VITE_ENTRA_AUTHORITY=https://blitzboardcustomers.ciamlogin.com/c6006e69-7941-4e27-9ec0-b7adfca05e67
+VITE_ENTRA_API_SCOPE=api://b2ec116e-77f7-4ac0-b8aa-22bbd411a87c/access_as_user
+VITE_ENTRA_REDIRECT_URI=http://localhost:5173/
+```
+
+API `local.settings.json` uses `AUTH_MODE=entra`, `APP_ENVIRONMENT=local`,
+`BILLING_MODE=paddle`, and these public provider settings:
+
+```dotenv
+ENTRA_TENANT_ID=c6006e69-7941-4e27-9ec0-b7adfca05e67
+ENTRA_SPA_CLIENT_ID=77e53ed3-acc0-49a1-acfa-3a3311002baa
+ENTRA_API_AUDIENCE=b2ec116e-77f7-4ac0-b8aa-22bbd411a87c
+ENTRA_API_SCOPE=access_as_user
+ENTRA_AUTHORITY=https://blitzboardcustomers.ciamlogin.com/c6006e69-7941-4e27-9ec0-b7adfca05e67
+ENTRA_ISSUER=https://c6006e69-7941-4e27-9ec0-b7adfca05e67.ciamlogin.com/c6006e69-7941-4e27-9ec0-b7adfca05e67/v2.0
+```
+
+The exact issuer above was checked against the tenant's OIDC discovery metadata.
+The v2 API token audience is the API client ID, not its `api://` scope URI.
+The validator uses RS256 and cached provider signing keys; it verifies issuer,
+audience, tenant, SPA client, expiry, not-before, issued-at, v2 token format,
+Object ID, and delegated scope. Missing tokens/dev headers are rejected in Entra
+mode. Stable internal user IDs derive from trusted issuer/tenant/Object ID, not
+email, and never automatically link to local development accounts.
+
+Use the local Cosmos emulator with database `blitzboard-entra-local`, keeping
+development content in `blitzboard-studio` unchanged. `BILLING_MODE=paddle` here
+only disables mock billing/fixture access; checkout is not connected and no
+payments are initiated. Real sign-ins currently provision an isolated Free
+personal workspace. This is not the server-approved, invite-only alpha policy.
+
+Pending invitation tokens are temporarily kept in tab storage for up to 30 minutes
+and removed from the URL before redirect; acceptance/cancel/logout clears them.
+Entra email claims are not automatically treated as verified. Invitation acceptance
+requires a trusted `email_verified: true` claim, otherwise it fails closed. A
+verified-recipient challenge, local Entra invitation capture, alpha workspace
+bootstrap/entitlements, and production delivery are follow-up work.
+
+Start the emulators, Functions at port 7071 using the workspace virtual environment,
+and Vite at port 5173. Vite fails if that port is occupied instead of silently
+changing the registered callback. Visit `http://localhost:5173/`, select Continue
+to sign in, complete the email passcode on Microsoft's page, and check profile
+loading, refresh, a saved playbook, and provider logout. Never paste tokens or
+passcodes into chat. Use a second real account to check workspace isolation before
+deployment. Live authenticated behavior still requires this browser smoke test.
+
+For local demo mode, restore `AUTH_MODE=development`, `BILLING_MODE=mock`, and
+`COSMOS_DATABASE=blitzboard-studio` in API settings, and `VITE_AUTH_MODE=development`
+in the frontend. Retain the matching local development secret. Restart both
+services; never deploy development auth or mock fixtures.
+
+Auth regression commands from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s api -p test_auth.py
+node --test --test-force-exit --test-concurrency=1 frontend/src/api/entra.test.js frontend/src/components/StartupPage.test.js
+```
+
+Production deployment still requires HTTPS callbacks, environment-specific settings,
+and narrowly scoped CSP identity endpoints; do not deploy the local settings file.
+Entra setup does not provision Azure application infrastructure or authorize deployment.
 
 ### Available Locally
 
@@ -87,8 +164,8 @@ roles fail closed, including older Admin invitations. Existing Admin records are
 not automatically migrated: review them and explicitly assign Coach through an
 authorized Owner before that membership can access content again.
 
-This permission foundation does not enable Entra authentication or payment-free
-alpha access; those remain separate implementation steps.
+These permission checks are also used with Entra authentication. Payment-free,
+server-approved alpha access remains a separate implementation step.
 
 ### Record Status
 

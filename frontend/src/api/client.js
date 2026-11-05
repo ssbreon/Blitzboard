@@ -1,4 +1,5 @@
 import { createBreadcrumbCache } from '../utils/breadcrumbCache'
+import { createEntraSession } from './entra'
 
 const baseUrl = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '')
 const authMode = import.meta.env.VITE_AUTH_MODE || ''
@@ -13,10 +14,46 @@ try {
 } catch { signedOut = true }
 
 export const isDevelopmentAuth = import.meta.env.DEV && authMode === 'development'
+export const isEntraAuth = authMode === 'entra'
+let entraSession
+let authenticationError = null
+const inviteKey = 'blitzboard:pending-invitation'
+const session = () => (entraSession ??= createEntraSession(import.meta.env))
+export function getAuthenticationError() { return authenticationError }
+
+export function pendingInvitation() {
+  try {
+    const token = new URLSearchParams(location.hash.slice(1)).get('invite')
+    if (token && /^[A-Za-z0-9_-]{20,200}$/.test(token)) {
+      sessionStorage.setItem(inviteKey, JSON.stringify({ token, expiresAt: Date.now() + 30 * 60 * 1000 }))
+      history.replaceState(null, '', location.pathname + location.search)
+      return token
+    }
+    const pending = JSON.parse(sessionStorage.getItem(inviteKey) || 'null')
+    if (pending?.expiresAt > Date.now() && /^[A-Za-z0-9_-]{20,200}$/.test(pending.token)) return pending.token
+    sessionStorage.removeItem(inviteKey)
+  } catch { return null }
+  return null
+}
+
+export function clearPendingInvitation() {
+  try { sessionStorage.removeItem(inviteKey) } catch { }
+}
+
+export async function initializeAuthentication() {
+  if (!isEntraAuth) return
+  pendingInvitation()
+  signedOut = true
+  try {
+    signedOut = !await session().initialize()
+    authenticationError = null
+  } catch (error) { authenticationError = error }
+}
+
 export function isSignedOut() { return signedOut }
 export function selectedDevelopmentPlan() { return isDevelopmentAuth ? developmentPlan : null }
 
-export function signOut() {
+export function resetSession() {
   signedOut = true
   try {
     sessionStorage.setItem(signedOutKey, 'true')
@@ -27,8 +64,18 @@ export function signOut() {
   } catch { return }
 }
 
+export function signOut() {
+  resetSession()
+  clearPendingInvitation()
+  if (isEntraAuth) return session().signOut()
+}
+
 export function signIn(plan = 'free') {
   if (plan !== null && !['free', 'individual', 'team'].includes(plan)) throw new Error('Choose a subscription tier')
+  if (isEntraAuth) {
+    pendingInvitation()
+    return session().signIn()
+  }
   if (!isDevelopmentAuth) {
     const configuredUrl = import.meta.env.VITE_SIGN_IN_URL
     if (!configuredUrl) throw new Error('Production sign-in is not connected. Configure the authentication provider before signing in.')
@@ -54,9 +101,14 @@ export function signIn(plan = 'free') {
   } catch { return }
 }
 
-function authenticationHeaders(path) {
+async function authenticationHeaders(path) {
   if (path === '/health') return {}
   if (signedOut) throw new Error('You are signed out')
+  if (isEntraAuth) {
+    const token = await session().accessToken()
+    if (signedOut) throw new Error('You are signed out')
+    return { Authorization: `Bearer ${token}` }
+  }
   if (!isDevelopmentAuth) return {}
 
   const secret = import.meta.env.VITE_DEV_AUTH_SECRET
@@ -89,7 +141,7 @@ async function sendRequest(path, options = {}, workspaceId) {
   const { headers = {}, ...fetchOptions } = options
   const response = await fetch(`${baseUrl}/api${path}`, {
     ...fetchOptions,
-    headers: { 'Content-Type': 'application/json', ...authenticationHeaders(path), ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}), ...headers },
+    headers: { 'Content-Type': 'application/json', ...headers, ...await authenticationHeaders(path), ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}) },
   })
   if (!response.ok) {
     const detail = await response.json().catch(() => ({}))

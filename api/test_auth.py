@@ -15,6 +15,9 @@ os.environ.pop("COSMOS_ENDPOINT", None)
 os.environ.pop("COSMOSDB_ENDPOINT", None)
 
 import function_app
+import authentication
+import jwt
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 class FakeRequest:
@@ -43,6 +46,130 @@ def call_api(method, path, user_id=None, payload=None, workspace_id=None):
 
 def response_json(response):
     return json.loads(response.get_body())
+
+
+class EntraAuthenticationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    def setUp(self):
+        self.settings = {
+            "ENTRA_TENANT_ID": "11111111-1111-4111-8111-111111111111",
+            "ENTRA_SPA_CLIENT_ID": "22222222-2222-4222-8222-222222222222",
+            "ENTRA_API_AUDIENCE": "33333333-3333-4333-8333-333333333333",
+            "ENTRA_API_SCOPE": "access_as_user",
+            "ENTRA_AUTHORITY": "https://test.ciamlogin.com/11111111-1111-4111-8111-111111111111",
+            "ENTRA_ISSUER": "https://test.ciamlogin.com/11111111-1111-4111-8111-111111111111/v2.0",
+        }
+        self.validator = authentication.EntraAuthenticator(self.settings)
+        current = int(function_app.time())
+        self.claims = {
+            "iss": self.settings["ENTRA_ISSUER"], "aud": self.settings["ENTRA_API_AUDIENCE"],
+            "tid": self.settings["ENTRA_TENANT_ID"], "azp": self.settings["ENTRA_SPA_CLIENT_ID"],
+            "oid": "44444444-4444-4444-8444-444444444444", "sub": "subject",
+            "ver": "2.0", "iat": current, "nbf": current, "exp": current + 3600,
+            "scp": "access_as_user", "email": "coach@example.com", "name": "Coach",
+        }
+
+    def authenticate(self, claims=None, key=None, algorithm="RS256"):
+        token = jwt.encode(self.claims if claims is None else claims, key or self.key,
+                           algorithm=algorithm, headers={"kid": "test-key"})
+        with patch.object(self.validator, "signing_key", return_value=self.key.public_key()):
+            return self.validator.authenticate({"Authorization": "Bearer " + token})
+
+    def test_valid_identity_is_stable_and_not_linked_by_email(self):
+        identity = self.authenticate()
+        self.assertTrue(identity["userId"].startswith("entra-"))
+        self.assertFalse(identity["emailVerified"])
+        changed = {**self.claims, "email": "new@example.com", "name": "New name"}
+        self.assertEqual(self.authenticate(changed)["userId"], identity["userId"])
+        other = {**self.claims, "oid": "55555555-5555-4555-8555-555555555555"}
+        self.assertNotEqual(self.authenticate(other)["userId"], identity["userId"])
+        self.assertTrue(self.authenticate({**self.claims, "email_verified": True})["emailVerified"])
+        self.assertFalse(self.authenticate({**self.claims, "email_verified": "true"})["emailVerified"])
+
+    def test_invalid_access_tokens_are_rejected(self):
+        for claim, value in (("iss", "https://attacker.example"), ("aud", "wrong"),
+                             ("tid", "55555555-5555-4555-8555-555555555555"),
+                             ("azp", "55555555-5555-4555-8555-555555555555"), ("oid", "invalid"),
+                             ("ver", "1.0"), ("exp", 1), ("nbf", int(function_app.time()) + 3600)):
+            with self.subTest(claim=claim):
+                with self.assertRaises(function_app.accounts.AccountError) as failure:
+                    self.authenticate({**self.claims, claim: value})
+                self.assertEqual(failure.exception.status, 401)
+        wrong_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        with self.assertRaises(function_app.accounts.AccountError):
+            self.authenticate(key=wrong_key)
+        with self.assertRaises(function_app.accounts.AccountError):
+            self.authenticate(key="wrong-secret-that-is-at-least-32-bytes", algorithm="HS256")
+
+    def test_id_tokens_and_wrong_scopes_are_rejected(self):
+        claims = dict(self.claims)
+        claims.pop("scp")
+        with self.assertRaises(function_app.accounts.AccountError) as failure:
+            self.authenticate(claims)
+        self.assertEqual(failure.exception.status, 401)
+        with self.assertRaises(function_app.accounts.AccountError) as failure:
+            self.authenticate({**self.claims, "scp": "other_scope"})
+        self.assertEqual(failure.exception.status, 403)
+
+    def test_missing_configuration_and_dev_headers_fail_closed(self):
+        with self.assertRaises(function_app.accounts.AccountError) as failure:
+            authentication.EntraAuthenticator({})
+        self.assertEqual(failure.exception.status, 503)
+        with self.assertRaises(function_app.accounts.AccountError) as failure:
+            self.validator.authenticate({"X-Dev-User": "local-coach", "X-Dev-Auth-Secret": "test-secret"})
+        self.assertEqual(failure.exception.status, 401)
+
+    def test_missing_required_claims_are_rejected(self):
+        for claim in ("exp", "nbf", "iat", "iss", "aud", "tid", "oid", "ver", "azp"):
+            claims = dict(self.claims)
+            claims.pop(claim)
+            with self.subTest(claim=claim), self.assertRaises(function_app.accounts.AccountError) as failure:
+                self.authenticate(claims)
+            self.assertEqual(failure.exception.status, 401)
+
+    def test_metadata_and_signing_client_are_cached(self):
+        from io import StringIO
+        metadata = {"issuer": self.settings["ENTRA_ISSUER"], "jwks_uri": self.settings["ENTRA_AUTHORITY"] + "/discovery/v2.0/keys"}
+        key_client = Mock()
+        key_client.get_signing_key_from_jwt.return_value.key = self.key.public_key()
+        with patch.object(authentication, "urlopen", return_value=StringIO(json.dumps(metadata))) as fetch_metadata, patch.object(jwt, "PyJWKClient", return_value=key_client) as factory:
+            self.assertEqual(self.validator.signing_key("token-one"), self.key.public_key())
+            self.validator.signing_key("token-two")
+            fetch_metadata.assert_called_once()
+            factory.assert_called_once_with(metadata["jwks_uri"], lifespan=300, timeout=5)
+            self.assertEqual(key_client.get_signing_key_from_jwt.call_count, 2)
+
+    def test_bad_provider_metadata_and_outages_fail_closed(self):
+        from io import StringIO
+        for metadata in ({"issuer": "wrong", "jwks_uri": self.settings["ENTRA_AUTHORITY"] + "/keys"},
+                         {"issuer": self.settings["ENTRA_ISSUER"], "jwks_uri": "https://attacker.example/keys"}):
+            validator = authentication.EntraAuthenticator(self.settings)
+            with patch.object(authentication, "urlopen", return_value=StringIO(json.dumps(metadata))), self.assertRaises(function_app.accounts.AccountError) as failure:
+                validator.signing_key("token")
+            self.assertEqual(failure.exception.status, 503)
+        with patch.object(authentication, "urlopen", side_effect=OSError("Offline")) as fetch_metadata:
+            for _ in range(2):
+                with self.assertRaises(function_app.accounts.AccountError) as failure:
+                    self.validator.signing_key("token")
+                self.assertEqual(failure.exception.status, 503)
+            fetch_metadata.assert_called_once()
+
+    def test_entra_route_requires_bearer_and_provisions_identity_idempotently(self):
+        function_app.storage = function_app.Storage()
+        token = jwt.encode(self.claims, self.key, algorithm="RS256", headers={"kid": "test-key"})
+        request = FakeRequest("GET", "me")
+        request.headers["Authorization"] = "Bearer " + token
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()), patch.dict(os.environ, {"AUTH_MODE": "entra", "BILLING_MODE": "paddle"}):
+            self.assertEqual(call_api("GET", "me", "local-coach").status_code, 401)
+            first = response_json(function_app.api(request))
+            second = response_json(function_app.api(request))
+        self.assertTrue(first["userId"].startswith("entra-"))
+        self.assertEqual(first["userId"], second["userId"])
+        self.assertEqual(len(function_app.storage.list("profiles")), 1)
+        self.assertEqual(len(first["workspaces"]), 1)
 
 
 class PermissionTests(unittest.TestCase):

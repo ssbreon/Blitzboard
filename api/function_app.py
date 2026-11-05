@@ -15,6 +15,7 @@ from azure.core.exceptions import HttpResponseError, ResourceExistsError, Resour
 from azure.cosmos import CosmosClient
 import azure.functions as func
 import accounts
+import authentication
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -327,6 +328,11 @@ def forbidden():
 
 
 def authenticate_request(req):
+    if AUTH_MODE == "entra":
+        try:
+            return authentication.authenticate_entra(req.headers), None
+        except accounts.AccountError as error:
+            return None, response({"error": {"code": error.code, "message": str(error)}}, error.status)
     if AUTH_MODE != "development":
         return None, response({"error": {
             "code": "AUTH_NOT_CONFIGURED",

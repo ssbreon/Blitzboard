@@ -2,7 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useSta
 import { createPortal } from 'react-dom'
 import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
-import { createApi, isDevelopmentAuth, isSignedOut, selectedDevelopmentPlan, signIn, signOut } from './api/client'
+import { clearPendingInvitation, createApi, getAuthenticationError, isDevelopmentAuth, isEntraAuth, isSignedOut, pendingInvitation, resetSession, selectedDevelopmentPlan, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
 import { StartupPage } from './components/StartupPage'
 import { LoadingIndicator } from './components/LoadingIndicator'
@@ -1944,12 +1944,12 @@ function AppContent() {
   const [signedOut, setSignedOut] = useState(isSignedOut)
   const [user, setUser] = useState(null)
   const [entry, setEntry] = useState(null)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState(getAuthenticationError)
   const [loading, setLoading] = useState(true)
   const [mutations, setMutations] = useState(0)
   const [leave, setLeave] = useState(null)
   const [savingLeave, setSavingLeave] = useState(false)
-  const [inviteToken, setInviteToken] = useState(() => new URLSearchParams(location.hash.slice(1)).get('invite'))
+  const [inviteToken, setInviteToken] = useState(pendingInvitation)
   const guard = useRef(null)
   const generation = useRef(0)
   const pending = useRef(0)
@@ -2008,13 +2008,13 @@ function AppContent() {
         || identity.workspaces[0]
       if (!workspace) throw new Error('No accessible workspace')
       return loadWorkspace(workspace.id)
-    }).catch((failure) => { if (active) { signOut(); setSignedOut(true); setError(failure); setLoading(false) } })
+    }).catch((failure) => { if (active) { resetSession(); setSignedOut(true); setError(failure); setLoading(false) } })
     return () => { active = false; generation.current += 1 }
   }, [signedOut])
 
   function handleSignOut() {
     requestLeave(() => {
-      signOut()
+      try { Promise.resolve(signOut()).catch(setError) } catch (failure) { setError(failure) }
       generation.current += 1
       entryRef.current = null
       guard.current = null
@@ -2029,9 +2029,9 @@ function AppContent() {
     }, 'Sign Out')
   }
 
-  function handleSignIn(plan) {
+  async function handleSignIn(plan) {
     try {
-      signIn(plan)
+      await signIn(plan)
       if (!isDevelopmentAuth) return
       setError(null)
       setLoading(true)
@@ -2103,6 +2103,7 @@ function AppContent() {
       const workspace = await api.acceptInvitation(inviteToken)
       setUser(await api.me())
       setInviteToken(null)
+      clearPendingInvitation()
       history.replaceState(null, '', location.pathname + location.search)
       await loadWorkspace(workspace.id)
     } catch (failure) {
@@ -2113,8 +2114,8 @@ function AppContent() {
   }
 
   return <>
-    {signedOut ? <StartupPage development={isDevelopmentAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><main className="account-view"><div className="account-view-heading"><Users size={24} /><h1>Team Invitation</h1></div>
-      <div className="account-section"><p>{user.email || user.name}</p><div className="account-form-actions"><button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setInviteToken(null); history.replaceState(null, '', location.pathname + location.search) }}>Cancel</button><button type="button" className="dialog-create" disabled={savingLeave} onClick={acceptInvite}>{savingLeave ? 'Accepting...' : 'Accept Invitation'}</button></div></div>
+    {signedOut ? <StartupPage development={isDevelopmentAuth} cloudAuth={isEntraAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><main className="account-view"><div className="account-view-heading"><Users size={24} /><h1>Team Invitation</h1></div>
+      <div className="account-section"><p>{user.email || user.name}</p><div className="account-form-actions"><button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setInviteToken(null); clearPendingInvitation(); history.replaceState(null, '', location.pathname + location.search) }}>Cancel</button><button type="button" className="dialog-create" disabled={savingLeave} onClick={acceptInvite}>{savingLeave ? 'Accepting...' : 'Accept Invitation'}</button></div></div>
     </main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
       onWorkspaceChange={(id) => { if (id !== entry.workspace.id) requestLeave(() => loadWorkspace(id), 'Switch subscription') }}
       onUserUpdated={setUser} onWorkspaceUpdated={updateWorkspace} onGuardChange={(value) => { guard.current = value }}
