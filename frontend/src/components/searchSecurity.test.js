@@ -68,3 +68,27 @@ test('account management controls use effective permissions rather than role lab
     await server.close()
   }
 })
+
+test('team invitation renders a standard dialog with clear Coach details and footer actions', async () => {
+  const server = await createServer({ root, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
+  try {
+    const { TeamInvitationDialog } = await server.ssrLoadModule('/src/components/TeamInvitationDialog.jsx')
+    const markup = renderToStaticMarkup(createElement(TeamInvitationDialog, {
+      user: { name: 'Coach Two', email: 'coach+two@example.com' }, saving: false,
+      onAccept: () => {}, onCancel: () => {},
+    }))
+    assert.ok(markup.includes('role="dialog"'))
+    assert.ok(markup.includes('aria-modal="true"'))
+    assert.ok(markup.includes('You’ve been invited to join a Blitzboard team as a Coach.'))
+    assert.ok(markup.includes('plays, schedules, and game plans'))
+    assert.ok(markup.includes('workspace settings and membership'))
+    assert.ok(markup.includes('coach+two@example.com'))
+    assert.ok(markup.includes('verified email address it was sent to'))
+    const actions = markup.indexOf('class="dialog-actions"')
+    const cancel = markup.indexOf('>Cancel</button>', actions)
+    const accept = markup.indexOf('>Accept Invitation</button>', actions)
+    assert.ok(actions >= 0 && cancel > actions && accept > cancel)
+  } finally {
+    await server.close()
+  }
+})

@@ -2473,6 +2473,49 @@ html.is-drilling-through * {
   box-shadow: var(--shadow);
 }
 
+.team-invitation-dialog {
+  box-sizing: border-box;
+  width: min(520px, calc(100vw - 32px));
+  min-height: 300px;
+}
+
+.team-invitation-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.team-invitation-body p { margin: 0; }
+
+.team-invitation-email {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid goldenrodyellow;
+  border-radius: 6px;
+  background: lightgoldenrodyellow;
+}
+
+.team-invitation-email span,
+.team-invitation-note {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.team-invitation-email strong {
+  overflow-wrap: anywhere;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.team-invitation-dialog > .dialog-actions {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
 .account-team-dialog {
   flex: 0 1 680px;
   width: min(680px, calc(100vw - 32px));

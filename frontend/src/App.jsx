@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, C
 import { api } from './api'
 import { clearPendingInvitation, createApi, getAuthenticationError, isDevelopmentAuth, isEntraAuth, isSignedOut, pendingInvitation, resetSession, selectedDevelopmentPlan, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
+import { TeamInvitationDialog } from './components/TeamInvitationDialog'
 import { StartupPage } from './components/StartupPage'
 import { LoadingIndicator } from './components/LoadingIndicator'
 import { AffiliateRecommendations } from './components/AffiliateRecommendations'
@@ -333,7 +334,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
                 <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'profile')}><UserRound className="menu-item-icon" aria-hidden="true" />Profile</button>
                 <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 {workspace?.kind === 'team' && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
-                <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>
+                {!workspace?.alphaEnabled && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
                 <div className="account-menu-divider" role="separator" />
                 <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onSignOut() }}><LogOut className="menu-item-icon" aria-hidden="true" />Sign Out</button>
               </div>
@@ -2001,6 +2002,14 @@ function AppContent() {
     api.me().then((identity) => {
       if (!active) return
       setUser(identity)
+      if (!identity.workspaces?.length) {
+        entryRef.current = null
+        setEntry(null)
+        guard.current = null
+        try { sessionStorage.removeItem('blitzboard:workspace') } catch { }
+        setLoading(false)
+        return
+      }
       let stored
       try { stored = sessionStorage.getItem('blitzboard:workspace') } catch { stored = null }
       const workspace = identity.workspaces.find((item) => item.id === stored)
@@ -2113,10 +2122,15 @@ function AppContent() {
     }
   }
 
+  function cancelInvite() {
+    setInviteToken(null)
+    clearPendingInvitation()
+    setError(null)
+    history.replaceState(null, '', location.pathname + location.search)
+  }
+
   return <>
-    {signedOut ? <StartupPage development={isDevelopmentAuth} cloudAuth={isEntraAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><main className="account-view"><div className="account-view-heading"><Users size={24} /><h1>Team Invitation</h1></div>
-      <div className="account-section"><p>{user.email || user.name}</p><div className="account-form-actions"><button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setInviteToken(null); clearPendingInvitation(); history.replaceState(null, '', location.pathname + location.search) }}>Cancel</button><button type="button" className="dialog-create" disabled={savingLeave} onClick={acceptInvite}>{savingLeave ? 'Accepting...' : 'Accept Invitation'}</button></div></div>
-    </main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
+    {signedOut ? <StartupPage development={isDevelopmentAuth} cloudAuth={isEntraAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><TeamInvitationDialog user={user} saving={savingLeave} onAccept={acceptInvite} onCancel={cancelInvite} /></> : isEntraAuth && user && !user.workspaces?.length ? <><AppBar user={null} /><main className="auth-state"><h1>Blitzboard alpha is invite-only</h1><p>Ask a Team Owner for an invitation to join a workspace.</p><button type="button" className="dialog-cancel" onClick={handleSignOut}><LogOut size={16} aria-hidden="true" />Sign Out</button></main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
       onWorkspaceChange={(id) => { if (id !== entry.workspace.id) requestLeave(() => loadWorkspace(id), 'Switch subscription') }}
       onUserUpdated={setUser} onWorkspaceUpdated={updateWorkspace} onGuardChange={(value) => { guard.current = value }}
       onSignOut={handleSignOut}

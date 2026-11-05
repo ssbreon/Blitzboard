@@ -509,11 +509,14 @@ def api(req: func.HttpRequest) -> func.HttpResponse:
                     return limited
             accounts.ensure_user(storage, user)
         global_route = path[0] in {"me", "workspaces", "invitations"}
-        workspace, role = accounts.select_workspace(storage, user, None if global_route else req.headers.get("X-Workspace-Id"))
+        if global_route:
+            with storage.guard("user:" + user["userId"]):
+                return dispatch(req, user, None, None)
+        workspace, role = accounts.select_workspace(storage, user, req.headers.get("X-Workspace-Id"))
         token = request_workspace.set(workspace)
         try:
-            with storage.guard("user:" + user["userId"] if global_route else workspace["id"]):
-                workspace, role = accounts.select_workspace(storage, user, None if global_route else req.headers.get("X-Workspace-Id"))
+            with storage.guard(workspace["id"]):
+                workspace, role = accounts.select_workspace(storage, user, req.headers.get("X-Workspace-Id"))
                 request_workspace.set(workspace)
                 if path[0] in {"playbooks", "game-plans", "schedule-events", "search", "exports", "workspace"}:
                     accounts.enter_workspace(storage, workspace)
@@ -550,6 +553,8 @@ def dispatch(req, user, workspace, role):
     if account_result is not None:
         payload, status = account_result
         return response(payload, status) if status != 204 else func.HttpResponse(status_code=204)
+    if workspace is None:
+        return response({"error": {"code": "NOT_FOUND", "message": "Route not found"}}, 404)
     if not accounts.can_read(workspace):
         raise accounts.AccountError("CONTENT_RETENTION_ENDED", "This workspace's eighteen-month content retention period has ended", 410)
     if path[0] in accounts.CONTENT_ROUTE_PERMISSIONS:

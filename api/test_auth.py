@@ -162,7 +162,7 @@ class EntraAuthenticationTests(unittest.TestCase):
                 self.assertEqual(failure.exception.status, 503)
             fetch_metadata.assert_called_once()
 
-    def test_entra_route_requires_bearer_and_provisions_identity_idempotently(self):
+    def test_entra_route_requires_bearer_and_provisions_profile_without_workspace(self):
         function_app.storage = function_app.Storage()
         token = jwt.encode(self.claims, self.key, algorithm="RS256", headers={"kid": "test-key"})
         request = FakeRequest("GET", "me")
@@ -175,7 +175,8 @@ class EntraAuthenticationTests(unittest.TestCase):
         self.assertEqual(first["userId"], second["userId"])
         self.assertFalse(first["emailVerified"])
         self.assertEqual(len(function_app.storage.list("profiles")), 1)
-        self.assertEqual(len(first["workspaces"]), 1)
+        self.assertEqual(first["workspaces"], [])
+        self.assertEqual(len(function_app.storage.list("workspaces")), 0)
         self.assertEqual(first["email"], "coach@example.com")
 
         verified_claims = {**self.claims, "xms_edov": True}
@@ -184,6 +185,187 @@ class EntraAuthenticationTests(unittest.TestCase):
         with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()), patch.dict(os.environ, {"AUTH_MODE": "entra", "BILLING_MODE": "paddle"}):
             verified = response_json(function_app.api(request))
         self.assertTrue(verified["emailVerified"])
+
+    def test_entra_registration_without_workspace_stays_signed_in_but_cannot_access_content(self):
+        function_app.storage = function_app.Storage()
+        token = jwt.encode(self.claims, self.key, algorithm="RS256", headers={"kid": "test-key"})
+        request = FakeRequest("GET", "me")
+        request.headers["Authorization"] = "Bearer " + token
+        content_request = FakeRequest("GET", "playbooks")
+        content_request.headers["Authorization"] = "Bearer " + token
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()), patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle"}):
+            profile = response_json(function_app.api(request))
+            denied = function_app.api(content_request)
+        self.assertEqual(profile["workspaces"], [])
+        self.assertEqual(len(function_app.storage.list("profiles")), 1)
+        self.assertEqual(len(function_app.storage.list("workspaces")), 0)
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(response_json(denied)["error"]["code"], "ALPHA_ACCESS_REQUIRED")
+        legacy_id = "legacy-unapproved-team"
+        function_app.storage.save("workspaces", {
+            "id": legacy_id, "name": "Unapproved", "kind": "team", "ownerId": profile["userId"],
+            "defaults": {}, "subscription": function_app.accounts.new_subscription("team"),
+        })
+        function_app.storage.save("memberships", {
+            "id": function_app.accounts.membership_id(profile["userId"], legacy_id),
+            "userId": profile["userId"], "workspaceId": legacy_id, "role": "owner",
+        })
+        content_request.headers["X-Workspace-Id"] = legacy_id
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()), patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle"}):
+            legacy_denied = function_app.api(content_request)
+        self.assertEqual(legacy_denied.status_code, 403)
+
+    def test_entra_workspace_list_preserves_existing_free_personal_subscription(self):
+        function_app.storage = function_app.Storage()
+        policy = function_app.accounts
+        user_id = "entra-coach-with-existing-free"
+        profile = {"id": user_id, "name": "Coach Two", "email": "coach@example.com", "emailVerified": True,
+                   "coachingTitle": "", "preferences": dict(policy.DEFAULT_PREFERENCES)}
+        function_app.storage.save("profiles", profile)
+        personal_id = policy.personal_id(user_id)
+        function_app.storage.save("workspaces", {
+            "id": personal_id, "name": "Individual", "kind": "individual", "ownerId": user_id,
+            "defaults": {}, "subscription": policy.new_subscription("free"), "createdAt": policy.timestamp().isoformat(),
+        })
+        function_app.storage.save("memberships", {
+            "id": policy.membership_id(user_id, personal_id), "userId": user_id,
+            "workspaceId": personal_id, "role": "owner",
+        })
+        alpha_id = "alpha-team-existing"
+        function_app.storage.save("workspaces", {
+            "id": alpha_id, "name": "Blitzboard Alpha", "kind": "team", "ownerId": "alpha-owner",
+            "defaults": {}, "subscription": {"status": "active", "source": "alpha", "periodEndsAt": None, "kind": "team"},
+            "alphaEnabled": True, "createdAt": policy.timestamp().isoformat(),
+        })
+        function_app.storage.save("memberships", {
+            "id": policy.membership_id(user_id, alpha_id), "userId": user_id,
+            "workspaceId": alpha_id, "role": "coach",
+        })
+        identity = {"userId": user_id, "name": "Coach Two", "email": "coach@example.com", "emailVerified": True}
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle"}):
+            workspaces = policy.accessible(function_app.storage, user_id)
+            fallback, fallback_role = policy.select_workspace(function_app.storage, identity)
+            requested, requested_role = policy.select_workspace(function_app.storage, identity, alpha_id)
+        self.assertEqual({workspace["id"] for workspace in workspaces}, {personal_id, alpha_id})
+        self.assertEqual(fallback["id"], personal_id)
+        self.assertEqual(fallback_role, "owner")
+        self.assertEqual(requested["id"], alpha_id)
+        self.assertEqual(requested_role, "coach")
+        self.assertTrue(next(workspace for workspace in workspaces if workspace["id"] == personal_id)["capabilities"]["edit"])
+
+    def test_bootstrapped_alpha_owner_invites_verified_coach_without_paid_subscription(self):
+        function_app.storage = function_app.Storage()
+        policy = function_app.accounts
+        owner = {"userId": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com", "emailVerified": True}
+        coach = {"userId": "entra-coach", "name": "Alpha Coach", "email": "coach@example.com", "emailVerified": True}
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle"}):
+            policy.ensure_user(function_app.storage, owner)
+            policy.ensure_user(function_app.storage, coach)
+            workspace = policy.bootstrap_alpha_owner(function_app.storage, owner["userId"], "Blitzboard Alpha")
+            repeated = policy.bootstrap_alpha_owner(function_app.storage, owner["userId"], "Blitzboard Alpha")
+        self.assertTrue(workspace["alphaEnabled"])
+        self.assertEqual(repeated["id"], workspace["id"])
+        self.assertEqual(workspace["subscription"]["source"], "alpha")
+        self.assertIsNone(workspace["subscription"]["periodEndsAt"])
+
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "DEV_AUTH_SECRET": "local-test-secret", "APP_PUBLIC_URL": "http://localhost:5173"}):
+            invite = policy.queue_invitation(function_app.storage, owner, workspace, coach["email"], "coach")
+            message = function_app.storage.list("outbox")[0]
+            captured = json.loads(policy.outbox_cipher().decrypt(message["payload"].encode()))["acceptUrl"]
+            token = parse_qs(urlparse(captured).fragment)["invite"][0]
+            accepted, status = policy.accept_invitation(function_app.storage, coach, {"token": token})
+        self.assertEqual(status, 200)
+        self.assertEqual(accepted["role"], "coach")
+        self.assertEqual([item["id"] for item in policy.accessible(function_app.storage, coach["userId"])], [workspace["id"]])
+        self.assertEqual(function_app.storage.get("memberships", policy.membership_id(coach["userId"], workspace["id"]))["role"], "coach")
+        self.assertNotIn("tokenHash", invite)
+
+    def test_alpha_owner_bootstrap_is_restricted_to_local_entra_mode(self):
+        policy = function_app.accounts
+        storage = function_app.Storage()
+        storage.save("profiles", {"id": "owner", "name": "Owner", "email": "owner@example.com"})
+        for environment, deployed in (("production", False), ("local", True)):
+            patch_values = {"AUTH_MODE": "entra", "APP_ENVIRONMENT": environment,
+                            "WEBSITE_SITE_NAME": "alpha-app" if deployed else ""}
+            with self.subTest(environment=environment, deployed=deployed), patch.dict(os.environ, patch_values, clear=False):
+                with self.assertRaises(policy.AccountError) as failure:
+                    policy.bootstrap_alpha_owner(storage, "owner")
+                self.assertEqual(failure.exception.code, "ALPHA_BOOTSTRAP_LOCAL_ONLY")
+        with patch.dict(os.environ, {"AUTH_MODE": "development", "APP_ENVIRONMENT": "local"}):
+            with self.assertRaises(policy.AccountError) as failure:
+                policy.bootstrap_alpha_owner(storage, "owner")
+        self.assertEqual(failure.exception.code, "ALPHA_BOOTSTRAP_LOCAL_ONLY")
+
+    def test_entra_invitation_acceptance_is_available_without_existing_workspace(self):
+        function_app.storage = function_app.Storage()
+        policy = function_app.accounts
+        owner_claims = {**self.claims, "oid": "66666666-6666-4666-8666-666666666666", "email": "owner@example.com", "email_verified": True}
+        coach_claims = {**self.claims, "email_verified": True, "xms_edov": True}
+        owner = self.authenticate(owner_claims)
+        coach = self.authenticate(coach_claims)
+        def entra_request(method, path, claims, payload=None, workspace_id=None):
+            request = FakeRequest(method, path, payload=payload)
+            request.headers = {
+                "Authorization": "Bearer " + jwt.encode(claims, self.key, algorithm="RS256", headers={"kid": "test-key"}),
+            }
+            if workspace_id:
+                request.headers["X-Workspace-Id"] = workspace_id
+            return function_app.api(request)
+
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle"}):
+            policy.ensure_user(function_app.storage, owner)
+            policy.ensure_user(function_app.storage, coach)
+            team = policy.bootstrap_alpha_owner(function_app.storage, owner["userId"], "Blitzboard Alpha")
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle", "DEV_AUTH_SECRET": "local-test-secret", "APP_PUBLIC_URL": "http://localhost:5173"}), patch.object(function_app, "AUTH_MODE", "entra"), patch.object(authentication, "_authenticator", self.validator), patch.object(self.validator, "signing_key", return_value=self.key.public_key()):
+            created = entra_request("POST", "workspace/invitations", owner_claims,
+                                    {"email": coach["email"], "role": "coach"}, team["id"])
+            invite = response_json(created)
+            message = function_app.storage.list("outbox")[0]
+            captured = json.loads(policy.outbox_cipher().decrypt(message["payload"].encode()))["acceptUrl"]
+            token = parse_qs(urlparse(captured).fragment)["invite"][0]
+            accepted = entra_request("POST", "invitations/accept", coach_claims, {"token": token})
+            workspaces = entra_request("GET", "workspaces", coach_claims)
+            content_responses = [
+                entra_request("POST", "playbooks", coach_claims, {"name": "Coach Playbook", "year": 2026}, team["id"]),
+                entra_request("POST", "schedule-events", coach_claims,
+                              {"name": "Practice", "eventDate": "2026-01-15", "eventType": "Practice"}, team["id"]),
+                entra_request("POST", "game-plans", coach_claims, {"name": "Coach Game Plan", "year": 2026}, team["id"]),
+            ]
+            invite_again = entra_request("POST", "workspace/invitations", coach_claims,
+                                         {"email": "another-coach@example.com", "role": "coach"}, team["id"])
+            remove_member = entra_request("DELETE", f"workspace/members/{coach['userId']}", coach_claims,
+                                          workspace_id=team["id"])
+            update_workspace = entra_request("PATCH", "workspace", coach_claims,
+                                             {"name": "Coach Changed Team"}, team["id"])
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(response_json(accepted)["role"], "coach")
+        self.assertEqual([item["id"] for item in response_json(workspaces)["items"]], [team["id"]])
+        self.assertEqual([response.status_code for response in content_responses], [201, 201, 201])
+        self.assertEqual(invite_again.status_code, 403)
+        self.assertEqual(remove_member.status_code, 403)
+        self.assertEqual(update_workspace.status_code, 403)
+        self.assertEqual(invite["role"], "coach")
+        self.assertEqual(function_app.storage.get("memberships", policy.membership_id(coach["userId"], team["id"]))["role"], "coach")
+
+    def test_unverified_or_wrong_email_cannot_join_alpha_team(self):
+        function_app.storage = function_app.Storage()
+        policy = function_app.accounts
+        owner = {"userId": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com", "emailVerified": True}
+        with patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "BILLING_MODE": "paddle", "DEV_AUTH_SECRET": "local-test-secret", "APP_PUBLIC_URL": "http://localhost:5173"}):
+            policy.ensure_user(function_app.storage, owner)
+            workspace = policy.bootstrap_alpha_owner(function_app.storage, owner["userId"], "Blitzboard Alpha")
+            invite = policy.queue_invitation(function_app.storage, owner, workspace, "coach@example.com", "coach")
+            message = function_app.storage.list("outbox")[0]
+            captured = json.loads(policy.outbox_cipher().decrypt(message["payload"].encode()))["acceptUrl"]
+            token = parse_qs(urlparse(captured).fragment)["invite"][0]
+        for identity in (
+            {"userId": "unverified", "name": "Unverified", "email": "coach@example.com", "emailVerified": False},
+            {"userId": "wrong-email", "name": "Wrong", "email": "other@example.com", "emailVerified": True},
+        ):
+            with self.subTest(user_id=identity["userId"]), patch.dict(os.environ, {"AUTH_MODE": "entra", "APP_ENVIRONMENT": "local", "DEV_AUTH_SECRET": "local-test-secret", "APP_PUBLIC_URL": "http://localhost:5173"}), self.assertRaises(policy.AccountError) as failure:
+                policy.accept_invitation(function_app.storage, identity, {"token": token})
+            self.assertEqual(failure.exception.code, "INVITED_EMAIL_REQUIRED")
 
     def test_entra_email_claim_repairs_blank_profile_without_overwriting_existing_email(self):
         accounts = function_app.accounts

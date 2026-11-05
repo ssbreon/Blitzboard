@@ -152,6 +152,13 @@ def is_mock():
     return os.getenv("BILLING_MODE", "mock" if os.getenv("AUTH_MODE") == "development" else "paddle") == "mock"
 
 
+def local_invite_capture():
+    local = os.getenv("APP_ENVIRONMENT", "").lower() in {"local", "test"}
+    deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
+    return not deployed and (os.getenv("AUTH_MODE", "").lower() == "development" or
+                             (local and os.getenv("AUTH_MODE", "").lower() == "entra"))
+
+
 def validate_environment(endpoint=None):
     from urllib.parse import urlparse
 
@@ -189,11 +196,23 @@ def ensure_user(storage, identity):
     if profile is None:
         profile = storage.save("profiles", {
             "id": user_id, "name": identity["name"], "email": identity.get("email", ""),
+            "emailVerified": identity.get("emailVerified") is True,
             "coachingTitle": "", "preferences": dict(DEFAULT_PREFERENCES),
         })
-    elif not profile.get("email") and identity.get("email"):
-        profile["email"] = identity["email"]
-        profile = storage.save("profiles", profile)
+    else:
+        changed = False
+        if not profile.get("email") and identity.get("email"):
+            profile["email"] = identity["email"]
+            changed = True
+        verified_email = bool(profile.get("email")) and identity.get("emailVerified") is True and identity.get("email", "").casefold() == profile["email"].casefold()
+        if profile.get("emailVerified") is not verified_email:
+            profile["emailVerified"] = verified_email
+            changed = True
+        if changed:
+            profile = storage.save("profiles", profile)
+    if os.getenv("AUTH_MODE", "").lower() == "entra":
+        return profile
+
     workspace_id = personal_id(user_id)
     fixture = is_mock() and user_id == os.getenv("DEV_USER_ID", "local-coach")
     demo_plan = {"local-demo-free": "free", "local-demo-individual": "individual", "local-demo-team": "team"}.get(user_id) if is_mock() and os.getenv("AUTH_MODE") == "development" else None
@@ -216,30 +235,106 @@ def ensure_user(storage, identity):
     return profile
 
 
+def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
+    deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
+    if (os.getenv("AUTH_MODE", "").lower() != "entra" or deployed
+            or os.getenv("APP_ENVIRONMENT", "").lower() not in {"local", "test"}):
+        raise AccountError("ALPHA_BOOTSTRAP_LOCAL_ONLY", "Alpha owner bootstrap is restricted to local Entra testing", 403)
+    if not isinstance(user_id, str) or not user_id or storage.get("profiles", user_id) is None:
+        raise AccountError("USER_NOT_FOUND", "The signed-in user profile must exist before alpha bootstrap", 404)
+    if not isinstance(workspace_name, str) or not 1 <= len(workspace_name.strip()) <= 120:
+        raise AccountError("VALIDATION_ERROR", "An alpha workspace name is required (maximum 120 characters)")
+    with storage.guard("user:" + user_id):
+        existing_teams = [member for member in storage.list("memberships")
+                          if member["userId"] == user_id
+                          and (storage.get("workspaces", member["workspaceId"]) or {}).get("kind") == "team"]
+        if existing_teams:
+            if len(existing_teams) == 1:
+                member = existing_teams[0]
+                existing = storage.get("workspaces", member["workspaceId"])
+                if existing and existing.get("alphaEnabled") is True and member.get("role") == "owner":
+                    return summary(storage, existing, "owner")
+            raise AccountError("TEAM_MEMBERSHIP_EXISTS", "The user already belongs to a Team workspace", 409)
+        workspace_id = "alpha-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
+        workspace = {
+            "id": workspace_id,
+            "name": workspace_name.strip(),
+            "kind": "team",
+            "ownerId": user_id,
+            "defaults": {},
+            "subscription": {
+                "status": "active", "interval": None, "source": "alpha", "periodEndsAt": None,
+                "trialStartedAt": None, "trialEndsAt": None, "cancelAtPeriodEnd": False, "kind": "team",
+            },
+            "alphaEnabled": True,
+            "alphaApprovedAt": timestamp().isoformat(),
+            "alphaApprovedBy": "operator-bootstrap",
+            "createdAt": timestamp().isoformat(),
+        }
+        storage.save("workspaces", workspace)
+        storage.save("memberships", {
+            "id": membership_id(user_id, workspace_id), "userId": user_id,
+            "workspaceId": workspace_id, "role": "owner",
+        })
+        return summary(storage, workspace, "owner")
+
+
+def entra_workspace_allowed(workspace, member, user_id):
+    if workspace.get("alphaEnabled") is True:
+        return True
+    subscription = workspace.get("subscription", {})
+    return (workspace.get("kind") == "individual" and workspace.get("ownerId") == user_id
+            and member.get("role") == "owner" and subscription.get("kind") == "free")
+
+
 def accessible(storage, user_id):
     result = []
     for member in storage.list("memberships"):
         if member["userId"] == user_id and isinstance(member.get("role"), str) and member["role"] in ROLE_PERMISSIONS:
             workspace = storage.get("workspaces", member["workspaceId"])
+            if os.getenv("AUTH_MODE", "").lower() == "entra" and (
+                    not workspace or not entra_workspace_allowed(workspace, member, user_id)):
+                continue
             if workspace:
                 result.append(summary(storage, workspace, member["role"]))
     return sorted(result, key=lambda workspace: (workspace["kind"] != "individual", workspace["name"]))
 
 
 def select_workspace(storage, identity, requested=None):
-    workspace_id = requested or personal_id(identity["userId"])
+    entra_mode = os.getenv("AUTH_MODE", "").lower() == "entra"
+    if entra_mode and not requested:
+        available = []
+        for candidate in storage.list("memberships"):
+            if candidate["userId"] != identity["userId"] or candidate.get("role") not in ROLE_PERMISSIONS:
+                continue
+            candidate_workspace = storage.get("workspaces", candidate["workspaceId"])
+            if candidate_workspace and entra_workspace_allowed(candidate_workspace, candidate, identity["userId"]):
+                available.append(candidate)
+        if not available:
+            raise AccountError("ALPHA_ACCESS_REQUIRED", "Blitzboard alpha is invite-only. Ask a Team Owner for an invitation.", 403)
+        available.sort(key=lambda candidate: (
+            storage.get("workspaces", candidate["workspaceId"]).get("kind") != "individual",
+            storage.get("workspaces", candidate["workspaceId"]).get("name", ""),
+        ))
+        workspace_id = available[0]["workspaceId"]
+    else:
+        workspace_id = requested or personal_id(identity["userId"])
     member = storage.get("memberships", membership_id(identity["userId"], workspace_id))
     workspace = copy.deepcopy(storage.get("workspaces", workspace_id))
     if member is None or workspace is None:
         raise AccountError("FORBIDDEN", "You do not have access to this workspace", 403)
     if not isinstance(member.get("role"), str) or member["role"] not in ROLE_PERMISSIONS:
         raise AccountError("FORBIDDEN", "This workspace membership role is not supported", 403)
+    if entra_mode and not entra_workspace_allowed(workspace, member, identity["userId"]):
+        raise AccountError("FORBIDDEN", "This workspace is not enabled for the alpha", 403)
     if workspace["subscription"].get("source") == "development_fixture" and not is_mock():
         raise AccountError("FORBIDDEN", "Local fixture access is unavailable in this billing mode", 403)
     return workspace, member["role"]
 
 
 def can_edit(workspace):
+    if workspace.get("alphaEnabled") is True:
+        return True
     subscription = workspace["subscription"]
     if subscription.get("kind") == "free":
         return True
@@ -284,6 +379,7 @@ def summary(storage, workspace, role):
     if not writable and (subscription["status"] in {"active", "past_due"} or (subscription["status"] == "trialing" and subscription.get("trialStartedAt"))):
         subscription["status"] = "expired"
     public = {"id": workspace["id"], "name": workspace["name"], "kind": workspace["kind"], "role": role,
+              "alphaEnabled": workspace.get("alphaEnabled") is True,
               "defaults": workspace.get("defaults", {}), "subscription": subscription,
               "permissions": sorted(permission.value for permission in permissions),
               "capabilities": {"edit": Permission.PLAY_WRITE in permissions,
@@ -340,7 +436,7 @@ def pending_invites(storage, workspace_id):
 def outbox_cipher():
     from cryptography.fernet import Fernet
     key = os.getenv("EMAIL_OUTBOX_KEY")
-    if not key and os.getenv("AUTH_MODE") == "development":
+    if not key and local_invite_capture():
         secret = os.getenv("DEV_AUTH_SECRET", "")
         if secret:
             key = base64.urlsafe_b64encode(hashlib.sha256(("local-email:" + secret).encode()).digest()).decode()
@@ -351,9 +447,10 @@ def outbox_cipher():
 
 def queue_invitation(storage, identity, workspace, email, role, existing=None):
     cipher = outbox_cipher()
-    origin = os.getenv("APP_PUBLIC_URL", "http://localhost:5173" if os.getenv("AUTH_MODE") == "development" else "")
+    capture = local_invite_capture()
+    origin = os.getenv("APP_PUBLIC_URL", "http://localhost:5173" if capture else "")
     parsed = urlparse(origin)
-    if not parsed.netloc or (parsed.scheme != "https" and not (os.getenv("AUTH_MODE") == "development" and parsed.hostname in {"localhost", "127.0.0.1"})):
+    if not parsed.netloc or (parsed.scheme != "https" and not (capture and parsed.hostname in {"localhost", "127.0.0.1"})):
         raise AccountError("EMAIL_NOT_CONFIGURED", "A trusted application URL is required", 503)
     current = timestamp()
     token = secrets.token_urlsafe(32)
@@ -370,7 +467,7 @@ def queue_invitation(storage, identity, workspace, email, role, existing=None):
                 storage.delete("outbox", message["id"])
     storage.save("invitations", invite)
     storage.save("outbox", {"id": str(uuid4()), "workspaceId": workspace["id"], "invitationId": invite["id"],
-                           "status": "captured" if os.getenv("AUTH_MODE") == "development" else "pending",
+                           "status": "captured" if capture else "pending",
                            "createdAt": current.isoformat(), "payload": cipher.encrypt(json.dumps(payload).encode()).decode()})
     return {key: value for key, value in invite.items() if key != "tokenHash"}
 
@@ -392,7 +489,10 @@ def accept_invitation(storage, identity, payload):
         if not identity.get("emailVerified") or identity.get("email", "").casefold() != invite["email"].casefold():
             raise AccountError("INVITED_EMAIL_REQUIRED", "Sign in with the verified email address that received this invitation", 403)
         workspace = storage.get("workspaces", invite["workspaceId"])
-        if not workspace or not can_edit(workspace):
+        entra_mode = os.getenv("AUTH_MODE", "").lower() == "entra"
+        if not workspace or (entra_mode and workspace.get("alphaEnabled") is not True):
+            raise AccountError("ALPHA_ACCESS_REQUIRED", "This invitation is not for an approved alpha workspace", 403)
+        if not can_edit(workspace):
             raise AccountError("SUBSCRIPTION_READ_ONLY", "The Team subscription must be active to accept invitations", 403)
         for member in storage.list("memberships"):
             if member["userId"] == identity["userId"]:
@@ -430,7 +530,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 item = {key: value for key, value in invite.items() if key != "tokenHash"}
                 if item["status"] == "pending" and timestamp() >= parse_date(item["expiresAt"]):
                     item["status"] = "expired"
-                if os.getenv("AUTH_MODE") == "development" and item["status"] == "pending":
+                if local_invite_capture() and item["status"] == "pending":
                     message = next((entry for entry in storage.list("outbox") if entry.get("invitationId") == invite["id"]), None)
                     if message:
                         from cryptography.fernet import InvalidToken
@@ -439,7 +539,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                         except InvalidToken:
                             item["captureUnavailable"] = True
                 items.append(item)
-            return {"items": items, "deliveryMode": "capture" if os.getenv("AUTH_MODE") == "development" else "pending"}, 200
+            return {"items": items, "deliveryMode": "capture" if local_invite_capture() else "pending"}, 200
         require_permission(workspace, role, Permission.MEMBER_INVITE)
         if len(path) == 2 and method == "POST":
             email = payload.get("email", "")
@@ -485,7 +585,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             return queue_invitation(storage, identity, workspace, invite["email"], invite["role"], invite), 200
     if path == ["me"]:
         if method == "GET":
-            return {**profile, "userId": user_id, "roles": [role],
+            return {**profile, "userId": user_id, "roles": [role] if role else [],
                     "emailVerified": identity.get("emailVerified") is True,
                     "workspaces": accessible(storage, user_id)}, 200
         if method == "PATCH":

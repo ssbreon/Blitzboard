@@ -41,11 +41,15 @@ Playbook records, membership, roles, revisions, slide metadata, and searchable f
 
 Authentication uses an external OIDC provider, with Microsoft Entra External ID and Google federation as the preferred deployment direction. Local development may use an explicit development identity behind a flag and local secret; production API routes must validate the external token and enforce ownership/role rules server-side. No plaintext passwords or Google credentials are stored.
 
+For the invite-only, payment-free alpha, Entra sign-in alone does not grant application access or create a personal Free workspace. An operator bootstraps an `alphaEnabled` Team workspace and its first Owner; Owners invite verified-email Coaches. Alpha access is stored and enforced server-side, independent of Paddle subscription status. The local-only bootstrap CLI is not a production provisioning mechanism.
+
 ## 4. Data Model & API
 
 **Core entities**: User, Playbook, Membership, Play, Slide, Revision, Annotation, ExportJob, and Asset.
 
 **Alpha authorization roles**: Owner can manage the workspace and membership; Coach can manage plays, schedules, and game plans within the workspace.
+
+**Alpha admission invariant**: Only membership in an operator-approved, alpha-enabled Team grants content access. Unapproved signed-in users can read their own profile and accept a valid invitation, but cannot create or access workspaces or content. Invitation acceptance requires a verified email matching the invitation recipient. A Team is alpha-enabled without a paid subscription; the last-Owner invariant still applies.
 
 **Workspace ownership invariant**: Every workspace must always have at least one active Owner. The API must reject removal or demotion of the last Owner. Ownership transfer must establish the successor as an Owner before demoting the current Owner, and membership changes must be serialized or conditional so concurrent requests cannot violate the invariant.
 

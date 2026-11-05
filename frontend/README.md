@@ -40,8 +40,9 @@ errors do not automatically redirect and discard unsaved work.
 
 The legacy `VITE_SIGN_IN_URL` redirect hook remains for non-Entra configurations;
 it is not a standalone authentication implementation. No credentials are collected
-by the app. Paddle onboarding and production invite-only alpha access remain
-unimplemented.
+by the app. Paddle onboarding remains unimplemented. The same OIDC identity has
+a stable internal user ID derived from trusted issuer, tenant, and Object ID
+claims. Email is only for display and recipient-bound invitation matching.
 
 Startup checks: `node --test --test-force-exit src/components/StartupPage.test.js`.
 
@@ -88,8 +89,45 @@ email, and never automatically link to local development accounts.
 Use the local Cosmos emulator with database `blitzboard-entra-local`, keeping
 development content in `blitzboard-studio` unchanged. `BILLING_MODE=paddle` here
 only disables mock billing/fixture access; checkout is not connected and no
-payments are initiated. Real sign-ins currently provision an isolated Free
-personal workspace. This is not the server-approved, invite-only alpha policy.
+payments are initiated.
+
+### Invite-Only Local Alpha
+
+In Entra mode, a successful sign-in creates/updates only the caller's profile.
+It does not create a Free workspace or grant content access. `/api/me` remains
+available and reports no workspaces; content/API workspace routes return
+`ALPHA_ACCESS_REQUIRED` until the user belongs to an alpha-enabled Team. Existing
+non-alpha records are retained, not deleted, but aren't available in this mode.
+
+After the intended Owner has signed in once locally and their Profile shows
+**Verified**, bootstrap their Team from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe api/bootstrap_alpha_owner.py "ssbreon+test@hotmail.com" --workspace-name "Blitzboard Alpha"
+```
+
+Replace the sample address with the chosen Owner's exact verified email. The
+operator-only script requires Entra/local settings and exactly one matching
+verified profile in the local `blitzboard-entra-local` emulator database. It
+creates one `alphaEnabled` Team workspace with that user as Owner and an `alpha`
+access source; it has no HTTP endpoint and cannot run in Azure. Re-running for
+the same Owner returns that existing alpha workspace. It does not expose a way
+for users to elevate themselves.
+
+Restart the local API after the bootstrap. The Owner signs in or reloads, opens
+the Team view, and invites a Coach by the Coach's email. With local Entra capture
+enabled, the invitation is encrypted in the local outbox and the Owner can copy
+the generated link from the Invitations tab for manual delivery. The Coach signs
+up/signs in with that same email and accepts the invite. Acceptance requires a
+matching email plus `email_verified: true` or `xms_edov: true` from the signed API
+token. The invitation is single-use, expires after seven days, and reserves one
+of ten seats. Do not copy captured invite links into chat.
+
+This CLI is a local alpha bootstrap only. A production Owner bootstrap and real
+email delivery/provider retrieval still need a separately reviewed operational
+path before deployment. The API's Owner/Coach permission enum remains the source
+of authorization: both roles manage Team content; only Owner manages workspace
+and membership.
 
 Pending invitation tokens are temporarily kept in tab storage for up to 30 minutes
 and removed from the URL before redirect; acceptance/cancel/logout clears them.
@@ -103,8 +141,8 @@ explicit `email_verified: true` or `xms_edov: true` token claim and an email mat
 an email address by itself is insufficient. Verify the real External ID access
 token before relying on invites.
 A verified-recipient challenge is still needed if the tenant doesn't emit an
-appropriate explicit verification claim. Local Entra invitation capture, alpha
-workspace bootstrap/entitlements, and production delivery are follow-up work.
+appropriate explicit verification claim. Local Entra invitation capture is
+available only to an Owner in the local alpha setup described above.
 
 Start the emulators, Functions at port 7071 using the workspace virtual environment,
 and Vite at port 5173. Vite fails if that port is occupied instead of silently
