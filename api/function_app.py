@@ -546,20 +546,24 @@ def dispatch(req, user, workspace, role):
         return response(payload, status) if status != 204 else func.HttpResponse(status_code=204)
     if not accounts.can_read(workspace):
         raise accounts.AccountError("CONTENT_RETENTION_ENDED", "This workspace's eighteen-month content retention period has ended", 410)
-    if method in {"POST", "PATCH", "DELETE"} and path != ["exports"]:
-        accounts.require_write(workspace, role, "delete" if method == "DELETE" else "edit")
+    if path[0] in accounts.CONTENT_ROUTE_PERMISSIONS:
+        accounts.require_permission(workspace, role, accounts.content_permission(path, method))
 
     if path == ["search"] and method == "GET":
+        play_read = accounts.has_permission(role, accounts.Permission.PLAY_READ)
+        game_read = accounts.has_permission(role, accounts.Permission.GAMEPLAN_READ)
+        if not (play_read or game_read):
+            return forbidden()
         query = (req.params.get("q") or "").strip().casefold()
         fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "unit", "category", "recordStatus", "workspaceId", "ownerId")
-        books = storage.list("playbooks", owner_id=owner_id, fields=fields)
+        books = storage.list("playbooks", owner_id=owner_id, fields=fields) if play_read else []
         books_by_id = {book["id"]: book for book in books}
         results = []
         for entity_type, records in (
             ("playbooks", books),
-            ("gamePlans", storage.list("gamePlans", owner_id=owner_id, fields=fields)),
-            ("plays", storage.list("plays", owner_id=owner_id, fields=fields)),
-            ("scoutPlays", storage.list("scoutPlays", owner_id=owner_id, fields=fields)),
+            ("gamePlans", storage.list("gamePlans", owner_id=owner_id, fields=fields) if game_read else []),
+            ("plays", storage.list("plays", owner_id=owner_id, fields=fields) if play_read else []),
+            ("scoutPlays", storage.list("scoutPlays", owner_id=owner_id, fields=fields) if game_read else []),
         ):
             for record in records:
                 if query and query not in (record.get("name") or "").casefold():
@@ -791,6 +795,7 @@ def dispatch(req, user, workspace, role):
         payload = body(req)
         for key, entity in {"playbookId": "playbooks", "gamePlanId": "gamePlans", "playId": "plays", "scoutPlayId": "scoutPlays"}.items():
             if payload.get(key):
+                accounts.require_permission(workspace, role, accounts.Permission.GAMEPLAN_READ if entity in {"gamePlans", "scoutPlays"} else accounts.Permission.PLAY_READ)
                 referenced = storage.get(entity, payload[key])
                 if not referenced or not accounts.belongs(referenced, workspace):
                     return forbidden()
@@ -801,6 +806,8 @@ def dispatch(req, user, workspace, role):
         record = storage.get("exports", path[1])
         if not record:
             return not_found("Export", path[1])
+        if record.get("gamePlanId") or record.get("scoutPlayId"):
+            accounts.require_permission(workspace, role, accounts.Permission.GAMEPLAN_READ)
         return response(record) if accounts.belongs(record, workspace) else forbidden()
 
     return response({"error": {"code": "NOT_FOUND", "message": "Route not found"}}, 404)

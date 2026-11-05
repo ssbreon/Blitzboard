@@ -40,3 +40,24 @@ test('production policy forbids inline scripts, external scripts, plugins, and f
   assert.deepEqual(directives['frame-ancestors'], ["'none'"])
   assert.equal(globalHeaders['X-Content-Type-Options'], 'nosniff')
 })
+
+test('account management controls use effective permissions rather than role labels', async () => {
+  const server = await createServer({ root, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
+  try {
+    const { AccountViews } = await server.ssrLoadModule('/src/components/AccountViews.jsx')
+    const render = (role, permissions) => renderToStaticMarkup(createElement(AccountViews, {
+      view: 'team', user: { userId: 'coach', preferences: {} }, api: {},
+      workspace: { name: 'Alpha', kind: 'team', role, permissions, defaults: {}, subscription: { kind: 'team' }, capabilities: { manageTeam: true } },
+    }))
+    const denied = render('owner', [])
+    assert.ok(!denied.includes('account-team-tab-invitations'))
+    assert.ok(denied.includes('<fieldset disabled=""'))
+    const granted = render('coach', ['workspace.settings', 'member.invite'])
+    assert.ok(granted.includes('account-team-tab-invitations'))
+    assert.ok(granted.includes('account-invite-form'))
+    assert.ok(!granted.includes('<fieldset disabled=""'))
+    assert.ok(!granted.includes('value="admin"'))
+  } finally {
+    await server.close()
+  }
+})

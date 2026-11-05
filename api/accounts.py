@@ -7,8 +7,74 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr
+from enum import Enum
+from types import MappingProxyType
 from urllib.parse import quote, urlparse
 from uuid import uuid4
+
+
+class Permission(Enum):
+    PLAY_READ = "play.read"
+    PLAY_WRITE = "play.write"
+    PLAY_DELETE = "play.delete"
+    SCHEDULE_READ = "schedule.read"
+    SCHEDULE_WRITE = "schedule.write"
+    SCHEDULE_DELETE = "schedule.delete"
+    GAMEPLAN_READ = "gameplan.read"
+    GAMEPLAN_WRITE = "gameplan.write"
+    GAMEPLAN_DELETE = "gameplan.delete"
+    MEMBER_INVITE = "member.invite"
+    MEMBER_REMOVE = "member.remove"
+    WORKSPACE_SETTINGS = "workspace.settings"
+    WORKSPACE_TRANSFER_OWNERSHIP = "workspace.transfer_ownership"
+
+
+CONTENT_PERMISSIONS = frozenset({
+    Permission.PLAY_READ, Permission.PLAY_WRITE, Permission.PLAY_DELETE,
+    Permission.SCHEDULE_READ, Permission.SCHEDULE_WRITE, Permission.SCHEDULE_DELETE,
+    Permission.GAMEPLAN_READ, Permission.GAMEPLAN_WRITE, Permission.GAMEPLAN_DELETE,
+})
+ROLE_PERMISSIONS = MappingProxyType({
+    "owner": CONTENT_PERMISSIONS | frozenset({
+        Permission.MEMBER_INVITE, Permission.MEMBER_REMOVE,
+        Permission.WORKSPACE_SETTINGS, Permission.WORKSPACE_TRANSFER_OWNERSHIP,
+    }),
+    "coach": CONTENT_PERMISSIONS,
+})
+READ_PERMISSIONS = frozenset({Permission.PLAY_READ, Permission.SCHEDULE_READ, Permission.GAMEPLAN_READ})
+CONTENT_ROUTE_PERMISSIONS = MappingProxyType({
+    "playbooks": (Permission.PLAY_READ, Permission.PLAY_WRITE, Permission.PLAY_DELETE),
+    "schedule-events": (Permission.SCHEDULE_READ, Permission.SCHEDULE_WRITE, Permission.SCHEDULE_DELETE),
+    "game-plans": (Permission.GAMEPLAN_READ, Permission.GAMEPLAN_WRITE, Permission.GAMEPLAN_DELETE),
+    "exports": (Permission.PLAY_READ, Permission.PLAY_READ, Permission.PLAY_DELETE),
+})
+
+
+def has_permission(role, permission):
+    return isinstance(role, str) and isinstance(permission, Permission) and permission in ROLE_PERMISSIONS.get(role, frozenset())
+
+
+def require_permission(workspace, role, permission):
+    if not has_permission(role, permission):
+        raise AccountError("FORBIDDEN", "You do not have permission to perform this action", 403)
+    if permission in READ_PERMISSIONS:
+        if not can_read(workspace):
+            raise AccountError("CONTENT_RETENTION_ENDED", "This workspace's eighteen-month content retention period has ended", 410)
+    elif not can_edit(workspace):
+        raise AccountError("SUBSCRIPTION_READ_ONLY", "This workspace is read-only until its subscription is active", 403)
+
+
+def content_permission(path, method):
+    permissions = CONTENT_ROUTE_PERMISSIONS.get(path[0])
+    if permissions is None or method not in {"GET", "POST", "PATCH", "DELETE"}:
+        raise AccountError("FORBIDDEN", "This content operation is not supported", 403)
+    return permissions[0 if method == "GET" else 2 if method == "DELETE" else 1]
+
+
+def effective_permissions(workspace, role):
+    readable, writable = can_read(workspace), can_edit(workspace)
+    return frozenset(permission for permission in ROLE_PERMISSIONS.get(role, frozenset())
+                     if (readable if permission in READ_PERMISSIONS else writable))
 
 
 DEFAULT_LIMITS = {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}
@@ -150,7 +216,7 @@ def ensure_user(storage, identity):
 def accessible(storage, user_id):
     result = []
     for member in storage.list("memberships"):
-        if member["userId"] == user_id:
+        if member["userId"] == user_id and isinstance(member.get("role"), str) and member["role"] in ROLE_PERMISSIONS:
             workspace = storage.get("workspaces", member["workspaceId"])
             if workspace:
                 result.append(summary(storage, workspace, member["role"]))
@@ -163,6 +229,8 @@ def select_workspace(storage, identity, requested=None):
     workspace = copy.deepcopy(storage.get("workspaces", workspace_id))
     if member is None or workspace is None:
         raise AccountError("FORBIDDEN", "You do not have access to this workspace", 403)
+    if not isinstance(member.get("role"), str) or member["role"] not in ROLE_PERMISSIONS:
+        raise AccountError("FORBIDDEN", "This workspace membership role is not supported", 403)
     if workspace["subscription"].get("source") == "development_fixture" and not is_mock():
         raise AccountError("FORBIDDEN", "Local fixture access is unavailable in this billing mode", 403)
     return workspace, member["role"]
@@ -200,15 +268,6 @@ def can_read(workspace):
     return deadline is None or timestamp() < deadline
 
 
-def require_write(workspace, role, action="edit"):
-    if not can_edit(workspace):
-        raise AccountError("SUBSCRIPTION_READ_ONLY", "This workspace is read-only until its subscription is active", 403)
-    if action in {"delete", "team"} and role not in {"owner", "admin"}:
-        raise AccountError("FORBIDDEN", "This action requires an Admin or Owner", 403)
-    if action == "billing" and role != "owner":
-        raise AccountError("FORBIDDEN", "Only the subscription Owner may manage billing", 403)
-
-
 def belongs(record, workspace):
     if record.get("workspaceId"):
         return record["workspaceId"] == workspace["id"]
@@ -218,12 +277,16 @@ def belongs(record, workspace):
 def summary(storage, workspace, role):
     subscription = dict(workspace["subscription"])
     writable = can_edit(workspace)
+    permissions = effective_permissions(workspace, role)
     if not writable and (subscription["status"] in {"active", "past_due"} or (subscription["status"] == "trialing" and subscription.get("trialStartedAt"))):
         subscription["status"] = "expired"
     public = {"id": workspace["id"], "name": workspace["name"], "kind": workspace["kind"], "role": role,
               "defaults": workspace.get("defaults", {}), "subscription": subscription,
-              "capabilities": {"edit": writable, "delete": writable and role in {"owner", "admin"},
-                               "manageTeam": writable and workspace["kind"] == "team" and role in {"owner", "admin"}, "billing": role == "owner"}}
+              "permissions": sorted(permission.value for permission in permissions),
+              "capabilities": {"edit": Permission.PLAY_WRITE in permissions,
+                               "delete": Permission.PLAY_DELETE in permissions,
+                               "manageTeam": workspace["kind"] == "team" and Permission.WORKSPACE_SETTINGS in permissions,
+                               "billing": has_permission(role, Permission.WORKSPACE_SETTINGS)}}
     limits = limits_for_workspace(workspace)
     public["usage"] = {entity: len(storage.list(entity, workspace_id=workspace["id"])) for entity in limits}
     public["limits"] = dict(limits)
@@ -321,6 +384,8 @@ def accept_invitation(storage, identity, payload):
         invite = storage.get("invitations", invite["id"])
         if not secrets.compare_digest(invite.get("tokenHash", ""), digest) or invite["status"] != "pending" or timestamp() >= parse_date(invite["expiresAt"]):
             raise AccountError("INVITATION_EXPIRED", "Invitation has expired, been revoked, or already been used", 409)
+        if invite.get("role") != "coach":
+            raise AccountError("INVALID_INVITATION", "Invitation role is not supported", 400)
         if not identity.get("emailVerified") or identity.get("email", "").casefold() != invite["email"].casefold():
             raise AccountError("INVITED_EMAIL_REQUIRED", "Sign in with the verified email address that received this invitation", 403)
         workspace = storage.get("workspaces", invite["workspaceId"])
@@ -352,8 +417,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
     if path == ["invitations", "accept"] and method == "POST":
         return accept_invitation(storage, identity, payload)
     if path[:2] == ["workspace", "invitations"]:
-        if workspace["kind"] != "team" or role not in {"owner", "admin"}:
-            raise AccountError("FORBIDDEN", "Only Team Admins may manage invitations", 403)
+        if workspace["kind"] != "team" or not has_permission(role, Permission.MEMBER_INVITE):
+            raise AccountError("FORBIDDEN", "You may not manage this workspace's invitations", 403)
         if len(path) == 2 and method == "GET":
             items = []
             for invite in storage.list("invitations"):
@@ -372,7 +437,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                             item["captureUnavailable"] = True
                 items.append(item)
             return {"items": items, "deliveryMode": "capture" if os.getenv("AUTH_MODE") == "development" else "pending"}, 200
-        require_write(workspace, role, "team")
+        require_permission(workspace, role, Permission.MEMBER_INVITE)
         if len(path) == 2 and method == "POST":
             email = payload.get("email", "")
             if not isinstance(email, str) or len(email) > 254:
@@ -382,8 +447,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             if display or address != email or "@" not in email or any(character.isspace() for character in email) or "." not in email.split("@")[-1]:
                 raise AccountError("VALIDATION_ERROR", "A valid email address is required")
             assigned_role = payload.get("role", "coach")
-            if assigned_role not in {"coach", "admin"}:
-                raise AccountError("VALIDATION_ERROR", "Invitation role must be Coach or Admin")
+            if assigned_role != "coach":
+                raise AccountError("VALIDATION_ERROR", "Invitation role must be Coach")
             pending = pending_invites(storage, workspace["id"])
             if any(invite["email"].casefold() == email.casefold() for invite in pending):
                 raise AccountError("INVITATION_EXISTS", "An invitation for this email is already pending", 409)
@@ -436,7 +501,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             enter_workspace(storage, workspace)
             return summary(storage, workspace, role), 200
         if method == "PATCH":
-            require_write(workspace, role, "team")
+            require_permission(workspace, role, Permission.WORKSPACE_SETTINGS)
             if "name" in payload and workspace["kind"] == "team":
                 if not isinstance(payload["name"], str) or not 1 <= len(payload["name"].strip()) <= 120:
                     raise AccountError("VALIDATION_ERROR", "Team name is required (maximum 120 characters)")
@@ -446,9 +511,9 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             storage.save("workspaces", workspace)
             return summary(storage, workspace, role), 200
     if path == ["workspace", "ownership", "transfer"] and method == "POST":
-        if workspace["kind"] != "team" or role != "owner":
+        if workspace["kind"] != "team":
             raise AccountError("FORBIDDEN", "Only a Team Owner may transfer ownership", 403)
-        require_write(workspace, role, "team")
+        require_permission(workspace, role, Permission.WORKSPACE_TRANSFER_OWNERSHIP)
         target_user_id = payload.get("userId")
         if not isinstance(target_user_id, str) or not target_user_id.strip():
             raise AccountError("VALIDATION_ERROR", "A Team member userId is required")
@@ -459,6 +524,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             raise AccountError("NOT_FOUND", "Team member was not found", 404)
         if target["role"] == "owner":
             raise AccountError("ALREADY_OWNER", "This Team member is already an Owner", 409)
+        if target["role"] != "coach":
+            raise AccountError("FORBIDDEN", "Only a supported Coach membership may receive ownership", 403)
         target["role"] = "owner"
         storage.save("memberships", target)
         return {"userId": target_user_id, "role": "owner"}, 200
@@ -471,7 +538,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                                 "coachingTitle": member_profile.get("coachingTitle", ""), "role": member["role"]})
         return {"items": members}, 200
     if len(path) == 3 and path[:2] == ["workspace", "members"]:
-        require_write(workspace, role, "team")
+        require_permission(workspace, role, Permission.WORKSPACE_TRANSFER_OWNERSHIP if method == "PATCH" else Permission.MEMBER_REMOVE)
         member = storage.get("memberships", membership_id(path[2], workspace["id"]))
         if not member:
             raise AccountError("NOT_FOUND", "Member was not found", 404)
@@ -485,8 +552,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 owner_count = sum(item["workspaceId"] == workspace["id"] and item["role"] == "owner" for item in storage.list("memberships"))
                 if owner_count < 2:
                     raise AccountError("OWNER_TRANSFER_REQUIRED", "Transfer ownership before demoting the last Owner", 409)
-            if target_role not in {"coach", "admin"}:
-                raise AccountError("VALIDATION_ERROR", "Role must be Coach or Admin")
+            if target_role != "coach":
+                raise AccountError("VALIDATION_ERROR", "Role must be Coach")
             member["role"] = target_role
             storage.save("memberships", member)
             return {"userId": member["userId"], "role": member["role"]}, 200
@@ -496,14 +563,14 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             storage.delete("memberships", member["id"])
             return None, 204
     if path == ["workspace", "billing"] and method == "GET":
-        if role != "owner":
+        if not has_permission(role, Permission.WORKSPACE_SETTINGS):
             return {"managedByTeam": True, "status": summary(storage, workspace, role)["subscription"]["status"]}, 200
         plan = workspace["subscription"].get("kind", workspace["kind"])
         return {"subscription": summary(storage, workspace, role)["subscription"], "prices": PRICES[plan],
             "plans": {kind: dict(prices) for kind, prices in PRICES.items() if kind != "free"},
                 "taxIncluded": True, "provider": "mock" if is_mock() else "paddle", "connected": False}, 200
     if path[:2] == ["workspace", "billing"] and method == "POST":
-        if role != "owner":
+        if not has_permission(role, Permission.WORKSPACE_SETTINGS):
             raise AccountError("FORBIDDEN", "Only the subscription Owner may manage billing", 403)
         raise AccountError("BILLING_NOT_CONNECTED", "Paddle checkout and portal are not configured for this workspace", 503)
     return None

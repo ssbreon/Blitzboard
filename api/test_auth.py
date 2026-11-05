@@ -45,6 +45,49 @@ def response_json(response):
     return json.loads(response.get_body())
 
 
+class PermissionTests(unittest.TestCase):
+    def test_content_routes_select_named_permissions(self):
+        policy = function_app.accounts
+        for root, prefix in (("playbooks", "PLAY"), ("schedule-events", "SCHEDULE"), ("game-plans", "GAMEPLAN")):
+            for method, action in (("GET", "READ"), ("POST", "WRITE"), ("PATCH", "WRITE"), ("DELETE", "DELETE")):
+                with self.subTest(root=root, method=method):
+                    self.assertEqual(policy.content_permission([root, "parent", "child", "record"], method),
+                                     policy.Permission[f"{prefix}_{action}"])
+        self.assertEqual(policy.content_permission(["exports"], "POST"), policy.Permission.PLAY_READ)
+        with self.assertRaises(policy.AccountError):
+            policy.content_permission(["unknown"], "POST")
+        with self.assertRaises(policy.AccountError):
+            policy.content_permission(["playbooks"], "PUT")
+
+    def test_permission_matrix_denies_unknown_roles_and_permissions(self):
+        policy = function_app.accounts
+        self.assertEqual(policy.ROLE_PERMISSIONS["owner"], frozenset(policy.Permission))
+        self.assertEqual(len(policy.ROLE_PERMISSIONS["coach"]), 9)
+        for permission in policy.Permission:
+            for role in ("owner", "coach", "admin", "unknown", None, [], {}):
+                with self.subTest(role=role, permission=permission):
+                    expected = role == "owner" or (role == "coach" and permission in policy.CONTENT_PERMISSIONS)
+                    self.assertEqual(policy.has_permission(role, permission), expected)
+        self.assertFalse(policy.has_permission("owner", "play.write"))
+        with self.assertRaises(TypeError):
+            policy.ROLE_PERMISSIONS["admin"] = policy.CONTENT_PERMISSIONS
+
+    def test_permission_grant_does_not_bypass_workspace_entitlement(self):
+        policy = function_app.accounts
+        workspace = {"subscription": {"kind": "team", "status": "trialing", "trialEndsAt": None}}
+        for permission in policy.Permission:
+            with self.subTest(permission=permission):
+                if permission in policy.READ_PERMISSIONS:
+                    policy.require_permission(workspace, "owner", permission)
+                else:
+                    with self.assertRaises(policy.AccountError) as failure:
+                        policy.require_permission(workspace, "owner", permission)
+                    self.assertEqual(failure.exception.code, "SUBSCRIPTION_READ_ONLY")
+        with self.assertRaises(policy.AccountError) as failure:
+            policy.require_permission(workspace, "coach", policy.Permission.MEMBER_INVITE)
+        self.assertEqual(failure.exception.code, "FORBIDDEN")
+
+
 class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
@@ -520,21 +563,82 @@ class AuthenticationTests(unittest.TestCase):
         members = {member["userId"]: member for member in response_json(response)["items"]}
         self.assertEqual(members["coach-b"]["coachingTitle"], "")
 
-    def test_coach_edits_shared_content_but_cannot_delete(self):
+    def test_coach_edits_and_deletes_shared_content(self):
         team = self.team_fixture()
         created = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Team"}, team["id"]))
         path = f"playbooks/{created['id']}"
         self.assertEqual(call_api("PATCH", path, "coach-b", {"name": "Edited"}, team["id"]).status_code, 200)
-        self.assertEqual(call_api("DELETE", path, "coach-b", workspace_id=team["id"]).status_code, 403)
-        self.assertEqual(len(response_json(call_api("GET", "playbooks", "coach-b", workspace_id=team["id"]))["items"]), 1)
+        self.assertEqual(call_api("DELETE", path, "coach-b", workspace_id=team["id"]).status_code, 204)
+        self.assertEqual(len(response_json(call_api("GET", "playbooks", "coach-b", workspace_id=team["id"]))["items"]), 0)
 
-    def test_admin_can_delete_and_removal_preserves_contributions(self):
-        team = self.team_fixture("admin")
+    def test_coach_removal_preserves_contributions(self):
+        team = self.team_fixture()
         created = response_json(call_api("POST", "playbooks", "coach-b", {"name": "Contribution"}, team["id"]))
         self.assertEqual(call_api("DELETE", "workspace/members/coach-b", "local-coach", workspace_id=team["id"]).status_code, 204)
         self.assertEqual(call_api("GET", f"playbooks/{created['id']}", "coach-b", workspace_id=team["id"]).status_code, 403)
         self.assertEqual(call_api("GET", f"playbooks/{created['id']}", "local-coach", workspace_id=team["id"]).status_code, 200)
         self.assertEqual(call_api("GET", "playbooks", "coach-b").status_code, 200)
+
+    def test_coach_content_permissions_cover_categories_and_children(self):
+        team = self.team_fixture()
+        for root, extra in (("playbooks", {}), ("game-plans", {}), ("schedule-events", {"eventType": "Practice", "eventDate": "2026-11-05"})):
+            with self.subTest(root=root):
+                created = call_api("POST", root, "coach-b", {"name": "Team content", **extra}, team["id"])
+                self.assertEqual(created.status_code, 201)
+                record = response_json(created)
+                path = f"{root}/{record['id']}"
+                self.assertEqual(call_api("GET", path, "coach-b", workspace_id=team["id"]).status_code, 200)
+                self.assertEqual(call_api("PATCH", path, "coach-b", {"name": "Updated"}, team["id"]).status_code, 200)
+                if root != "schedule-events":
+                    children = "plays" if root == "playbooks" else "scout-plays"
+                    child_path = f"{path}/{children}"
+                    child = response_json(call_api("POST", child_path, "coach-b", {"name": "Child"}, team["id"]))
+                    item_path = f"{child_path}/{child['id']}"
+                    self.assertEqual(call_api("PATCH", item_path, "coach-b", {"name": "Updated child", "_etag": child["_etag"]}, team["id"]).status_code, 200)
+                    if root == "playbooks":
+                        slide_path = f"{item_path}/slides"
+                        slide = response_json(call_api("POST", slide_path, "coach-b", {"title": "Adjustment"}, team["id"]))
+                        self.assertEqual(call_api("DELETE", f"{slide_path}/{slide['id']}", "coach-b", workspace_id=team["id"]).status_code, 204)
+                    self.assertEqual(call_api("DELETE", item_path, "coach-b", workspace_id=team["id"]).status_code, 204)
+                self.assertEqual(call_api("DELETE", path, "coach-b", workspace_id=team["id"]).status_code, 204)
+
+    def test_coach_cannot_manage_workspace_or_members(self):
+        team = self.team_fixture()
+        for method, path, payload in (
+            ("PATCH", "workspace", {"name": "Forbidden"}),
+            ("GET", "workspace/invitations", None),
+            ("POST", "workspace/invitations", {"email": "new@example.com"}),
+            ("DELETE", "workspace/invitations/missing", None),
+            ("POST", "workspace/invitations/missing/resend", {}),
+            ("DELETE", "workspace/members/local-coach", None),
+            ("PATCH", "workspace/members/coach-b", {"role": "owner"}),
+            ("POST", "workspace/ownership/transfer", {"userId": "local-coach"}),
+        ):
+            with self.subTest(method=method, path=path):
+                self.assertEqual(call_api(method, path, "coach-b", payload, team["id"]).status_code, 403)
+        self.assertEqual(call_api("GET", "workspace/members", "coach-b", workspace_id=team["id"]).status_code, 200)
+
+    def test_admin_membership_and_invitation_roles_fail_closed(self):
+        team = self.team_fixture("admin")
+        for root in ("playbooks", "game-plans", "schedule-events", "search", "exports", "workspace/members"):
+            self.assertEqual(call_api("GET", root, "coach-b", workspace_id=team["id"]).status_code, 403)
+        self.assertEqual(call_api("POST", "workspace/invitations", "local-coach", {"email": "new@example.com", "role": "admin"}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("PATCH", "workspace/members/coach-b", "local-coach", {"role": "admin"}, team["id"]).status_code, 400)
+
+    def test_summary_permissions_and_capabilities_share_policy(self):
+        team = self.team_fixture()
+        for user, role in (("local-coach", "owner"), ("coach-b", "coach")):
+            result = response_json(call_api("GET", "workspace", user, workspace_id=team["id"]))
+            expected = sorted(permission.value for permission in function_app.accounts.ROLE_PERMISSIONS[role])
+            self.assertEqual(result["permissions"], expected)
+            self.assertTrue(result["capabilities"]["delete"])
+            self.assertEqual(result["capabilities"]["manageTeam"], role == "owner")
+        workspace = function_app.storage.get("workspaces", team["id"])
+        workspace["subscription"]["periodEndsAt"] = (function_app.accounts.timestamp() - timedelta(seconds=1)).isoformat()
+        function_app.storage.save("workspaces", workspace)
+        result = response_json(call_api("GET", "workspace", "coach-b", workspace_id=team["id"]))
+        self.assertEqual(set(result["permissions"]), {permission.value for permission in function_app.accounts.READ_PERMISSIONS})
+        self.assertFalse(result["capabilities"]["delete"])
 
     def test_workspace_and_provenance_cannot_be_forged(self):
         team = self.team_fixture()
@@ -647,6 +751,27 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         response = call_api("POST", "workspace/ownership/transfer", "local-coach", {"userId": "outsider"}, team["id"])
         self.assertEqual(response.status_code, 404)
+
+    def test_concurrent_owner_demotions_preserve_one_owner(self):
+        team = self.team_fixture()
+        self.assertEqual(call_api("POST", "workspace/ownership/transfer", "local-coach", {"userId": "coach-b"}, team["id"]).status_code, 200)
+        def demote(user_id):
+            return call_api("PATCH", f"workspace/members/{user_id}", user_id, {"role": "coach"}, team["id"]).status_code
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            statuses = list(executor.map(demote, ("local-coach", "coach-b")))
+        self.assertEqual(sorted(statuses), [200, 409])
+        owners = [member for member in function_app.storage.list("memberships") if member["workspaceId"] == team["id"] and member["role"] == "owner"]
+        self.assertEqual(len(owners), 1)
+
+    def test_legacy_admin_invitation_cannot_create_membership(self):
+        team = self.team_fixture()
+        invite, token = self.invite_token(team["id"], "new@example.com")
+        stored = function_app.storage.get("invitations", invite["id"])
+        stored["role"] = "admin"
+        function_app.storage.save("invitations", stored)
+        result = call_api("POST", "invitations/accept", "new@example.com", {"token": token})
+        self.assertEqual(result.status_code, 400)
+        self.assertIsNone(function_app.storage.get("memberships", function_app.accounts.membership_id("new@example.com", team["id"])))
 
     def test_local_fixture_is_not_reseeded_after_expiry(self):
         first = response_json(call_api("GET", "me", "local-coach"))
@@ -762,7 +887,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("PATCH", "me/preferences", "local-coach", {"fieldOrientation": "vertical"}).status_code, 400)
 
     def test_only_owner_can_start_billing_actions(self):
-        team = self.team_fixture("admin")
+        team = self.team_fixture()
         self.assertEqual(call_api("POST", "workspace/billing/checkout", "coach-b", {}, team["id"]).status_code, 403)
         self.assertEqual(call_api("POST", "workspace/billing/checkout", "local-coach", {}, team["id"]).status_code, 503)
 
@@ -849,8 +974,8 @@ class AuthenticationTests(unittest.TestCase):
         team = self.team_fixture()
         book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Shared"}, team["id"]))
         workspace = function_app.storage.get("workspaces", team["id"])
-        with patch.object(function_app.accounts, "select_workspace", side_effect=[(workspace, "admin"), (workspace, "coach")]):
-            self.assertEqual(call_api("DELETE", f"playbooks/{book['id']}", "coach-b", workspace_id=team["id"]).status_code, 403)
+        with patch.object(function_app.accounts, "select_workspace", side_effect=[(workspace, "owner"), (workspace, "coach")]):
+            self.assertEqual(call_api("PATCH", "workspace", "coach-b", {"name": "Forbidden"}, team["id"]).status_code, 403)
         self.assertIsNotNone(function_app.storage.get("playbooks", book["id"]))
 
     def test_health_is_public(self):

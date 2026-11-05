@@ -23,7 +23,6 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [members, setMembers] = useState([])
   const [invitations, setInvitations] = useState([])
   const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState('coach')
   const [invitationCopyFeedback, setInvitationCopyFeedback] = useState(null)
   const [deliveryMode, setDeliveryMode] = useState(null)
   const [billing, setBilling] = useState(null)
@@ -36,13 +35,16 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const dirty = JSON.stringify(form) !== JSON.stringify(savedForm)
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
-  const teamEditable = workspace.capabilities.manageTeam
+  const teamEditable = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.settings'))
+  const canInvite = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.invite'))
+  const canRemove = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.remove'))
+  const canTransfer = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.transfer_ownership'))
   const ownerCount = members.filter((member) => member.role === 'owner').length
   const subscriptionPlan = workspace.subscription.kind || workspace.kind
 
   useEffect(() => {
     let active = true
-    const load = view === 'team' ? Promise.all([api.members(), workspace.role === 'coach' ? Promise.resolve({ items: [] }) : api.invitations()]) : view === 'billing' ? api.billing() : null
+    const load = view === 'team' ? Promise.all([api.members(), canInvite ? api.invitations() : Promise.resolve({ items: [] })]) : view === 'billing' ? api.billing() : null
     if (load) load.then((result) => {
       if (!active) return
       if (view === 'team') { setMembers(result[0].items); setInvitations(result[1].items); setDeliveryMode(result[1].deliveryMode) }
@@ -50,7 +52,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     }).catch((failure) => { if (active) setError(failure) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [api, view, workspace.role])
+  }, [api, view, canInvite])
 
   async function save(event) {
     event?.preventDefault()
@@ -109,7 +111,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   function handleTeamTabKeyDown(event) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
-    const tabs = TEAM_TABS.filter((tab) => tab.id !== 'invitations' || workspace.role !== 'coach')
+    const tabs = TEAM_TABS.filter((tab) => tab.id !== 'invitations' || canInvite)
     const currentIndex = tabs.findIndex((tab) => tab.id === teamTab)
     const nextIndex = event.key === 'Home' ? 0
       : event.key === 'End' ? tabs.length - 1
@@ -143,7 +145,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     setError(null)
     try {
       if (action === 'send') {
-        await api.invite({ email: inviteEmail, role: inviteRole })
+        await api.invite({ email: inviteEmail, role: 'coach' })
         setInviteEmail('')
       } else if (action === 'revoke') await api.revokeInvitation(invite.id)
       else await api.resendInvitation(invite.id)
@@ -228,7 +230,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     </form>}
 
     {view === 'team' && <div className="account-billing-tabs" role="tablist" aria-label="Team sections" onKeyDown={handleTeamTabKeyDown}>
-      {TEAM_TABS.filter((tab) => tab.id !== 'invitations' || workspace.role !== 'coach').map((tab) => <button
+      {TEAM_TABS.filter((tab) => tab.id !== 'invitations' || canInvite).map((tab) => <button
         key={tab.id}
         id={`account-team-tab-${tab.id}`}
         type="button"
@@ -253,23 +255,20 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           <p className="account-team-summary">{workspace.seatsUsed} / {workspace.seatLimit} seats reserved or active</p>
           {!loading && <div className="account-table-wrap"><table className="account-table data-grid-table"><thead><tr><th className="data-grid-type-header" scope="col" aria-label="Type" /><th>Name</th><th>Title</th><th>Role</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{members.map((member) => <tr key={member.userId}><td className="data-grid-type-cell" aria-label="Staff member" title="Staff member"><UserRound size={17} strokeWidth={2} aria-hidden="true" /></td><td>{member.name}</td><td>{member.coachingTitle || ''}</td><td>
-              {teamEditable && member.role !== 'owner' ? <select aria-label={`Role for ${member.name}`} value={member.role} disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
-                <option value="coach">Coach</option><option value="admin">Admin</option>
-              </select> : teamEditable && workspace.role === 'owner' && member.userId === user.userId && ownerCount > 1 ? <select aria-label={`Role for ${member.name}`} value="owner" disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
+              {canTransfer && member.role === 'owner' && member.userId === user.userId && ownerCount > 1 ? <select aria-label={`Role for ${member.name}`} value="owner" disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
                 <option value="owner">Owner</option><option value="coach">Coach</option>
               </select> : <span className="account-role">{member.role}</span>}
             </td><td><div className="account-member-actions">
-              {teamEditable && workspace.role === 'owner' && member.role !== 'owner' && <button type="button" className="account-member-transfer" title={`Transfer ownership to ${member.name}`} aria-label={`Transfer ownership to ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'transfer')}><ArrowRightLeft size={15} aria-hidden="true" /><span>Transfer</span></button>}
-              {teamEditable && member.role !== 'owner' && <button type="button" className="account-icon-button" title={`Remove ${member.name}`} aria-label={`Remove ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'remove')}><Trash2 size={16} /></button>}
+              {canTransfer && member.role === 'coach' && <button type="button" className="account-member-transfer" title={`Transfer ownership to ${member.name}`} aria-label={`Transfer ownership to ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'transfer')}><ArrowRightLeft size={15} aria-hidden="true" /><span>Transfer</span></button>}
+              {canRemove && member.role !== 'owner' && <button type="button" className="account-icon-button" title={`Remove ${member.name}`} aria-label={`Remove ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'remove')}><Trash2 size={16} /></button>}
             </div></td></tr>)}</tbody>
           </table></div>}
         </section>
       </div>
-      {workspace.role !== 'coach' && <div id="account-team-panel-invitations" className={`account-team-panel${teamTab === 'invitations' ? ' active' : ''}`} role="tabpanel" aria-labelledby="account-team-tab-invitations" aria-hidden={teamTab !== 'invitations'} inert={teamTab !== 'invitations'} tabIndex={teamTab === 'invitations' ? 0 : -1}>
+      {canInvite && <div id="account-team-panel-invitations" className={`account-team-panel${teamTab === 'invitations' ? ' active' : ''}`} role="tabpanel" aria-labelledby="account-team-tab-invitations" aria-hidden={teamTab !== 'invitations'} inert={teamTab !== 'invitations'} tabIndex={teamTab === 'invitations' ? 0 : -1}>
         <section className="account-section" aria-label="Team invitations">
-          {teamEditable && <form className="account-invite-form" onSubmit={(event) => { event.preventDefault(); inviteAction('send') }}>
+          {canInvite && <form className="account-invite-form" onSubmit={(event) => { event.preventDefault(); inviteAction('send') }}>
             <label className="dialog-field"><span>Email</span><input type="email" required maxLength={254} value={inviteEmail} disabled={saving} onChange={(event) => setInviteEmail(event.target.value)} /></label>
-            <label className="dialog-field"><span>Role</span><select value={inviteRole} disabled={saving} onChange={(event) => setInviteRole(event.target.value)}><option value="coach">Coach</option><option value="admin">Admin</option></select></label>
             <button type="submit" className="dialog-create" disabled={saving || workspace.seatsUsed >= workspace.seatLimit}><Mail size={16} aria-hidden="true" />Invite</button>
           </form>}
           {deliveryMode === 'capture' && <p className="account-team-summary">Captured locally</p>}
@@ -292,8 +291,8 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             rowActionLabel={(invite) => `Invitation actions for ${invite.email}`}
             rowActions={(invite) => [
               { key: 'copy', label: 'Copy Invitation Link', icon: Copy, disabled: !invite.capturedUrl, onClick: copyInvitation },
-              { key: 'resend', label: 'Resend Invitation', icon: Mail, disabled: !teamEditable || invite.status !== 'pending', onClick: (row) => inviteAction('resend', row) },
-              { key: 'revoke', label: 'Revoke Invitation', icon: Trash2, destructive: true, disabled: !teamEditable || invite.status !== 'pending', onClick: (row) => inviteAction('revoke', row) },
+              { key: 'resend', label: 'Resend Invitation', icon: Mail, disabled: !canInvite || invite.status !== 'pending', onClick: (row) => inviteAction('resend', row) },
+              { key: 'revoke', label: 'Revoke Invitation', icon: Trash2, destructive: true, disabled: !canInvite || invite.status !== 'pending', onClick: (row) => inviteAction('revoke', row) },
             ]}
           /></div>}
         </section>

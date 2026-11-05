@@ -48,7 +48,7 @@ Entra, Paddle, or Resend integration yet.
 
 - Profile name/coaching title and personal theme, field standard, and timezone preferences.
 - Individual and Team switcher under the app-bar user icon, with per-tab selection.
-- Workspace-bound requests, isolated libraries, scoped Owner/Admin/Coach capabilities.
+- Workspace-bound requests, isolated libraries, scoped Owner/Coach permissions.
 - Save/Discard/Cancel navigation, including base-play and adjustment drafts.
 - Account-menu Sign Out uses the same unsaved-change guard, clears the selected
 	workspace, and blocks authenticated frontend requests for this tab. The signed-out
@@ -64,6 +64,31 @@ Free limits are 5 playbooks, 15 games, 500 plays, and 500 scouting plays.
 Individual limits are 100 playbooks, 100 games, 5,000 plays, and 5,000 scouting plays.
 Team limits are 100 playbooks, 200 games, 10,000 plays, and 10,000 scouting plays.
 The ten Team seats include the Owner and pending unexpired invitations.
+
+### Permission Policy
+
+The API's `Permission` enum and immutable `ROLE_PERMISSIONS` mapping are defined
+in `api/accounts.py`. Owner has all thirteen explicitly listed permissions; Coach
+has the nine play, schedule, and game-plan read/write/delete permissions.
+Play permissions include playbooks, plays, groupings, and adjustment slides;
+game-plan permissions include nested scouting plays. Archive, restore, and reorder
+use write permission. Exports require read permission for their source content.
+
+Workspace summaries return effective `permissions` and compatible `capabilities`
+derived from the same policy. Subscription expiry removes mutation permissions
+without granting access to other workspaces. The API still verifies membership,
+resource scope, and permissions inside workspace guards. The frontend uses returned
+permissions for management controls, not role labels as authorization.
+
+Only Owners can invite/remove Coaches, change workspace settings, or transfer
+ownership. Owner self-demotion requires another Owner; concurrent demotions cannot
+remove the last Owner. Invitations assign Coach only. Admin and unknown membership
+roles fail closed, including older Admin invitations. Existing Admin records are
+not automatically migrated: review them and explicitly assign Coach through an
+authorized Owner before that membership can access content again.
+
+This permission foundation does not enable Entra authentication or payment-free
+alpha access; those remain separate implementation steps.
 
 ### Record Status
 
