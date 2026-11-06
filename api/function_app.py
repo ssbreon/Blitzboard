@@ -3,6 +3,7 @@ import os
 import secrets
 import hashlib
 import threading
+from functools import wraps
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -264,6 +265,36 @@ def response(payload, status=200):
     )
 
 
+def cors_response(handler):
+    @wraps(handler)
+    def wrapped(req):
+        result = handler(req)
+        origin = req.headers.get("Origin")
+        allowed_origins = {
+            value.strip().rstrip("/")
+            for value in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+            if value.strip()
+        }
+        local_development = AUTH_MODE == "development" and not (
+            os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID")
+        )
+        headers = dict(result.headers)
+        headers.pop("Access-Control-Allow-Origin", None)
+        headers.pop("Vary", None)
+        if origin and origin.rstrip("/") in allowed_origins:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Vary"] = "Origin"
+        elif origin and local_development and not allowed_origins:
+            headers["Access-Control-Allow-Origin"] = "*"
+        return func.HttpResponse(
+            result.get_body(),
+            status_code=result.status_code,
+            mimetype=result.mimetype,
+            headers=headers,
+        )
+    return wrapped
+
+
 def affiliate_destination(partner_id):
     partner = next((item for item in AFFILIATE_PARTNERS if item["id"] == partner_id), None)
     if partner is None:
@@ -497,6 +528,7 @@ def validate_schedule_event(payload, partial=False):
 
 
 @app.route(route="{*path}", methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"])
+@cors_response
 def api(req: func.HttpRequest) -> func.HttpResponse:
     path = (req.route_params.get("path") or "").strip("/").split("/")
     if len(path) == 2 and path[0] == "go" and req.method == "GET":

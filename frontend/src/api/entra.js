@@ -13,6 +13,7 @@ export function createEntraSession(settings, createClient = (config) => new Publ
     authorityUrl = new URL(authority)
     redirectUrl = new URL(redirectUri)
   } catch { throw new Error('Entra authentication settings are missing or invalid') }
+  // Keep sign-in bound to this External ID tenant and a same-origin callback.
   if (!guid.test(clientId) || !guid.test(tenantId) || authorityUrl.protocol !== 'https:'
     || !authorityUrl.hostname.endsWith('.ciamlogin.com') || authorityUrl.username || authorityUrl.password
     || authorityUrl.port || authorityUrl.search || authorityUrl.hash
@@ -34,8 +35,10 @@ export function createEntraSession(settings, createClient = (config) => new Publ
   function initialize() {
     initialization ??= (async () => {
       await client.initialize()
+      // Process the redirect callback before resolving the current account.
       const result = await client.handleRedirectPromise()
       const accounts = client.getAllAccounts()
+      // Reuse a cached account only when the choice is unambiguous.
       const account = result?.account || client.getActiveAccount() || (accounts.length === 1 ? accounts[0] : null)
       client.setActiveAccount(account)
       return Boolean(account)
@@ -46,6 +49,7 @@ export function createEntraSession(settings, createClient = (config) => new Publ
     initialize,
     async signIn() {
       await initialize()
+      // Account selection is a prompt; the tenant's user flow controls sign-in methods.
       return client.loginRedirect({ scopes, prompt: 'select_account' })
     },
     async accessToken() {
@@ -58,6 +62,7 @@ export function createEntraSession(settings, createClient = (config) => new Publ
         return result.accessToken
       } catch (error) {
         if (error instanceof InteractionRequiredAuthError) {
+          // Avoid interrupting work with an automatic redirect when interaction is needed.
           const failure = new Error('Your sign-in needs to be renewed. Sign out and sign in again after saving your changes.')
           failure.code = 'AUTH_INTERACTION_REQUIRED'
           throw failure

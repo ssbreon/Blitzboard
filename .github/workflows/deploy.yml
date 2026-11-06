@@ -1,0 +1,158 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Target GitHub environment
+        type: choice
+        options: [dev, production]
+        default: dev
+        required: true
+      artifact_run_id:
+        description: Previous successful Deploy run ID to redeploy; leave blank to build this commit
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.target }}
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    env:
+      DEPLOY_TARGET: ${{ inputs.target }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        if: inputs.artifact_run_id == ''
+
+      - uses: actions/setup-node@v4
+        if: inputs.artifact_run_id == ''
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install and validate frontend
+        if: inputs.artifact_run_id == ''
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_AUTH_MODE: entra
+          VITE_ENTRA_CLIENT_ID: ${{ vars.ENTRA_SPA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          VITE_ENTRA_AUTHORITY: ${{ vars.ENTRA_AUTHORITY }}
+          VITE_ENTRA_API_SCOPE: ${{ vars.ENTRA_API_SCOPE }}
+        run: |
+          for name in VITE_API_BASE_URL VITE_ENTRA_CLIENT_ID VITE_ENTRA_TENANT_ID VITE_ENTRA_AUTHORITY VITE_ENTRA_API_SCOPE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::$name is required in the $DEPLOY_TARGET GitHub environment"
+              exit 1
+            fi
+          done
+          npm ci
+          npm run lint
+          node --test src/api/entra.test.js
+          npm run test:schedule
+          npm run test:security
+          npm run build
+          node scripts/configure-deployment.js
+
+      - name: Test API
+        if: inputs.artifact_run_id == ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install API dependencies and run tests
+        if: inputs.artifact_run_id == ''
+        working-directory: api
+        run: |
+          python -m pip install -r requirements.txt
+          python -m unittest test_auth.py
+
+      - name: Package release
+        if: inputs.artifact_run_id == ''
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          mkdir -p release
+          cp -R frontend/dist release/frontend
+          (cd api && zip -q -r ../release/api.zip . -x 'local.settings.json' '__pycache__/*' '*.pyc' '.venv/*' 'venv/*')
+          node -e 'const fs = require("node:fs"); fs.writeFileSync("release/release.json", JSON.stringify({ environment: process.env.DEPLOY_TARGET, commit: process.env.GITHUB_SHA, apiBaseUrl: process.env.VITE_API_BASE_URL }, null, 2) + "\n")'
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.artifact_run_id == ''
+        with:
+          name: release-${{ inputs.target }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 90
+
+      - uses: actions/download-artifact@v4
+        if: inputs.artifact_run_id != ''
+        with:
+          name: release-${{ inputs.target }}
+          run-id: ${{ inputs.artifact_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: release/
+
+      - name: Verify release artifact target
+        env:
+          EXPECTED_TARGET: ${{ inputs.target }}
+        run: |
+          node -e 'const release = JSON.parse(require("node:fs").readFileSync("release/release.json", "utf8")); if (release.environment !== process.env.EXPECTED_TARGET) throw new Error(`Artifact targets ${release.environment}, not ${process.env.EXPECTED_TARGET}`); console.log(`Deploying ${release.commit} to ${release.environment}`)'
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.SWA_DEPLOYMENT_TOKEN }}
+          action: upload
+          app_location: release/frontend
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+          skip_api_build: true
+
+      - name: Deploy Flex Consumption Function App
+        env:
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_FUNCTION_APP: ${{ vars.AZURE_FUNCTION_APP }}
+        run: |
+          az functionapp deployment source config-zip \
+            --subscription "$AZURE_SUBSCRIPTION_ID" \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_FUNCTION_APP" \
+            --src release/api.zip \
+            --build-remote true
+
+      - name: Verify API health
+        run: |
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --max-time 20 "${API_BASE_URL%/}/api/health"; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo '::error::API health check did not pass within 3 minutes'
+          exit 1

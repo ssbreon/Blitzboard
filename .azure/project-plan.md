@@ -128,4 +128,8 @@ For the invite-only, payment-free alpha, Entra sign-in alone does not grant appl
 
 **Acceptance criteria**: A signed-in coordinator can create and edit a defensive play, save named slides and revisions, manage permitted collaborators, search the play library, export one play or an entire playbook, and recover cleanly from loading, validation, authorization, and storage errors on desktop and mobile layouts.
 
+**Recovery gate**: Follow the [recovery and deployment rollback runbook](recovery-runbook.md). Do not store production user data until the non-production Cosmos restore and application rollback drills pass, the production account's backup mode is verified, and the recovery objectives and regional-outage limitation are accepted.
+
+**Deployment path**: Follow the [deployment runbook](deployment-runbook.md). GitHub Actions provides CI and manually dispatched deployments to pre-provisioned dev or production resources; production must use a protected GitHub environment.
+
 **Handoff**: After explicit plan approval, hand off to `azure-project-scaffold` to execute this approved plan in the existing workspace without replacing the React/Vite frontend or Python Azure Functions API.

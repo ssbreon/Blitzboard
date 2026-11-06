@@ -48,6 +48,29 @@ def response_json(response):
     return json.loads(response.get_body())
 
 
+class CorsTests(unittest.TestCase):
+    def test_allowed_origin_is_reflected_for_api_responses(self):
+        origin = "https://dev.blitzboardstudio.com"
+        request = FakeRequest("GET", "health")
+        request.headers["Origin"] = origin
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.dict(
+            os.environ, {"CORS_ALLOWED_ORIGINS": origin, "WEBSITE_SITE_NAME": "api-dev"}
+        ):
+            result = function_app.api(request)
+        self.assertEqual(result.headers["Access-Control-Allow-Origin"], origin)
+        self.assertEqual(result.headers["Vary"], "Origin")
+
+    def test_unlisted_origin_is_not_allowed_on_preflight(self):
+        request = FakeRequest("OPTIONS", "health")
+        request.headers["Origin"] = "https://untrusted.example"
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.dict(
+            os.environ, {"CORS_ALLOWED_ORIGINS": "https://dev.blitzboardstudio.com", "WEBSITE_SITE_NAME": "api-dev"}
+        ):
+            result = function_app.api(request)
+        self.assertEqual(result.status_code, 204)
+        self.assertNotIn("Access-Control-Allow-Origin", result.headers)
+
+
 class EntraAuthenticationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
