@@ -17,6 +17,7 @@ os.environ.pop("COSMOSDB_ENDPOINT", None)
 import function_app
 import authentication
 import jwt
+from bootstrap_alpha_owner_cloud import validate_cloud_bootstrap_target
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 
@@ -69,6 +70,61 @@ class CorsTests(unittest.TestCase):
             result = function_app.api(request)
         self.assertEqual(result.status_code, 204)
         self.assertNotIn("Access-Control-Allow-Origin", result.headers)
+
+
+class CloudAlphaBootstrapTests(unittest.TestCase):
+    def test_operator_bootstrap_creates_verified_owner_once_and_rejects_another_alpha_workspace(self):
+        storage = function_app.Storage()
+        policy = function_app.accounts
+        storage.save("profiles", {
+            "id": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com",
+            "emailVerified": True, "preferences": {},
+        })
+        storage.save("profiles", {
+            "id": "entra-second-owner", "name": "Second Owner", "email": "second@example.com",
+            "emailVerified": True, "preferences": {},
+        })
+        settings = {
+            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production",
+            "WEBSITE_SITE_NAME": "", "WEBSITE_INSTANCE_ID": "",
+        }
+        with patch.dict(os.environ, settings, clear=False):
+            workspace = policy.bootstrap_alpha_owner_operator(storage, "entra-owner")
+            repeated = policy.bootstrap_alpha_owner_operator(storage, "entra-owner")
+            with self.assertRaises(policy.AccountError) as failure:
+                policy.bootstrap_alpha_owner_operator(storage, "entra-second-owner")
+        self.assertEqual(workspace["id"], repeated["id"])
+        self.assertTrue(workspace["alphaEnabled"])
+        self.assertEqual(storage.get("memberships", policy.membership_id("entra-owner", workspace["id"]))["role"], "owner")
+        self.assertEqual(failure.exception.code, "ALPHA_BOOTSTRAP_ALREADY_COMPLETE")
+
+    def test_operator_bootstrap_requires_verified_external_profile(self):
+        storage = function_app.Storage()
+        storage.save("profiles", {
+            "id": "entra-unverified", "name": "Unverified", "email": "unverified@example.com",
+            "emailVerified": False, "preferences": {},
+        })
+        with patch.dict(os.environ, {
+            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production",
+            "WEBSITE_SITE_NAME": "", "WEBSITE_INSTANCE_ID": "",
+        }, clear=False):
+            with self.assertRaises(function_app.accounts.AccountError) as failure:
+                function_app.accounts.bootstrap_alpha_owner_operator(storage, "entra-unverified")
+        self.assertEqual(failure.exception.code, "VERIFIED_EMAIL_REQUIRED")
+
+    def test_cloud_bootstrap_target_requires_exact_subscription_and_no_cosmos_key(self):
+        account_name = "blitzboard-dev-eastus2-cosmos"
+        subscription_id = "691331e9-3649-44e6-9ec9-b5fc30f47d3a"
+        endpoint = validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {})
+        self.assertEqual(endpoint, f"https://{account_name}.documents.azure.com:443/")
+        with self.assertRaisesRegex(ValueError, "active Azure CLI subscription"):
+            validate_cloud_bootstrap_target(account_name, subscription_id, "11111111-1111-4111-8111-111111111111", {})
+        with self.assertRaisesRegex(ValueError, "Cosmos key"):
+            validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {"COSMOS_KEY": "present"})
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {
+                "COSMOS_ENDPOINT": "https://localhost:8081/",
+            })
 
 
 class EntraAuthenticationTests(unittest.TestCase):

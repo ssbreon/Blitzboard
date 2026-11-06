@@ -73,7 +73,7 @@ def schedule_range(req):
 
 
 class Storage:
-    def __init__(self):
+    def __init__(self, credential=None):
         self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits", "affiliateClicks")}
         self.usage = {}
         self.lock = threading.RLock()
@@ -95,7 +95,7 @@ class Storage:
         elif COSMOS_ENDPOINT:
             client = CosmosClient(
                 COSMOS_ENDPOINT,
-                credential=DefaultAzureCredential(),
+                credential=credential if credential is not None else DefaultAzureCredential(),
                 enable_endpoint_discovery=False,
             )
             database = client.get_database_client(COSMOS_DATABASE)

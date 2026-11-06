@@ -235,11 +235,7 @@ def ensure_user(storage, identity):
     return profile
 
 
-def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
-    deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
-    if (os.getenv("AUTH_MODE", "").lower() != "entra" or deployed
-            or os.getenv("APP_ENVIRONMENT", "").lower() not in {"local", "test"}):
-        raise AccountError("ALPHA_BOOTSTRAP_LOCAL_ONLY", "Alpha owner bootstrap is restricted to local Entra testing", 403)
+def _create_alpha_owner(storage, user_id, workspace_name):
     if not isinstance(user_id, str) or not user_id or storage.get("profiles", user_id) is None:
         raise AccountError("USER_NOT_FOUND", "The signed-in user profile must exist before alpha bootstrap", 404)
     if not isinstance(workspace_name, str) or not 1 <= len(workspace_name.strip()) <= 120:
@@ -256,27 +252,70 @@ def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
                     return summary(storage, existing, "owner")
             raise AccountError("TEAM_MEMBERSHIP_EXISTS", "The user already belongs to a Team workspace", 409)
         workspace_id = "alpha-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
-        workspace = {
-            "id": workspace_id,
-            "name": workspace_name.strip(),
-            "kind": "team",
-            "ownerId": user_id,
-            "defaults": {},
-            "subscription": {
-                "status": "active", "interval": None, "source": "alpha", "periodEndsAt": None,
-                "trialStartedAt": None, "trialEndsAt": None, "cancelAtPeriodEnd": False, "kind": "team",
-            },
-            "alphaEnabled": True,
-            "alphaApprovedAt": timestamp().isoformat(),
-            "alphaApprovedBy": "operator-bootstrap",
-            "createdAt": timestamp().isoformat(),
-        }
-        storage.save("workspaces", workspace)
-        storage.save("memberships", {
-            "id": membership_id(user_id, workspace_id), "userId": user_id,
-            "workspaceId": workspace_id, "role": "owner",
-        })
+        workspace = storage.get("workspaces", workspace_id)
+        if workspace is None:
+            workspace = {
+                "id": workspace_id,
+                "name": workspace_name.strip(),
+                "kind": "team",
+                "ownerId": user_id,
+                "defaults": {},
+                "subscription": {
+                    "status": "active", "interval": None, "source": "alpha", "periodEndsAt": None,
+                    "trialStartedAt": None, "trialEndsAt": None, "cancelAtPeriodEnd": False, "kind": "team",
+                },
+                "alphaEnabled": True,
+                "alphaApprovedAt": timestamp().isoformat(),
+                "alphaApprovedBy": "operator-bootstrap",
+                "createdAt": timestamp().isoformat(),
+            }
+            storage.save("workspaces", workspace)
+        elif (workspace.get("kind") != "team" or workspace.get("ownerId") != user_id
+                or workspace.get("alphaEnabled") is not True):
+            raise AccountError("ALPHA_BOOTSTRAP_CONFLICT", "The deterministic alpha workspace ID is already in use", 409)
+        member_id = membership_id(user_id, workspace_id)
+        member = storage.get("memberships", member_id)
+        if member is None:
+            storage.save("memberships", {
+                "id": member_id, "userId": user_id, "workspaceId": workspace_id, "role": "owner",
+            })
+        elif member.get("workspaceId") != workspace_id or member.get("role") != "owner":
+            raise AccountError("ALPHA_BOOTSTRAP_CONFLICT", "The initial Owner membership is inconsistent", 409)
         return summary(storage, workspace, "owner")
+
+
+def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
+    deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
+    if (os.getenv("AUTH_MODE", "").lower() != "entra" or deployed
+            or os.getenv("APP_ENVIRONMENT", "").lower() not in {"local", "test"}):
+        raise AccountError("ALPHA_BOOTSTRAP_LOCAL_ONLY", "Alpha owner bootstrap is restricted to local Entra testing", 403)
+    return _create_alpha_owner(storage, user_id, workspace_name)
+
+
+def bootstrap_alpha_owner_operator(storage, user_id, workspace_name="Blitzboard Alpha"):
+    deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
+    environment = os.getenv("APP_ENVIRONMENT", "").lower()
+    if (os.getenv("AUTH_MODE", "").lower() != "entra" or deployed
+            or environment in {"", "local", "test"}):
+        raise AccountError("ALPHA_BOOTSTRAP_OPERATOR_ONLY", "Operator bootstrap must run in a cloud environment", 403)
+    profile = storage.get("profiles", user_id) if isinstance(user_id, str) else None
+    if not profile:
+        raise AccountError("USER_NOT_FOUND", "The signed-in user profile must exist before alpha bootstrap", 404)
+    if profile.get("emailVerified") is not True or not profile.get("email"):
+        raise AccountError("VERIFIED_EMAIL_REQUIRED", "The initial Owner must have a verified email address", 403)
+    if not user_id.startswith("entra-"):
+        raise AccountError("INVALID_OWNER_IDENTITY", "Operator bootstrap requires an External ID profile", 400)
+
+    workspace_id = "alpha-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
+    with storage.guard("alpha-owner-bootstrap"):
+        alpha_workspaces = [workspace for workspace in storage.list("workspaces")
+                            if workspace.get("alphaEnabled") is True]
+        if alpha_workspaces and not (
+                len(alpha_workspaces) == 1
+                and alpha_workspaces[0].get("id") == workspace_id
+                and alpha_workspaces[0].get("ownerId") == user_id):
+            raise AccountError("ALPHA_BOOTSTRAP_ALREADY_COMPLETE", "An alpha workspace already exists; refusing to create another", 409)
+        return _create_alpha_owner(storage, user_id, workspace_name)
 
 
 def entra_workspace_allowed(workspace, member, user_id):
