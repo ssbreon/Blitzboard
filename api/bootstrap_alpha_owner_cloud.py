@@ -84,12 +84,14 @@ def main(argv=None):
     os.environ.pop("COSMOSDB_ENDPOINT", None)
     os.environ.pop("COSMOS_KEY", None)
     os.environ.pop("COSMOSDB_KEY", None)
+    os.environ["BLITZBOARD_SKIP_STORAGE_INITIALIZATION"] = "1"
 
     try:
         from azure.identity import AzureCliCredential
         import accounts
         import function_app
 
+        os.environ.pop("BLITZBOARD_SKIP_STORAGE_INITIALIZATION", None)
         storage = function_app.Storage(credential=AzureCliCredential())
         profiles = [profile for profile in storage.list("profiles")
                     if profile.get("id", "").startswith("entra-")

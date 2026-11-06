@@ -250,9 +250,19 @@ class Storage:
                 self.container.delete_item(lock_id, partition_key=scope, etag=lease["_etag"], match_condition=MatchConditions.IfNotModified)
 
 
-storage = Storage()
+def _initialize_storage():
+    if os.getenv("BLITZBOARD_SKIP_STORAGE_INITIALIZATION") == "1":
+        if os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"):
+            raise RuntimeError("Storage initialization can only be skipped by an operator CLI process")
+        return None
+    return Storage()
+
+
+storage = _initialize_storage()
 
 if AUTH_MODE == "development":
+    if storage is None:
+        raise RuntimeError("Development auth cannot run without initialized storage")
     storage.claim_legacy_records(DEV_USER_ID)
 
 

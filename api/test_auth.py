@@ -73,6 +73,20 @@ class CorsTests(unittest.TestCase):
 
 
 class CloudAlphaBootstrapTests(unittest.TestCase):
+    def test_operator_import_can_skip_global_storage_only_outside_function_app(self):
+        with patch.dict(os.environ, {
+            "BLITZBOARD_SKIP_STORAGE_INITIALIZATION": "1",
+            "WEBSITE_SITE_NAME": "",
+            "WEBSITE_INSTANCE_ID": "",
+        }, clear=False):
+            self.assertIsNone(function_app._initialize_storage())
+        with patch.dict(os.environ, {
+            "BLITZBOARD_SKIP_STORAGE_INITIALIZATION": "1",
+            "WEBSITE_SITE_NAME": "blitzboard-api-dev-eastus",
+        }, clear=False):
+            with self.assertRaisesRegex(RuntimeError, "operator CLI process"):
+                function_app._initialize_storage()
+
     def test_operator_bootstrap_creates_verified_owner_once_and_rejects_another_alpha_workspace(self):
         storage = function_app.Storage()
         policy = function_app.accounts
