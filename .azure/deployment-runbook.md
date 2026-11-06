@@ -46,55 +46,40 @@ The API package excludes `local.settings.json`, virtual environments, and byteco
 
 Entra sign-in creates a Blitzboard profile, but the invite-only alpha intentionally does not create a workspace or grant Owner access. The first operator must bootstrap one alpha-enabled Team Owner before CRUD smoke tests or invitations can be used.
 
-Do not run `api/bootstrap_alpha_owner.py` against Azure; it is restricted to local/test use. Do not add a public bootstrap endpoint or place a Cosmos key in the script. Use this one-time operator procedure instead:
+Do not run `api/bootstrap_alpha_owner.py` against Azure; it is restricted to local/test use. Do not add a public bootstrap endpoint, disable tenant Security Defaults, or place a Cosmos key in a script. The operator bootstrap uses a manually dispatched GitHub Actions workflow and the existing `dev` OIDC identity. This avoids interactive Azure CLI sign-in and uses the Function App's data store through a temporary, container-scoped role.
 
 1. Sign in to the dev app once with the intended first Owner's External ID account. The API must successfully validate the token so it creates the verified profile.
-2. In Azure Cloud Shell, ensure the signed-in operator is in the subscription's Default Directory, then select the dev subscription:
+2. In GitHub **Settings → Environments → dev → Environment secrets**, add `ALPHA_BOOTSTRAP_OWNER_EMAIL` with the exact verified email used to sign in. This is temporary; remove it after the bootstrap succeeds.
+3. In Azure Cloud Shell, ensure the signed-in operator is in the subscription's Default Directory, then select the dev subscription. Resolve the deployment app's service-principal object ID from its application (client) ID:
 
 	```bash
 	az account set --subscription <dev-subscription-id>
+	deployment_client_id="<AZURE_CLIENT_ID from the dev GitHub environment>"
+	deployment_principal_id=$(az ad sp show --id "$deployment_client_id" --query id --output tsv)
 	```
 
-3. Temporarily grant the operator's Default Directory identity **Cosmos DB Built-in Data Contributor** on only the dev `playboard` container. The operator needs Azure permission to create Cosmos native role assignments. The following command records the role-assignment ID for later removal:
+4. Temporarily grant that service principal **Cosmos DB Built-in Data Contributor** on only the dev `playboard` container. The operator needs Azure permission to create Cosmos native role assignments. Save the returned role-assignment ID for cleanup:
 
 	```bash
-	operator_principal_id=$(az ad signed-in-user show --query id --output tsv)
-	operator_role_assignment_id=$(az cosmosdb sql role assignment create \
+	bootstrap_role_assignment_id=$(az cosmosdb sql role assignment create \
 	  --resource-group rg-blitzboard-dev-eastus2 \
 	  --account-name blitzboard-dev-eastus2-cosmos \
 	  --scope "/dbs/blitzboard-studio/colls/playboard" \
-	  --principal-id "$operator_principal_id" \
+	  --principal-id "$deployment_principal_id" \
 	  --role-definition-id 00000000-0000-0000-0000-000000000002 \
 	  --query name --output tsv)
 	```
 
-4. Clone the `dev` branch into Cloud Shell and install the API requirements in a temporary virtual environment:
+5. In GitHub **Actions → Bootstrap Dev Alpha Owner → Run workflow**, select the `dev` branch and enter `BOOTSTRAP_DEV_ALPHA` in the confirmation field. The job uses the `dev` GitHub environment and its existing OIDC identity; it does not use a client secret. The script confirms the subscription and Cosmos account, refuses Cosmos key settings and Function App runtimes, verifies exactly one matching verified External ID profile, and refuses to create a second alpha workspace.
 
-	```bash
-	git clone --branch dev --single-branch https://github.com/ssbreon/Blitzboard.git
-	cd Blitzboard/api
-	python -m venv .venv
-	source .venv/bin/activate
-	python -m pip install -r requirements.txt
-	```
-
-5. Run the operator command, confirming the Cosmos account and subscription. Omit `--owner-email` to enter the verified owner's email interactively instead of putting it in shell history:
-
-	```bash
-	python bootstrap_alpha_owner_cloud.py \
-	  --confirm-cosmos-account blitzboard-dev-eastus2-cosmos \
-	  --subscription-id <dev-subscription-id>
-	```
-
-	The command requires the active Azure CLI subscription to match, refuses Cosmos key settings and Function App runtimes, verifies there is exactly one matching verified External ID profile, and refuses to create a second alpha workspace. It uses Azure CLI authentication through `AzureCliCredential`; no Cosmos key or public API endpoint is involved.
 6. Sign out and back in to the dev app. Confirm the user sees the `Blitzboard Alpha` Team with the Owner role, then run synthetic CRUD/export smoke tests.
-7. Remove the operator's temporary Cosmos data-plane role assignment:
+7. Regardless of workflow success or failure, remove the temporary Cosmos data-plane role assignment and the `ALPHA_BOOTSTRAP_OWNER_EMAIL` environment secret:
 
 	```bash
 	az cosmosdb sql role assignment delete \
 	  --resource-group rg-blitzboard-dev-eastus2 \
 	  --account-name blitzboard-dev-eastus2-cosmos \
-	  --role-assignment-id "$operator_role_assignment_id"
+	  --role-assignment-id "$bootstrap_role_assignment_id"
 	```
 
 	Keep the Function App's own Cosmos role assignment in place. Record the bootstrap result and operator in the deployment notes.

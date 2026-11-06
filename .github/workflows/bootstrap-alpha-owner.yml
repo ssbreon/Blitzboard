@@ -1,0 +1,72 @@
+name: Bootstrap Dev Alpha Owner
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type BOOTSTRAP_DEV_ALPHA to authorize the one-time dev bootstrap
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-alpha-owner-dev
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: dev
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      ALPHA_BOOTSTRAP_OWNER_EMAIL: ${{ secrets.ALPHA_BOOTSTRAP_OWNER_EMAIL }}
+      BOOTSTRAP_CONFIRMATION: ${{ inputs.confirmation }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install API dependencies
+        working-directory: api
+        run: python -m pip install -r requirements.txt
+
+      - name: Sign in to Azure with GitHub OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate one-time bootstrap inputs
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/dev" ]]; then
+            echo "::error::Run this workflow from the dev branch only"
+            exit 1
+          fi
+          if [[ "$BOOTSTRAP_CONFIRMATION" != "BOOTSTRAP_DEV_ALPHA" ]]; then
+            echo "::error::Confirmation must be BOOTSTRAP_DEV_ALPHA"
+            exit 1
+          fi
+          if [[ -z "$ALPHA_BOOTSTRAP_OWNER_EMAIL" ]]; then
+            echo "::error::Set the temporary ALPHA_BOOTSTRAP_OWNER_EMAIL secret in the dev environment"
+            exit 1
+          fi
+
+      - name: Create the first dev alpha Owner
+        working-directory: api
+        shell: bash
+        run: |
+          python bootstrap_alpha_owner_cloud.py \
+            --owner-email "$ALPHA_BOOTSTRAP_OWNER_EMAIL" \
+            --confirm-cosmos-account blitzboard-dev-eastus2-cosmos \
+            --subscription-id "$AZURE_SUBSCRIPTION_ID"
