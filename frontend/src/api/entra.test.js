@@ -46,13 +46,21 @@ test('Entra processes callback once, selects its account, and acquires API token
 })
 
 test('Entra login and provider logout use registered URLs and the API scope', async () => {
-  const account = { homeAccountId: 'coach' }
-  const { session, login, logout } = fixture({ accounts: [account] })
+  const { session, login } = fixture()
   await session.signIn()
   assert.deepEqual(login().scopes, [settings.VITE_ENTRA_API_SCOPE, 'email'])
-  await session.signOut()
+  assert.equal(login().prompt, undefined)
+  const account = { homeAccountId: 'coach' }
+  const { session: logoutSession, logout } = fixture({ accounts: [account] })
+  await logoutSession.signOut()
   assert.equal(logout().account, account)
   assert.equal(logout().postLogoutRedirectUri, 'http://localhost:5173/')
+})
+
+test('Entra sign-in reuses an existing cached account', async () => {
+  const { session, login } = fixture({ accounts: [{ homeAccountId: 'coach' }] })
+  await session.signIn()
+  assert.equal(login(), undefined)
 })
 
 test('Entra requires explicit login when signed out or multiple cached accounts exist', async () => {

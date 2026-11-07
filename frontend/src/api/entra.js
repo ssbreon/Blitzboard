@@ -48,9 +48,8 @@ export function createEntraSession(settings, createClient = (config) => new Publ
   return {
     initialize,
     async signIn() {
-      await initialize()
-      // Account selection is a prompt; the tenant's user flow controls sign-in methods.
-      return client.loginRedirect({ scopes, prompt: 'select_account' })
+      if (await initialize()) return
+      return client.loginRedirect({ scopes })
     },
     async accessToken() {
       await initialize()
