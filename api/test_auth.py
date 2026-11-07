@@ -76,15 +76,20 @@ class ConfiguredAlphaBootstrapTests(unittest.TestCase):
         function_app.storage = function_app.Storage()
         self.owner = {
             "userId": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com",
-            "emailVerified": True, "roles": [],
+            "emailVerified": False, "externalIdentity": {
+                "tenantId": "11111111-1111-4111-8111-111111111111",
+                "objectId": "22222222-2222-4222-8222-222222222222",
+            }, "roles": [],
         }
         self.settings = {
             "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production", "DEPLOYMENT_ENVIRONMENT": "dev",
             "WEBSITE_SITE_NAME": "blitzboard-api-dev-eastus", "WEBSITE_INSTANCE_ID": "instance",
-            "ALPHA_INITIAL_OWNER_EMAIL": "owner@example.com", "BILLING_MODE": "paddle",
+            "ENTRA_TENANT_ID": "11111111-1111-4111-8111-111111111111",
+            "ALPHA_INITIAL_OWNER_OBJECT_ID": "22222222-2222-4222-8222-222222222222",
+            "BILLING_MODE": "paddle",
         }
 
-    def test_verified_allowlisted_sign_in_bootstraps_one_alpha_owner_idempotently(self):
+    def test_tenant_scoped_object_id_bootstraps_owner_without_email_claim_and_is_idempotent(self):
         with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(
             function_app, "authenticate_request", return_value=(self.owner, None)
         ), patch.dict(os.environ, self.settings, clear=False):
@@ -100,9 +105,13 @@ class ConfiguredAlphaBootstrapTests(unittest.TestCase):
         self.assertEqual(len(function_app.storage.list("memberships")), 1)
 
     def test_bootstrap_setting_does_not_promote_unlisted_or_unverified_user(self):
-        unlisted = {**self.owner, "userId": "entra-other", "email": "other@example.com"}
-        unverified = {**self.owner, "userId": "entra-unverified", "emailVerified": False}
-        for identity in (unlisted, unverified):
+        unlisted = {**self.owner, "userId": "entra-other", "externalIdentity": {
+            **self.owner["externalIdentity"], "objectId": "33333333-3333-4333-8333-333333333333",
+        }}
+        wrong_tenant = {**self.owner, "userId": "entra-wrong-tenant", "externalIdentity": {
+            **self.owner["externalIdentity"], "tenantId": "44444444-4444-4444-8444-444444444444",
+        }}
+        for identity in (unlisted, wrong_tenant):
             with self.subTest(identity=identity["userId"]), patch.object(
                 function_app, "AUTH_MODE", "entra"
             ), patch.object(function_app, "authenticate_request", return_value=(identity, None)), patch.dict(
@@ -110,6 +119,15 @@ class ConfiguredAlphaBootstrapTests(unittest.TestCase):
             ):
                 result = function_app.api(FakeRequest("GET", "me"))
             self.assertEqual(result.status_code, 200)
+        self.assertEqual(function_app.storage.list("workspaces"), [])
+
+    def test_bootstrap_setting_missing_object_id_does_not_promote_anyone(self):
+        settings = {key: value for key, value in self.settings.items() if key != "ALPHA_INITIAL_OWNER_OBJECT_ID"}
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(
+            function_app, "authenticate_request", return_value=(self.owner, None)
+        ), patch.dict(os.environ, settings, clear=False):
+            result = function_app.api(FakeRequest("GET", "me"))
+        self.assertEqual(result.status_code, 200)
         self.assertEqual(function_app.storage.list("workspaces"), [])
 
     def test_bootstrap_setting_only_runs_in_deployed_dev_environment(self):

@@ -294,21 +294,22 @@ def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
 
 def bootstrap_configured_alpha_owner(storage, identity):
     deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
-    target_email = os.getenv("ALPHA_INITIAL_OWNER_EMAIL", "").strip().casefold()
+    target_object_id = os.getenv("ALPHA_INITIAL_OWNER_OBJECT_ID", "").strip().casefold()
+    target_tenant_id = os.getenv("ENTRA_TENANT_ID", "").strip().casefold()
     if (os.getenv("AUTH_MODE", "").lower() != "entra" or not deployed
             or os.getenv("APP_ENVIRONMENT", "").lower() != "production"
             or os.getenv("DEPLOYMENT_ENVIRONMENT", "").lower() != "dev"
-            or not target_email):
+            or not target_object_id or not target_tenant_id):
         return None
     user_id = identity.get("userId") if isinstance(identity, dict) else None
-    email = identity.get("email", "") if isinstance(identity, dict) else ""
+    external_identity = identity.get("externalIdentity", {}) if isinstance(identity, dict) else {}
     if (not isinstance(user_id, str) or not user_id.startswith("entra-")
-            or identity.get("emailVerified") is not True or not isinstance(email, str)
-            or email.strip().casefold() != target_email):
+            or not isinstance(external_identity, dict)
+            or str(external_identity.get("objectId", "")).casefold() != target_object_id
+            or str(external_identity.get("tenantId", "")).casefold() != target_tenant_id):
         return None
     profile = storage.get("profiles", user_id)
-    if (not profile or profile.get("emailVerified") is not True
-            or profile.get("email", "").strip().casefold() != target_email):
+    if not profile:
         return None
 
     workspace_id = "alpha-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]

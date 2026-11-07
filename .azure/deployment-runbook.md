@@ -48,18 +48,18 @@ Entra sign-in creates a Blitzboard profile, but the invite-only alpha intentiona
 
 Do not run `api/bootstrap_alpha_owner.py` against Azure; it remains restricted to local/test use. Do not add a public bootstrap endpoint, disable tenant Security Defaults, or place a Cosmos key in the application. For the one-time dev bootstrap, use a temporary Function App setting. The existing Function App managed identity already has Cosmos Data Contributor on the dev `playboard` container.
 
-1. Sign in to the dev app with the intended first Owner's External ID account and confirm it reaches the invite-only screen. This creates the verified Blitzboard profile.
+1. Sign in to the dev app with the intended first Owner's External ID account and confirm it reaches the invite-only screen. This creates the Blitzboard profile and establishes the External ID object ID that the one-time setting will allowlist.
 2. In the dev Function App **Settings → Environment variables → App settings**, add:
 
 	- `DEPLOYMENT_ENVIRONMENT=dev`
-	- `ALPHA_INITIAL_OWNER_EMAIL=<the exact verified email used to sign in>`
+	- `ALPHA_INITIAL_OWNER_OBJECT_ID=<the Object ID of the intended first Owner in the External ID tenant>`
 
-	Save the settings and restart the Function App. `ALPHA_INITIAL_OWNER_EMAIL` is a temporary allowlist setting; do not add it to GitHub or production.
-3. Sign out and sign back into the dev app. The first successful authenticated API request bootstraps the `Blitzboard Alpha` Team and Owner membership, but only when the verified External ID email exactly matches the setting and no other alpha workspace exists.
+	Find the user Object ID in **Microsoft Entra admin center → External tenant → Users → select the user → Overview**. Save the settings and restart the Function App. This is a temporary dev-only allowlist; do not add it to GitHub or production.
+3. Sign out and sign back into the dev app. The first successful authenticated API request bootstraps the `Blitzboard Alpha` Team and Owner membership, but only when the signed-in token's tenant ID and object ID match the configured tenant and allowlist, and no other alpha workspace exists.
 4. Confirm the app displays the Team and Owner role, then run synthetic CRUD/export smoke tests.
-5. Immediately remove `ALPHA_INITIAL_OWNER_EMAIL` from the dev Function App settings and restart the app. Keep `DEPLOYMENT_ENVIRONMENT=dev`. Record the bootstrap result and operator in the deployment notes.
+5. Immediately remove `ALPHA_INITIAL_OWNER_OBJECT_ID` from the dev Function App settings and restart the app. Keep `DEPLOYMENT_ENVIRONMENT=dev`. Record the bootstrap result and operator in the deployment notes.
 
-The bootstrap is idempotent for the same initial Owner, refuses to promote unverified or nonmatching users, and is disabled outside a deployed app with `DEPLOYMENT_ENVIRONMENT=dev` and `AUTH_MODE=entra`.
+The bootstrap is idempotent for the same initial Owner, matches both the configured tenant ID and signed-in user's immutable object ID, and is disabled outside a deployed app with `DEPLOYMENT_ENVIRONMENT=dev` and `AUTH_MODE=entra`. This bootstrap does not fix missing email claims; configure and verify a signed-in email claim before enabling regular invitation acceptance.
 
 ## First dev deployment
 
