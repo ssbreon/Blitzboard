@@ -348,9 +348,13 @@ html.is-drilling-through * {
 }
 
 .affiliate-recommendations-actions .dialog-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   flex: 0 0 auto;
   min-height: 36px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-size: 13px;
 }
 
