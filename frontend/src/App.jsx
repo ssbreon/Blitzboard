@@ -1951,6 +1951,7 @@ function AppContent() {
   const [leave, setLeave] = useState(null)
   const [savingLeave, setSavingLeave] = useState(false)
   const [inviteToken, setInviteToken] = useState(pendingInvitation)
+  const [signingIn, setSigningIn] = useState(false)
   const guard = useRef(null)
   const generation = useRef(0)
   const pending = useRef(0)
@@ -2038,14 +2039,27 @@ function AppContent() {
     }, 'Sign Out')
   }
 
+  useEffect(() => {
+    // Re-enable sign-in when Safari restores this page from the back-forward cache.
+    const restore = (event) => { if (event.persisted) setSigningIn(false) }
+    window.addEventListener('pageshow', restore)
+    return () => window.removeEventListener('pageshow', restore)
+  }, [])
+
   async function handleSignIn(plan) {
+    if (signingIn) return
+    setSigningIn(true)
     try {
       await signIn(plan)
       if (!isDevelopmentAuth) return
+      setSigningIn(false)
       setError(null)
       setLoading(true)
       setSignedOut(false)
     } catch (failure) {
+      setSigningIn(false)
+      // A redirect is already underway; the first sign-in will complete.
+      if (failure?.errorCode === 'interaction_in_progress') return
       setError(failure)
     }
   }
@@ -2130,7 +2144,7 @@ function AppContent() {
   }
 
   return <>
-    {signedOut ? <StartupPage development={isDevelopmentAuth} cloudAuth={isEntraAuth} onSignIn={handleSignIn} /> : inviteToken && user ? <><AppBar user={null} /><TeamInvitationDialog user={user} saving={savingLeave} onAccept={acceptInvite} onCancel={cancelInvite} /></> : isEntraAuth && user && !user.workspaces?.length ? <><AppBar user={null} /><main className="auth-state"><h1>Blitzboard alpha is invite-only</h1><p>Ask a Team Owner for an invitation to join a workspace.</p><button type="button" className="dialog-cancel" onClick={handleSignOut}><LogOut size={16} aria-hidden="true" />Sign Out</button></main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
+    {signedOut ? <StartupPage development={isDevelopmentAuth} cloudAuth={isEntraAuth} onSignIn={handleSignIn} busy={signingIn} /> : inviteToken && user ? <><AppBar user={null} /><TeamInvitationDialog user={user} saving={savingLeave} onAccept={acceptInvite} onCancel={cancelInvite} /></> : isEntraAuth && user && !user.workspaces?.length ? <><AppBar user={null} /><main className="auth-state"><h1>Blitzboard alpha is invite-only</h1><p>Ask a Team Owner for an invitation to join a workspace.</p><button type="button" className="dialog-cancel" onClick={handleSignOut}><LogOut size={16} aria-hidden="true" />Sign Out</button></main></> : entry && user ? <WorkspaceApp key={entry.workspace.id} authUser={user} workspace={entry.workspace} api={entry.api}
       onWorkspaceChange={(id) => { if (id !== entry.workspace.id) requestLeave(() => loadWorkspace(id), 'Switch subscription') }}
       onUserUpdated={setUser} onWorkspaceUpdated={updateWorkspace} onGuardChange={(value) => { guard.current = value }}
       onSignOut={handleSignOut}
