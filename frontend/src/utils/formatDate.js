@@ -1,4 +1,4 @@
-export function formatDate(value, timeZone) {
+export function formatDate(value) {
   if (!value) return '—'
-  return new Date(value).toLocaleString(undefined, typeof timeZone === 'string' && timeZone ? { timeZone } : undefined)
+  return new Date(value).toLocaleString()
 }
