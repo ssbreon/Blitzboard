@@ -139,18 +139,26 @@ const scheduleQuery = (range, query = '') => {
 
 async function sendRequest(path, options = {}, workspaceId) {
   const { headers = {}, ...fetchOptions } = options
-  const response = await fetch(`${baseUrl}/api${path}`, {
-    ...fetchOptions,
-    headers: { 'Content-Type': 'application/json', ...headers, ...await authenticationHeaders(path), ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}) },
-  })
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}))
-    const error = new Error(detail.error?.message || `Request failed with ${response.status}`)
-    error.code = detail.error?.code
-    error.status = response.status
-    throw error
+  const method = fetchOptions.method || 'GET'
+  const retryDelays = [100, 250]
+  for (let attempt = 0; ; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api${path}`, {
+      ...fetchOptions,
+      headers: { 'Content-Type': 'application/json', ...headers, ...await authenticationHeaders(path), ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}) },
+    })
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}))
+      if (method === 'GET' && detail.error?.code === 'WORKSPACE_BUSY' && attempt < retryDelays.length) {
+        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]))
+        continue
+      }
+      const error = new Error(detail.error?.message || `Request failed with ${response.status}`)
+      error.code = detail.error?.code
+      error.status = response.status
+      throw error
+    }
+    return response.status === 204 ? null : response.json()
   }
-  return response.status === 204 ? null : response.json()
 }
 
 export function createApi(workspaceId, onMutationState, sharedCache) {

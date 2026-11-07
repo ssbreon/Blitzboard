@@ -27,6 +27,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
   const [loading, setLoading] = useState(true)
+  const [refreshingRows, setRefreshingRows] = useState(false)
   const isLoading = items === undefined && loading
   const [error, setError] = useState(null)
   const [page, setPage] = useState(0)
@@ -128,7 +129,10 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
         if (!cancelled) setError(err)
       })
       .finally(() => {
-        if (!cancelled) setLoading(false)
+          if (!cancelled) {
+            setLoading(false)
+          setRefreshingRows(false)
+          }
       })
     return () => {
       cancelled = true
@@ -223,6 +227,13 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
     }
   }
 
+  function refreshRows() {
+    if (refreshingRows || items !== undefined) return
+    setRefreshingRows(true)
+    breadcrumbCache?.clear()
+    setRefreshToken((token) => token + 1)
+  }
+
   function handleDrop(event, targetRow) {
     event.preventDefault()
     const sourceId = dragId
@@ -284,12 +295,13 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
     return true
   }
 
-  const dropdownItems = [{ label: 'Refresh', icon: RefreshCw, onClick: () => { breadcrumbCache?.clear(); setRefreshToken((t) => t + 1) } }, ...menuItems]
+  const dropdownItems = [{ label: 'Refresh', icon: RefreshCw, disabled: refreshingRows || items !== undefined, onClick: refreshRows }, ...menuItems]
   const dropdownActions = dropdownItems.map((item) => (
     <button
       key={item.label}
       type="button"
       role="menuitem"
+      disabled={item.disabled}
       onClick={() => {
         item.onClick()
         setMenuOpen(false)
