@@ -17,7 +17,6 @@ os.environ.pop("COSMOSDB_ENDPOINT", None)
 import function_app
 import authentication
 import jwt
-from bootstrap_alpha_owner_cloud import validate_cloud_bootstrap_target
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 
@@ -72,73 +71,55 @@ class CorsTests(unittest.TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", result.headers)
 
 
-class CloudAlphaBootstrapTests(unittest.TestCase):
-    def test_operator_import_can_skip_global_storage_only_outside_function_app(self):
-        with patch.dict(os.environ, {
-            "BLITZBOARD_SKIP_STORAGE_INITIALIZATION": "1",
-            "WEBSITE_SITE_NAME": "",
-            "WEBSITE_INSTANCE_ID": "",
-        }, clear=False):
-            self.assertIsNone(function_app._initialize_storage())
-        with patch.dict(os.environ, {
-            "BLITZBOARD_SKIP_STORAGE_INITIALIZATION": "1",
-            "WEBSITE_SITE_NAME": "blitzboard-api-dev-eastus",
-        }, clear=False):
-            with self.assertRaisesRegex(RuntimeError, "operator CLI process"):
-                function_app._initialize_storage()
-
-    def test_operator_bootstrap_creates_verified_owner_once_and_rejects_another_alpha_workspace(self):
-        storage = function_app.Storage()
-        policy = function_app.accounts
-        storage.save("profiles", {
-            "id": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com",
-            "emailVerified": True, "preferences": {},
-        })
-        storage.save("profiles", {
-            "id": "entra-second-owner", "name": "Second Owner", "email": "second@example.com",
-            "emailVerified": True, "preferences": {},
-        })
-        settings = {
-            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production",
-            "WEBSITE_SITE_NAME": "", "WEBSITE_INSTANCE_ID": "",
+class ConfiguredAlphaBootstrapTests(unittest.TestCase):
+    def setUp(self):
+        function_app.storage = function_app.Storage()
+        self.owner = {
+            "userId": "entra-owner", "name": "Alpha Owner", "email": "owner@example.com",
+            "emailVerified": True, "roles": [],
         }
-        with patch.dict(os.environ, settings, clear=False):
-            workspace = policy.bootstrap_alpha_owner_operator(storage, "entra-owner")
-            repeated = policy.bootstrap_alpha_owner_operator(storage, "entra-owner")
-            with self.assertRaises(policy.AccountError) as failure:
-                policy.bootstrap_alpha_owner_operator(storage, "entra-second-owner")
-        self.assertEqual(workspace["id"], repeated["id"])
-        self.assertTrue(workspace["alphaEnabled"])
-        self.assertEqual(storage.get("memberships", policy.membership_id("entra-owner", workspace["id"]))["role"], "owner")
-        self.assertEqual(failure.exception.code, "ALPHA_BOOTSTRAP_ALREADY_COMPLETE")
+        self.settings = {
+            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production", "DEPLOYMENT_ENVIRONMENT": "dev",
+            "WEBSITE_SITE_NAME": "blitzboard-api-dev-eastus", "WEBSITE_INSTANCE_ID": "instance",
+            "ALPHA_INITIAL_OWNER_EMAIL": "owner@example.com", "BILLING_MODE": "paddle",
+        }
 
-    def test_operator_bootstrap_requires_verified_external_profile(self):
-        storage = function_app.Storage()
-        storage.save("profiles", {
-            "id": "entra-unverified", "name": "Unverified", "email": "unverified@example.com",
-            "emailVerified": False, "preferences": {},
-        })
-        with patch.dict(os.environ, {
-            "AUTH_MODE": "entra", "APP_ENVIRONMENT": "production",
-            "WEBSITE_SITE_NAME": "", "WEBSITE_INSTANCE_ID": "",
-        }, clear=False):
-            with self.assertRaises(function_app.accounts.AccountError) as failure:
-                function_app.accounts.bootstrap_alpha_owner_operator(storage, "entra-unverified")
-        self.assertEqual(failure.exception.code, "VERIFIED_EMAIL_REQUIRED")
+    def test_verified_allowlisted_sign_in_bootstraps_one_alpha_owner_idempotently(self):
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(
+            function_app, "authenticate_request", return_value=(self.owner, None)
+        ), patch.dict(os.environ, self.settings, clear=False):
+            first = function_app.api(FakeRequest("GET", "me"))
+            repeated = function_app.api(FakeRequest("GET", "me"))
 
-    def test_cloud_bootstrap_target_requires_exact_subscription_and_no_cosmos_key(self):
-        account_name = "blitzboard-dev-eastus2-cosmos"
-        subscription_id = "691331e9-3649-44e6-9ec9-b5fc30f47d3a"
-        endpoint = validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {})
-        self.assertEqual(endpoint, f"https://{account_name}.documents.azure.com:443/")
-        with self.assertRaisesRegex(ValueError, "active Azure CLI subscription"):
-            validate_cloud_bootstrap_target(account_name, subscription_id, "11111111-1111-4111-8111-111111111111", {})
-        with self.assertRaisesRegex(ValueError, "Cosmos key"):
-            validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {"COSMOS_KEY": "present"})
-        with self.assertRaisesRegex(ValueError, "does not match"):
-            validate_cloud_bootstrap_target(account_name, subscription_id, subscription_id, {
-                "COSMOS_ENDPOINT": "https://localhost:8081/",
-            })
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(repeated.status_code, 200)
+        profile = response_json(first)
+        self.assertEqual(profile["workspaces"][0]["role"], "owner")
+        self.assertTrue(profile["workspaces"][0]["alphaEnabled"])
+        self.assertEqual(len(function_app.storage.list("workspaces")), 1)
+        self.assertEqual(len(function_app.storage.list("memberships")), 1)
+
+    def test_bootstrap_setting_does_not_promote_unlisted_or_unverified_user(self):
+        unlisted = {**self.owner, "userId": "entra-other", "email": "other@example.com"}
+        unverified = {**self.owner, "userId": "entra-unverified", "emailVerified": False}
+        for identity in (unlisted, unverified):
+            with self.subTest(identity=identity["userId"]), patch.object(
+                function_app, "AUTH_MODE", "entra"
+            ), patch.object(function_app, "authenticate_request", return_value=(identity, None)), patch.dict(
+                os.environ, self.settings, clear=False
+            ):
+                result = function_app.api(FakeRequest("GET", "me"))
+            self.assertEqual(result.status_code, 200)
+        self.assertEqual(function_app.storage.list("workspaces"), [])
+
+    def test_bootstrap_setting_only_runs_in_deployed_dev_environment(self):
+        settings = {**self.settings, "DEPLOYMENT_ENVIRONMENT": "production"}
+        with patch.object(function_app, "AUTH_MODE", "entra"), patch.object(
+            function_app, "authenticate_request", return_value=(self.owner, None)
+        ), patch.dict(os.environ, settings, clear=False):
+            result = function_app.api(FakeRequest("GET", "me"))
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual(function_app.storage.list("workspaces"), [])
 
 
 class EntraAuthenticationTests(unittest.TestCase):

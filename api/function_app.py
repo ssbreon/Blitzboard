@@ -73,7 +73,7 @@ def schedule_range(req):
 
 
 class Storage:
-    def __init__(self, credential=None):
+    def __init__(self):
         self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits", "affiliateClicks")}
         self.usage = {}
         self.lock = threading.RLock()
@@ -95,7 +95,7 @@ class Storage:
         elif COSMOS_ENDPOINT:
             client = CosmosClient(
                 COSMOS_ENDPOINT,
-                credential=credential if credential is not None else DefaultAzureCredential(),
+                credential=DefaultAzureCredential(),
                 enable_endpoint_discovery=False,
             )
             database = client.get_database_client(COSMOS_DATABASE)
@@ -250,19 +250,9 @@ class Storage:
                 self.container.delete_item(lock_id, partition_key=scope, etag=lease["_etag"], match_condition=MatchConditions.IfNotModified)
 
 
-def _initialize_storage():
-    if os.getenv("BLITZBOARD_SKIP_STORAGE_INITIALIZATION") == "1":
-        if os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"):
-            raise RuntimeError("Storage initialization can only be skipped by an operator CLI process")
-        return None
-    return Storage()
-
-
-storage = _initialize_storage()
+storage = Storage()
 
 if AUTH_MODE == "development":
-    if storage is None:
-        raise RuntimeError("Development auth cannot run without initialized storage")
     storage.claim_legacy_records(DEV_USER_ID)
 
 
@@ -559,6 +549,7 @@ def api(req: func.HttpRequest) -> func.HttpResponse:
                 if limited is not None:
                     return limited
             accounts.ensure_user(storage, user)
+        accounts.bootstrap_configured_alpha_owner(storage, user)
         global_route = path[0] in {"me", "workspaces", "invitations"}
         if global_route:
             with storage.guard("user:" + user["userId"]):

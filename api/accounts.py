@@ -292,19 +292,24 @@ def bootstrap_alpha_owner(storage, user_id, workspace_name="Blitzboard Alpha"):
     return _create_alpha_owner(storage, user_id, workspace_name)
 
 
-def bootstrap_alpha_owner_operator(storage, user_id, workspace_name="Blitzboard Alpha"):
+def bootstrap_configured_alpha_owner(storage, identity):
     deployed = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("WEBSITE_INSTANCE_ID"))
-    environment = os.getenv("APP_ENVIRONMENT", "").lower()
-    if (os.getenv("AUTH_MODE", "").lower() != "entra" or deployed
-            or environment in {"", "local", "test"}):
-        raise AccountError("ALPHA_BOOTSTRAP_OPERATOR_ONLY", "Operator bootstrap must run in a cloud environment", 403)
-    profile = storage.get("profiles", user_id) if isinstance(user_id, str) else None
-    if not profile:
-        raise AccountError("USER_NOT_FOUND", "The signed-in user profile must exist before alpha bootstrap", 404)
-    if profile.get("emailVerified") is not True or not profile.get("email"):
-        raise AccountError("VERIFIED_EMAIL_REQUIRED", "The initial Owner must have a verified email address", 403)
-    if not user_id.startswith("entra-"):
-        raise AccountError("INVALID_OWNER_IDENTITY", "Operator bootstrap requires an External ID profile", 400)
+    target_email = os.getenv("ALPHA_INITIAL_OWNER_EMAIL", "").strip().casefold()
+    if (os.getenv("AUTH_MODE", "").lower() != "entra" or not deployed
+            or os.getenv("APP_ENVIRONMENT", "").lower() != "production"
+            or os.getenv("DEPLOYMENT_ENVIRONMENT", "").lower() != "dev"
+            or not target_email):
+        return None
+    user_id = identity.get("userId") if isinstance(identity, dict) else None
+    email = identity.get("email", "") if isinstance(identity, dict) else ""
+    if (not isinstance(user_id, str) or not user_id.startswith("entra-")
+            or identity.get("emailVerified") is not True or not isinstance(email, str)
+            or email.strip().casefold() != target_email):
+        return None
+    profile = storage.get("profiles", user_id)
+    if (not profile or profile.get("emailVerified") is not True
+            or profile.get("email", "").strip().casefold() != target_email):
+        return None
 
     workspace_id = "alpha-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
     with storage.guard("alpha-owner-bootstrap"):
@@ -314,8 +319,8 @@ def bootstrap_alpha_owner_operator(storage, user_id, workspace_name="Blitzboard 
                 len(alpha_workspaces) == 1
                 and alpha_workspaces[0].get("id") == workspace_id
                 and alpha_workspaces[0].get("ownerId") == user_id):
-            raise AccountError("ALPHA_BOOTSTRAP_ALREADY_COMPLETE", "An alpha workspace already exists; refusing to create another", 409)
-        return _create_alpha_owner(storage, user_id, workspace_name)
+            return None
+        return _create_alpha_owner(storage, user_id, "Blitzboard Alpha")
 
 
 def entra_workspace_allowed(workspace, member, user_id):
