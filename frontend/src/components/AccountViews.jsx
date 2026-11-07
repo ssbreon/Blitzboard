@@ -44,13 +44,27 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
 
   useEffect(() => {
     let active = true
-    const load = view === 'team' ? Promise.all([api.members(), canInvite ? api.invitations() : Promise.resolve({ items: [] })]) : view === 'billing' ? api.billing() : null
-    if (load) load.then((result) => {
-      if (!active) return
-      if (view === 'team') { setMembers(result[0].items); setInvitations(result[1].items); setDeliveryMode(result[1].deliveryMode) }
-      else setBilling(result)
-    }).catch((failure) => { if (active) setError(failure) })
-      .finally(() => { if (active) setLoading(false) })
+    async function load() {
+      try {
+        if (view === 'team') {
+          const memberResult = await api.members()
+          if (!active) return
+          const invitationResult = canInvite ? await api.invitations() : { items: [] }
+          if (!active) return
+          setMembers(memberResult.items)
+          setInvitations(invitationResult.items)
+          setDeliveryMode(invitationResult.deliveryMode)
+        } else if (view === 'billing') {
+          const result = await api.billing()
+          if (active) setBilling(result)
+        }
+      } catch (failure) {
+        if (active) setError(failure)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    if (view === 'team' || view === 'billing') load()
     return () => { active = false }
   }, [api, view, canInvite])
 
