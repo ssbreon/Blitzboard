@@ -79,6 +79,7 @@ def effective_permissions(workspace, role):
 
 DEFAULT_LIMITS = {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}
 FREE_LIMITS = {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500}
+TEAM_SEAT_LIMIT = 20
 LIMIT_SETTINGS = {
     "playbooks": "CONTENT_LIMIT_PLAYBOOKS",
     "gamePlans": "CONTENT_LIMIT_GAME_PLANS",
@@ -434,7 +435,7 @@ def summary(storage, workspace, role):
     limits = limits_for_workspace(workspace)
     public["usage"] = {entity: len(storage.list(entity, workspace_id=workspace["id"])) for entity in limits}
     public["limits"] = dict(limits)
-    public["seatLimit"] = 10 if workspace["kind"] == "team" else 1
+    public["seatLimit"] = TEAM_SEAT_LIMIT if workspace["kind"] == "team" else 1
     public["seatsUsed"] = sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships")) + len(pending_invites(storage, workspace["id"]))
     plan = subscription.get("kind", workspace["kind"])
     public["prices"] = dict(PRICES[plan])
@@ -571,7 +572,7 @@ def accept_invitation(storage, identity, payload):
                 if other and other["kind"] == "team":
                     raise AccountError("TEAM_MEMBERSHIP_EXISTS", "You already belong to a Team", 409)
         active_count = sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships"))
-        if active_count >= 10:
+        if active_count >= TEAM_SEAT_LIMIT:
             raise AccountError("SEAT_LIMIT_REACHED", "This Team has no available seats", 409)
         storage.save("memberships", {"id": membership_id(identity["userId"], workspace["id"]),
                                      "userId": identity["userId"], "workspaceId": workspace["id"], "role": invite["role"]})
@@ -629,8 +630,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
             members = [member for member in storage.list("memberships") if member["workspaceId"] == workspace["id"]]
             if any((storage.get("profiles", member["userId"]) or {}).get("email", "").casefold() == email.casefold() for member in members):
                 raise AccountError("MEMBER_EXISTS", "This email already belongs to the Team", 409)
-            if len(members) + len(pending) >= 10:
-                raise AccountError("SEAT_LIMIT_REACHED", "This Team has reached its ten-seat limit", 409)
+            if len(members) + len(pending) >= TEAM_SEAT_LIMIT:
+                raise AccountError("SEAT_LIMIT_REACHED", "This Team has no available seats", 409)
             return queue_invitation(storage, identity, workspace, email, assigned_role), 201
         if len(path) == 4 and path[3] == "link" and method == "GET":
             invite = storage.get("invitations", path[2])
@@ -656,7 +657,7 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 raise AccountError("INVITATION_CLOSED", "Invitation is no longer pending", 409)
             if timestamp() - parse_date(invite["lastSentAt"]) < timedelta(seconds=60):
                 raise AccountError("RESEND_THROTTLED", "Wait one minute before resending", 429)
-            if timestamp() >= parse_date(invite["expiresAt"]) and len(pending_invites(storage, workspace["id"])) + sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships")) >= 10:
+            if timestamp() >= parse_date(invite["expiresAt"]) and len(pending_invites(storage, workspace["id"])) + sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships")) >= TEAM_SEAT_LIMIT:
                 raise AccountError("SEAT_LIMIT_REACHED", "This Team has no available seats", 409)
             return queue_invitation(storage, identity, workspace, invite["email"], invite["role"], invite), 200
     if path == ["me"]:

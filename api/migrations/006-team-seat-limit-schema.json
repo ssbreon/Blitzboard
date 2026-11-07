@@ -1,0 +1,9 @@
+{
+  "version": 6,
+  "provider": "azure-cosmos-nosql",
+  "description": "Increases the Team workspace seat quota to include larger coaching staffs.",
+  "quotasPerWorkspace": {
+    "teamSeats": 20
+  },
+  "legacyCompatibility": "Existing memberships and pending invitations are retained. The Owner and pending unexpired invitations count toward the Team seat limit."
+}

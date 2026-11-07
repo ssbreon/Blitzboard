@@ -56,6 +56,7 @@ test('startup welcome, local identities, session restoration and production isol
     assert.ok(first.includes('Please login here'))
     assert.ok(first.includes('Local development'))
     assert.equal((first.match(/type="radio"/g) || []).length, 3)
+    assert.ok(first.includes('Up to 20 coaches'))
     assert.ok(first.includes('10,000 scouting plays'))
     for (const cloudAuth of [false, true]) {
       const invitation = renderToStaticMarkup(createElement(StartupPage, { invitation: true, cloudAuth, development: !cloudAuth }))

@@ -4,7 +4,7 @@ import { ArrowRight, Check, UserRound, Users } from 'lucide-react'
 const PLANS = [
   { id: 'free', name: 'Free', price: 'Free', annual: 'No recurring charge', seats: '1 coach', limits: ['5 playbooks', '15 games', '500 plays', '500 scouting plays'], detail: 'Includes coaching resource recommendations.' },
   { id: 'individual', name: 'Individual', price: '$9.99', annual: '$99.90 / year, paid upfront', seats: '1 coach', limits: ['100 playbooks', '100 games', '5,000 plays', '5,000 scouting plays'], detail: '14-day trial. No recommendations or upgrade prompts.' },
-  { id: 'team', name: 'Team', price: '$29.99', annual: '$299.90 / year, paid upfront', seats: 'Up to 10 coaches', limits: ['100 playbooks', '200 games', '10,000 plays', '10,000 scouting plays'], detail: '14-day trial. Shared workspace, staff roles and invitations.' },
+  { id: 'team', name: 'Team', price: '$29.99', annual: '$299.90 / year, paid upfront', seats: 'Up to 20 coaches', limits: ['100 playbooks', '200 games', '10,000 plays', '10,000 scouting plays'], detail: '14-day trial. Shared workspace, staff roles and invitations.' },
 ]
 
 export function StartupPage({ development = false, cloudAuth = false, invitation = false, onSignIn, busy = false }) {

@@ -121,7 +121,7 @@ the generated link from the Invitations tab for manual delivery. The Coach signs
 up/signs in with that same email and accepts the invite. Acceptance requires a
 matching email plus `email_verified: true` or `xms_edov: true` from the signed API
 token. The invitation is single-use, expires after seven days, and reserves one
-of ten seats. Do not copy captured invite links into chat.
+of twenty seats. Do not copy captured invite links into chat.
 
 This CLI is a local alpha bootstrap only; a restricted production Owner bootstrap
 is still required before launch. Production alpha invitations use manual delivery:
@@ -192,7 +192,7 @@ Entra setup does not provision Azure application infrastructure or authorize dep
 Free limits are 5 playbooks, 15 games, 500 plays, and 500 scouting plays.
 Individual limits are 100 playbooks, 100 games, 5,000 plays, and 5,000 scouting plays.
 Team limits are 100 playbooks, 200 games, 10,000 plays, and 10,000 scouting plays.
-The ten Team seats include the Owner and pending unexpired invitations.
+The twenty Team seats include the Owner and pending unexpired invitations.
 
 ### Permission Policy
 

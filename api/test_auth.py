@@ -888,7 +888,7 @@ class AuthenticationTests(unittest.TestCase):
                 workspace = next(item for item in identity["workspaces"] if item["subscription"]["kind"] == plan)
                 self.assertEqual(workspace["limits"], expected_limits)
                 self.assertTrue(workspace["capabilities"]["edit"])
-                self.assertEqual(workspace["seatLimit"], 10 if plan == "team" else 1)
+                self.assertEqual(workspace["seatLimit"], 20 if plan == "team" else 1)
                 period_end = workspace["subscription"]["periodEndsAt"]
                 repeated = response_json(call_api("GET", "me", user_id))
                 self.assertEqual(next(item for item in repeated["workspaces"] if item["id"] == workspace["id"])["subscription"]["periodEndsAt"], period_end)
@@ -1269,13 +1269,16 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_last_invitation_seat_is_concurrency_safe(self):
         team = self.team_fixture()
-        for index in range(7):
+        for index in range(17):
             self.invite_token(team["id"], f"coach{index}@example.com")
         def invite(email):
             return call_api("POST", "workspace/invitations", "local-coach", {"email": email}, team["id"]).status_code
         with ThreadPoolExecutor(max_workers=2) as executor:
             results = list(executor.map(invite, ["last1@example.com", "last2@example.com"]))
         self.assertEqual(sorted(results), [201, 409])
+        workspace = response_json(call_api("GET", "workspace", "local-coach", workspace_id=team["id"]))
+        self.assertEqual(workspace["seatLimit"], 20)
+        self.assertEqual(workspace["seatsUsed"], 20)
 
     def test_coaches_cannot_invite_or_view_captured_tokens(self):
         team = self.team_fixture()
