@@ -28,7 +28,7 @@ export function createEntraSession(settings, createClient = (config) => new Publ
       clientId, authority, knownAuthorities: [authorityUrl.hostname], redirectUri,
       postLogoutRedirectUri: redirectUri, navigateToLoginRequestUrl: false,
     },
-    cache: { cacheLocation: 'sessionStorage' },
+    cache: { cacheLocation: 'localStorage' },
     system: { loggerOptions: { piiLoggingEnabled: false, loggerCallback: () => {} } },
   })
   let initialization

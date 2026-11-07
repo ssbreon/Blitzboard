@@ -40,7 +40,7 @@ test('Entra processes callback once, selects its account, and acquires API token
   assert.equal(initializationCount(), 1)
   assert.equal(await session.accessToken(), 'api-access-token')
   assert.deepEqual(silentRequests[0].scopes, [settings.VITE_ENTRA_API_SCOPE, 'email'])
-  assert.equal(config.cache.cacheLocation, 'sessionStorage')
+  assert.equal(config.cache.cacheLocation, 'localStorage')
   assert.equal(config.auth.navigateToLoginRequestUrl, false)
   assert.deepEqual(config.auth.knownAuthorities, ['test.ciamlogin.com'])
 })
