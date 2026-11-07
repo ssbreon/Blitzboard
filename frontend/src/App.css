@@ -843,9 +843,12 @@ html.is-drilling-through * {
   transform: translate(-50%, -50%) rotate(90deg);
   color: transparent;
   -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
-  font-family: Georgia, 'Times New Roman', Times, serif;
-  font-size: 44px;
-  font-weight: 700;
+  font-family: Oswald, sans-serif; /* Georgia, 'Times New Roman', Times, serif; */
+  font-size: 50px;
+  font-weight: 500;
+  fill: transparent;
+  stroke: #bdbdbd;
+  opacity: 0.75;  
   pointer-events: none;
   z-index: 1;
 
@@ -4685,6 +4688,10 @@ html.is-drilling-through * {
 
     border-width: 1.5px;
   }
+}
+
+.print-sheet .print-field .play-designer-yard-number {
+  font-size: calc(50px * var(--drawing-size-scale, 1));
 }
 
 .print-grid:not(.per-page-4) .print-field {
