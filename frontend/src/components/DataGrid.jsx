@@ -57,7 +57,6 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const menuRef = useRef(null)
   const rowMenuRef = useRef(null)
   const rowMenuTriggerRef = useRef(null)
-  const rowMenuPortalTargetRef = useRef(null)
   const hasLoadedRows = useRef(false)
 
   function dismissOpenHint() {
@@ -280,7 +279,6 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
     const top = rect.bottom + 4 + menuHeight <= window.innerHeight
       ? rect.bottom + 4 : Math.max(8, rect.top - menuHeight - 4)
     rowMenuTriggerRef.current = trigger
-    rowMenuPortalTargetRef.current = trigger.closest('[role="dialog"]') || document.body
     setRowMenuPosition({ top, right: Math.max(8, window.innerWidth - rect.right) })
     setOpenRowMenuId(row.id)
     return true
@@ -605,7 +603,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                                   </button>
                                 ))}
                               </div>,
-                              rowMenuPortalTargetRef.current || document.body
+                              document.body
                             )}
                         </div>
                       </td>

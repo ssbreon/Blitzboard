@@ -4339,6 +4339,7 @@ html.is-drilling-through * {
 
 .row-actions-dropdown {
   min-width: 140px;
+  z-index: 130;
 }
 
 .row-actions-destructive {
