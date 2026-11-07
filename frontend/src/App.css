@@ -94,16 +94,6 @@ button:active:not(:disabled):not([role^='menuitem']) {
 .startup-plan-detail { margin-top: auto; font-size: 12px; line-height: 1.5; color: var(--text); }
 .startup-sign-in { display: flex; justify-content: flex-end; margin-top: 22px; }
 .startup-sign-in button { display: inline-flex; align-items: center; justify-content: center; gap: 12px; min-height: 44px; }
-@media (prefers-color-scheme: dark) {
-  .startup-page {
-    --form-bg: #202326;
-    --input-bg: #2b3034;
-    --form-border: #58616b;
-    --navy-light: #365f7d;
-    --text: #c2cbd3;
-    --text-h: #f3f4f6;
-  }
-}
 @media (max-width: 650px) {
   .startup-brand { flex-wrap: wrap; font-size: 19px; }
   .startup-brand .startup-environment { width: 100%; margin-left: 50px; }
@@ -376,10 +366,6 @@ html.is-drilling-through * {
 .account-plan-options strong { color: var(--text-h); }
 .account-plan-options span { font-size: 13px; }
 
-@media (prefers-color-scheme: dark) {
-  .affiliate-recommendations { background: var(--code-bg); }
-}
-
 @media (max-width: 800px) {
   .affiliate-recommendations {
     grid-template-columns: minmax(0, 1fr);
@@ -416,11 +402,6 @@ html.is-drilling-through * {
   padding: 10px 16px;
   background: var(--primary-tab);
 
-  @media (prefers-color-scheme: dark) {
-    background: var(--code-bg);
-    border-bottom-color: #393c45;
-  }
-
   .play-designer-header {
     gap: 8px;
   }
@@ -434,11 +415,6 @@ html.is-drilling-through * {
       border-color: var(--accent-border);
     }
 
-    @media (prefers-color-scheme: dark) {
-      &:hover {
-        background: rgba(255, 255, 255, 0.08);
-      }
-    }
   }
 
   .play-designer-cancel,
@@ -455,9 +431,6 @@ html.is-drilling-through * {
       border-color: #aeb4bb;
     }
 
-    @media (prefers-color-scheme: dark) {
-      border-color: var(--border);
-    }
   }
 
   .play-designer-cancel:disabled,
@@ -950,11 +923,6 @@ html.is-drilling-through * {
   background: color-mix(in srgb, var(--primary-button) 10%, #fff);
   color: var(--primary-button);
 
-  @media (prefers-color-scheme: dark) {
-    border-color: color-mix(in srgb, var(--primary-button) 60%, #fff);
-    background: color-mix(in srgb, var(--primary-button) 45%, var(--code-bg));
-    color: #fff;
-  }
 }
 
 .play-designer-history-tools {
@@ -1698,10 +1666,6 @@ html.is-drilling-through * {
   
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-
-  @media (prefers-color-scheme: dark) {
-    background: #112240;
-  }
 
   h2 {
     display: flex;
@@ -3053,14 +3017,6 @@ html.is-drilling-through * {
 .loading-indicator-compact .loading-indicator-panel { gap: 8px; padding: 8px 12px; }
 .loading-indicator-compact .loading-football { width: 20px; height: 20px; }
 
-@media (prefers-color-scheme: dark) {
-  .loading-indicator-panel {
-    border-color: #5f6b77;
-    background: #242a30;
-    color: #edf1f5;
-  }
-}
-
 @keyframes football-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -3146,10 +3102,6 @@ html.is-drilling-through * {
   text-align: left;
   flex-grow: 1;
   background: whitesmoke;
-
-  @media (prefers-color-scheme: dark) {
-    --grid-chrome: #172A45;
-  }
 
   h1 {
     font-size: 32px;
@@ -3545,10 +3497,6 @@ html.is-drilling-through * {
 
   > .toolbar-menu {
     margin-left: auto;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    border-bottom-color: #393c45;
   }
 
 }
@@ -4074,9 +4022,6 @@ html.is-drilling-through * {
   border-bottom: none;
   background: gray;
 
-  @media (prefers-color-scheme: dark) {
-    background: var(--secondary-button);
-  }
 }
 
 .data-grid-table {
@@ -4119,10 +4064,6 @@ html.is-drilling-through * {
     border-bottom-color: var(--column-header-border);
     border-top: 1px solid var(--column-header-border);
 
-    @media (prefers-color-scheme: dark) {
-      background: var(--column-header-bg);
-      border-bottom-color: var(--column-header-border);
-    }
   }
 
   tbody td {
@@ -4175,36 +4116,6 @@ html.is-drilling-through * {
     fill: #facc15;
   }
 
-  @media (prefers-color-scheme: dark) {
-    tbody tr.is-grouping-row,
-    tbody tr.is-grouping-row:hover {
-      background: #4b5563;
-    }
-
-    tbody tr.is-grouping-row td {
-      background: aliceblue;
-      color: #f9fafb;
-    }
-
-    tbody tr.is-grouping-row.is-selected td {
-      background: #29445a;
-    }
-
-/*     tbody tr.is-selected,
-    tbody tr.is-selected:hover,
-    tbody tr.is-selected td {
-      background: #29445a;
-    }
- */
-    tbody tr.is-selected td:first-child {
-      box-shadow: inset 3px 0 #60a5fa;
-    }
-
-    .data-grid-grouping-cell {
-      border-left-color: #9ca3af;
-    }
-  }
-
   .data-grid-page-header,
   .data-grid-page-cell {
     width: 1%;
@@ -4216,9 +4127,6 @@ html.is-drilling-through * {
     background: var(--form-bg);
     border-right: 1px solid var(--form-border);
 
-    @media (prefers-color-scheme: dark) {
-      color: var(--text-h);
-    }
   }
 
   .data-grid-page-cell[draggable='true'] {
@@ -4463,9 +4371,6 @@ html.is-drilling-through * {
   box-shadow: var(--shadow);
   overflow: hidden;
 
-  @media (prefers-color-scheme: dark) {
-    background: #112240;
-  }
 }
 
 .print-dialog-header {
@@ -5135,9 +5040,6 @@ html.is-drilling-through * {
   max-height: none;
   background: gray;
 
-  @media (prefers-color-scheme: dark) {
-    background: var(--secondary-button);
-  }
 }
 
 .schedule-grid-view .data-grid-table tbody tr.schedule-grid-row-past {
