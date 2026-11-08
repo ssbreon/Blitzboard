@@ -48,8 +48,8 @@ export function createEntraSession(settings, createClient = (config) => new Publ
   return {
     initialize,
     async signIn() {
-      if (await initialize()) return
-      return client.loginRedirect({ scopes })
+      await initialize()
+      return client.loginRedirect({ scopes, prompt: 'select_account' })
     },
     async accessToken() {
       await initialize()
