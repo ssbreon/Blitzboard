@@ -160,6 +160,7 @@ async function sendRequest(path, options = {}, workspaceId) {
       const error = new Error(detail.error?.message || `Request failed with ${response.status}`)
       error.code = detail.error?.code
       error.status = response.status
+      error.diagnosticId = detail.error?.diagnosticId
       throw error
     }
     return response.status === 204 ? null : response.json()

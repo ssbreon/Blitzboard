@@ -72,6 +72,7 @@ export function ErrorDialogProvider({ children }) {
     current.error.errorCode != null ? `Provider error code: ${current.error.errorCode}` : '',
     current.error.subError != null ? `Provider sub-error: ${current.error.subError}` : '',
     current.error.status != null ? `HTTP status: ${current.error.status}` : '',
+    current.error.diagnosticId != null ? `Diagnostic ID: ${current.error.diagnosticId}` : '',
   ].filter(Boolean).join('\n') : ''
 
   return <ErrorQueueContext value={enqueue}>

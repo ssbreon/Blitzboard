@@ -49,6 +49,23 @@ def response_json(response):
 
 
 class CorsTests(unittest.TestCase):
+    def test_unexpected_api_failure_returns_safe_diagnostic_id(self):
+        request = FakeRequest("GET", "me")
+        with patch.object(function_app, "authenticate_request", side_effect=RuntimeError("private failure detail")):
+            with self.assertLogs("function_app", level="ERROR") as captured:
+                result = function_app.api(request)
+
+        payload = response_json(result)
+        diagnostic_id = payload["error"]["diagnosticId"]
+        self.assertEqual(result.status_code, 500)
+        self.assertEqual(payload["error"]["code"], "INTERNAL_ERROR")
+        self.assertNotIn("private failure detail", result.get_body().decode())
+        self.assertTrue(any("Unhandled API exception" in message for message in captured.output))
+        self.assertTrue(any(
+            record.custom_dimensions["diagnosticId"] == diagnostic_id
+            for record in captured.records
+        ))
+
     def test_allowed_origin_is_reflected_for_api_responses(self):
         origin = "https://dev.blitzboardstudio.com"
         request = FakeRequest("GET", "health")

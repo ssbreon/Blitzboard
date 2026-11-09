@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import secrets
 import hashlib
@@ -42,6 +43,7 @@ SEARCH_RESULT_LIMIT = 100
 SEARCH_REQUEST_LIMIT = 60
 SEARCH_WINDOW_SECONDS = 60
 request_workspace = ContextVar("request_workspace", default=None)
+logger = logging.getLogger(__name__)
 accounts.validate_environment(COSMOS_ENDPOINT)
 
 
@@ -268,7 +270,24 @@ def response(payload, status=200):
 def cors_response(handler):
     @wraps(handler)
     def wrapped(req):
-        result = handler(req)
+        try:
+            result = handler(req)
+        except Exception:
+            diagnostic_id = uuid4().hex
+            path = (req.route_params.get("path") or "").strip("/").split("/")
+            logger.exception(
+                "Unhandled API exception",
+                extra={"custom_dimensions": {
+                    "diagnosticId": diagnostic_id,
+                    "httpMethod": req.method,
+                    "operation": path[0] if path else "unknown",
+                }},
+            )
+            result = response({"error": {
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred. Please try again.",
+                "diagnosticId": diagnostic_id,
+            }}, 500)
         origin = req.headers.get("Origin")
         allowed_origins = {
             value.strip().rstrip("/")
