@@ -1131,6 +1131,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [scoutPlaysReloadToken, setScoutPlaysReloadToken] = useState(0)
   const [statusSaving, setStatusSaving] = useState(false)
   const [statusError, setStatusError] = useState(null)
+  const [loadingPlay, setLoadingPlay] = useState(false)
   const [searchOpening, setSearchOpening] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState(null)
 
@@ -1423,33 +1424,38 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function openDesignerForRow(kind, parentId, row, collection = parent, readOnly = false) {
-    row = await loadPlayDetails(kind, parentId, row)
-    if (!row) return
-    setSlideshow(false)
-    const template = findPlayTemplate(row.template) || DEFAULT_PLAY_TEMPLATE
-    setDesigner({
-      kind,
-      parentId,
-      id: row.id,
-      _etag: row._etag,
-      name: row.name,
-      gameType: row.gameType || template.gameType,
-      readOnly,
-      initialMarkers: row.markers || buildMarkersFromTemplate(template),
-      initialDrawings: row.drawings,
-      initialTextAnnotations: row.textAnnotations,
-      initialZones: row.zones,
-      initialTheme: row.theme,
-      showAssignments: row.showAssignments,
-      template: row.template,
-      category: row.category,
-      parentCategory: collection?.kind === 'gamePlan' ? row.unit || collection.category : collection?.category,
-      parentCollectionName: collection?.name,
-      fieldDecoration: row.fieldDecoration,
-      fieldOrientation: row.fieldOrientation,
-      fieldZone: row.fieldZone,
+    setLoadingPlay(true)
+    try {
+      row = await loadPlayDetails(kind, parentId, row)
+      if (!row) return
+      setSlideshow(false)
+      const template = findPlayTemplate(row.template) || DEFAULT_PLAY_TEMPLATE
+      setDesigner({
+        kind,
+        parentId,
+        id: row.id,
+        _etag: row._etag,
+        name: row.name,
+        gameType: row.gameType || template.gameType,
+        readOnly,
+        initialMarkers: row.markers || buildMarkersFromTemplate(template),
+        initialDrawings: row.drawings,
+        initialTextAnnotations: row.textAnnotations,
+        initialZones: row.zones,
+        initialTheme: row.theme,
+        showAssignments: row.showAssignments,
+        template: row.template,
+        category: row.category,
+        parentCategory: collection?.kind === 'gamePlan' ? row.unit || collection.category : collection?.category,
+        parentCollectionName: collection?.name,
+        fieldDecoration: row.fieldDecoration,
+        fieldOrientation: row.fieldOrientation,
+        fieldZone: row.fieldZone,
         perspective: row.perspective || defaultPlayPerspective(collection?.category),
-    })
+      })
+    } finally {
+      setLoadingPlay(false)
+    }
   }
 
   function handleSearchOpen(result) {
@@ -1685,6 +1691,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
               </span>
             )}
           </li>
+          {loadingPlay && <LoadingIndicator label="Loading play..." />}
           {parent && <li>
             {parent.kind === 'gamePlan' && gameCard ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
