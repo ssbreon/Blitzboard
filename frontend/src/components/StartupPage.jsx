@@ -5,6 +5,7 @@
  */
 import { useState } from 'react'
 import { ArrowRight, Check, UserRound, Users } from 'lucide-react'
+import { clearSiteData } from '../utils/clearSiteData'
 
 const PLANS = [
   { id: 'free', name: 'Free', price: 'Free', annual: 'No recurring charge', seats: '1 coach', limits: ['5 playbooks', '15 games', '500 plays', '500 scouting plays'], detail: 'Includes coaching resource recommendations.' },
@@ -17,10 +18,19 @@ export function StartupPage({ development = false, cloudAuth = false, invitation
     try { return localStorage.getItem('blitzboard:welcome-seen') !== 'true' } catch { return true }
   })
   const [plan, setPlan] = useState('free')
+  const [clearing, setClearing] = useState(false)
 
   function continueToSignIn(selectedPlan = plan) {
     try { localStorage.setItem('blitzboard:welcome-seen', 'true') } catch { }
     onSignIn(selectedPlan)
+  }
+
+  async function handleClearSiteCache() {
+    if (!window.confirm('Clear this site\'s browser data? You may need to sign in again, and local preferences will be removed.')) return
+    setClearing(true)
+    const { incomplete } = await clearSiteData()
+    window.alert(`${incomplete ? 'Some site data could not be cleared.' : 'Accessible site data was cleared.'} Use your browser settings to remove HTTP-only cookies, browser cache, or data in other tabs.`)
+    window.location.reload()
   }
 
   return <main className="startup-page">
@@ -33,18 +43,19 @@ export function StartupPage({ development = false, cloudAuth = false, invitation
       <div>
         <h1 id="startup-title">{invitation ? 'Join your team on Blitzboard Studio' : firstVisit ? 'Welcome to Blitzboard Studio' : 'Blitzboard Studio'}</h1>
         <p>{invitation ? 'You have a team invitation. Sign in or create an account using the email address that received the invitation.' : 'Design football plays, build playbooks, plan practices and games, and keep your coaching staff on the same page.'}</p>
-        {firstVisit && !invitation && <p className="startup-existing-account">Already have a Blitzboard account? <a href="#login" aria-disabled={busy} onClick={(event) => {
-          event.preventDefault()
-          if (!busy) continueToSignIn(null)
-        }}>Please login here</a></p>}
+      </div>
+      <div className="startup-sign-in">
+        <button type="button" className="dialog-create" disabled={busy || clearing} aria-describedby={invitation ? 'startup-invitation-help' : undefined} onClick={() => continueToSignIn(invitation || cloudAuth ? null : plan)}>
+          {busy ? 'Signing in...' : invitation ? 'Sign in to accept invitation' : development ? `Sign in to ${PLANS.find((item) => item.id === plan).name}` : 'Continue to sign in'}<ArrowRight size={18} aria-hidden="true" />
+        </button>
       </div>
     </section>
-    <section className="startup-membership" aria-labelledby="startup-membership-title">
+    {(invitation || !cloudAuth) && <section className="startup-membership" aria-labelledby="startup-membership-title">
       <div className="startup-membership-heading">
-        <h2 id="startup-membership-title">{invitation ? 'Accept your invitation' : cloudAuth ? 'Sign in' : development ? 'Choose a coaching account' : firstVisit ? 'Choose your subscription' : 'Sign in'}</h2>
+        <h2 id="startup-membership-title">{invitation ? 'Accept your invitation' : development ? 'Choose a coaching account' : 'Choose your subscription'}</h2>
         {invitation ? <p id="startup-invitation-help">After signing in, confirm your invitation to join the team. No subscription purchase is needed.</p> : !cloudAuth && <p>USD. Taxes included in paid plans.</p>}
       </div>
-      {!cloudAuth && !invitation && <fieldset className="startup-plans" disabled={busy}>
+      {!cloudAuth && !invitation && <fieldset className="startup-plans" disabled={busy || clearing}>
         <legend className="sr-only">Subscription tier</legend>
         {PLANS.map((item) => <label key={item.id} className={`startup-plan${plan === item.id ? ' is-selected' : ''}`}>
           <div className="startup-plan-heading">
@@ -59,12 +70,10 @@ export function StartupPage({ development = false, cloudAuth = false, invitation
           <p className="startup-plan-detail">{item.detail}</p>
         </label>)}
       </fieldset>}
-      <div className="startup-sign-in">
-        <button type="button" className="dialog-create" disabled={busy} aria-describedby={invitation ? 'startup-invitation-help' : undefined} onClick={() => continueToSignIn(invitation || cloudAuth ? null : plan)}>
-          {busy ? 'Signing in...' : invitation ? 'Sign in to accept invitation' : development ? `Sign in to ${PLANS.find((item) => item.id === plan).name}` : 'Continue to sign in'}<ArrowRight size={18} aria-hidden="true" />
-        </button>
-      </div>
-    </section>
-    <footer className="startup-copyright">© 2027 Breon Technologies LLC. All Rights Reserved.</footer>
+    </section>}
+    <footer className="startup-copyright">
+      <button type="button" className="startup-clear-cache" disabled={busy || clearing} onClick={handleClearSiteCache}>{clearing ? 'Clearing site cache...' : 'Clear site cache'}</button>
+      <div>© 2027 Breon Technologies LLC. All Rights Reserved.</div>
+    </footer>
   </main>
 }

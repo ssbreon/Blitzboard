@@ -52,9 +52,10 @@ test('startup welcome, local identities, session restoration and production isol
     const first = renderToStaticMarkup(createElement(StartupPage, { development: true }))
     assert.ok(first.includes('Welcome to Blitzboard Studio'))
     assert.ok(first.includes('© 2027 Breon Technologies LLC. All Rights Reserved.'))
-    assert.ok(first.includes('Already have a Blitzboard account?'))
-    assert.ok(first.includes('href="#login"'))
-    assert.ok(first.includes('Please login here'))
+    assert.ok(first.includes('Clear site cache'))
+    assert.ok(!first.includes('Already have a Blitzboard account?'))
+    assert.ok(!first.includes('Please login here'))
+    assert.ok(first.indexOf('Sign in to Free') < first.indexOf('class="startup-membership"'))
     assert.ok(first.includes('Local development'))
     assert.equal((first.match(/type="radio"/g) || []).length, 3)
     assert.ok(first.includes('Up to 20 coaches'))
@@ -80,6 +81,9 @@ test('startup welcome, local identities, session restoration and production isol
     assert.ok(!returning.includes('Already have a Blitzboard account?'))
     assert.ok(!returning.includes('Local development'))
     assert.ok(returning.includes('Continue to sign in'))
+    const cloud = renderToStaticMarkup(createElement(StartupPage, { cloudAuth: true }))
+    assert.ok(cloud.includes('Continue to sign in'))
+    assert.ok(!cloud.includes('startup-membership'))
 
     const { AboutDialog } = await server.ssrLoadModule('/src/components/AboutDialog.jsx')
     const about = renderToStaticMarkup(createElement(AboutDialog, { onClose: () => {} }))
@@ -156,4 +160,38 @@ test('startup welcome, local identities, session restoration and production isol
       else globalThis[key] = value
     }
   }
+})
+
+test('site data reset clears accessible storage and reports blocked databases', async () => {
+  const { clearSiteData } = await import('../utils/clearSiteData.js')
+  const cleared = []
+  const cookies = []
+  const browser = {
+    localStorage: { clear: () => cleared.push('local') },
+    sessionStorage: { clear: () => cleared.push('session') },
+    location: { pathname: '/team/invite', hostname: 'app.example.com' },
+    document: { get cookie() { return 'one=1; two=2' }, set cookie(value) { cookies.push(value) } },
+    caches: { keys: async () => ['assets'], delete: async (key) => { cleared.push(key); return true } },
+    navigator: { serviceWorker: { getRegistrations: async () => [{ unregister: async () => { cleared.push('worker'); return true } }] } },
+    indexedDB: {
+      databases: async () => [{ name: 'data' }],
+      deleteDatabase: () => {
+        const request = {}
+        queueMicrotask(() => request.onblocked())
+        return request
+      },
+    },
+  }
+  assert.deepEqual(await clearSiteData(browser), { incomplete: true })
+  assert.deepEqual(cleared, ['local', 'session', 'assets', 'worker'])
+  assert.ok(cookies.some((cookie) => cookie.startsWith('one=;') && cookie.includes('path=/team/') && cookie.includes('domain=example.com')))
+  assert.ok(cookies.some((cookie) => cookie.startsWith('two=;') && cookie.includes('path=/')))
+  browser.indexedDB.deleteDatabase = () => {
+    const request = {}
+    queueMicrotask(() => request.onsuccess())
+    return request
+  }
+  assert.deepEqual(await clearSiteData(browser), { incomplete: false })
+  browser.localStorage.clear = () => { throw new Error('Storage unavailable') }
+  assert.deepEqual(await clearSiteData(browser), { incomplete: true })
 })
