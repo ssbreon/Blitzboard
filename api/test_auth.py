@@ -563,7 +563,7 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_schedule_summary_omits_expanded_data_and_child_queries(self):
         for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {"opponent": "Falcons"})):
-            call_api("POST", path, "local-coach", {"name": "Summary", date_field: "2026-01-15", "startTime": "16:30", "notes": "Large notes", "installPlaybookIds": ["book"], **extra})
+            call_api("POST", path, "local-coach", {"name": "Summary", date_field: "2026-01-15", "startTime": "16:30", "location": "Main Stadium", "notes": "Large notes", "installPlaybookIds": ["book"], **extra})
             request = FakeRequest("GET", path, "local-coach")
             request.params = {"start": "2026-01-01", "end": "2026-12-31", "scheduleSummary": "true"}
             with patch.object(function_app, "with_child_count", side_effect=AssertionError("Year summary should not load child counts")):
@@ -572,6 +572,8 @@ class AuthenticationTests(unittest.TestCase):
             record = response_json(result)["items"][0]
             self.assertEqual(record[date_field], "2026-01-15")
             self.assertEqual(record["startTime"], "16:30")
+            if path == "game-plans":
+                self.assertEqual(record["location"], "Main Stadium")
             self.assertNotIn("notes", record)
             self.assertNotIn("installPlaybookIds", record)
             self.assertIn("ownerId", record)

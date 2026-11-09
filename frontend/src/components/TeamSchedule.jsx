@@ -120,6 +120,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
             </label>
             {isGame && <label className="schedule-field"><span>Game Site</span><select value={gameSite} onChange={(event) => setGameSite(event.target.value)} disabled={!canEdit || saving}><option value="">Select game site</option><option value="Home">Home</option><option value="Away">Away</option><option value="Neutral">Neutral</option></select></label>}
           </div>
+          {isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
           <div className="schedule-field-row">
             <label className="schedule-field"><span>Date</span><input className="date-picker" type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} required disabled={!canEdit || saving} /></label>
             <label className="schedule-field"><span>Start</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={!canEdit || saving} /></label>

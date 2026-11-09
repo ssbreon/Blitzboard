@@ -135,6 +135,7 @@ function GamePlanBanner({ game }) {
     ['Date', date],
     ['Time', time],
     ['Location', game.location || game.gameSite || '\u2014'],
+    ['Game Site', game.gameSite || '\u2014'],
   ]
 
   return <section className="game-plan-banner" aria-label="Game plan details">
@@ -459,6 +460,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [gameDate, setGameDate] = useState(parentRecord.gameDate || '')
   const [startTime, setStartTime] = useState(parentRecord.startTime || '')
   const [gameSite, setGameSite] = useState(parentRecord.gameSite || '')
+  const [location, setLocation] = useState(parentRecord.location || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [settingsOpen, setSettingsOpen] = useState(openSettingsOnMount)
@@ -469,6 +471,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [draftGameDate, setDraftGameDate] = useState(gameDate)
   const [draftStartTime, setDraftStartTime] = useState(startTime)
   const [draftGameSite, setDraftGameSite] = useState(gameSite)
+  const [draftLocation, setDraftLocation] = useState(location)
   const [playbooks, setPlaybooks] = useState([])
   const [playbooksLoading, setPlaybooksLoading] = useState(isGamePlan || installMode)
   const [playbooksError, setPlaybooksError] = useState(null)
@@ -734,6 +737,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         payload.gameDate = draftGameDate
         payload.startTime = draftStartTime
         if (draftGameSite) payload.gameSite = draftGameSite
+        payload.location = draftLocation.trim()
       } else {
         payload.category = draftCategory
       }
@@ -746,6 +750,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         setGameDate(updated.gameDate ?? draftGameDate)
         setStartTime(updated.startTime ?? draftStartTime)
         setGameSite(updated.gameSite ?? gameSite)
+        setLocation(updated.location ?? draftLocation.trim())
       }
       onParentUpdated(updated)
       closeSettings()
@@ -777,6 +782,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
     setDraftGameDate(gameDate)
     setDraftStartTime(startTime)
     setDraftGameSite(gameSite)
+    setDraftLocation(location)
     setSettingsOpen(true)
   }
 
@@ -852,6 +858,10 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
                     </select>
                   </label>
                 </div>
+                <label className="dialog-field">
+                  <span>Location</span>
+                  <input type="text" value={draftLocation} onChange={(event) => setDraftLocation(event.target.value)} />
+                </label>
                 <div className="dialog-field-row">
                   <label className="dialog-field">
                     <span>Game Date</span>

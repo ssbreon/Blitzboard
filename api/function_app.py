@@ -702,7 +702,7 @@ def dispatch(req, user, workspace, role):
         if method == "GET":
             bounds = schedule_range(req)
             if req.params.get("scheduleSummary") == "true":
-                fields = ("id", "name", "opponent", "gameDate", "startTime", "gameSite", "recordStatus", "workspaceId", "ownerId")
+                fields = ("id", "name", "opponent", "gameDate", "startTime", "gameSite", "location", "recordStatus", "workspaceId", "ownerId")
                 return response({"items": storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, fields=fields, **bounds)})
             records = storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, **bounds)
             items = [with_owner_name(with_child_count(record, "scoutPlays", owner_id)) for record in records]
