@@ -1993,7 +1993,7 @@ function AppContent() {
       entryRef.current = next
       setEntry(next)
       setUser((identity) => ({ ...identity, workspaces: identity.workspaces.map((item) => item.id === id ? workspace : item) }))
-      try { sessionStorage.setItem('blitzboard:workspace', id) } catch { return }
+      try { localStorage.setItem('blitzboard:workspace', id) } catch { return }
     } catch (failure) {
       if (current === generation.current) {
         setError(failure)
@@ -2025,12 +2025,12 @@ function AppContent() {
         entryRef.current = null
         setEntry(null)
         guard.current = null
-        try { sessionStorage.removeItem('blitzboard:workspace') } catch { }
+        try { localStorage.removeItem('blitzboard:workspace') } catch { }
         setLoading(false)
         return
       }
       let stored
-      try { stored = sessionStorage.getItem('blitzboard:workspace') } catch { stored = null }
+      try { stored = localStorage.getItem('blitzboard:workspace') } catch { stored = null }
       const workspace = identity.workspaces.find((item) => item.id === stored)
         || identity.workspaces.find((item) => item.subscription.kind === selectedDevelopmentPlan())
         || identity.workspaces[0]
