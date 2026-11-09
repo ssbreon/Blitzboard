@@ -51,6 +51,12 @@ export function yardNumberXPositions(fieldOrientation) {
 // the defense's goal line at 0 to the offense's goal line at 100) when yard numbers are shown.
 export const FIELD_ZONES = ['Green Zone', 'Yellow Zone', 'Red Zone', 'Gold Zone']
 export const DEFAULT_FIELD_ZONE = FIELD_ZONES[0]
+const GREEN_ZONE_ONLY_CATEGORIES = new Set(['Kickoff', 'Kickoff Return', 'Hands Team', 'Onside Kick'])
+
+export function isGreenZoneOnlyCategory(category) {
+  return GREEN_ZONE_ONLY_CATEGORIES.has(category)
+}
+
 export const PLAY_PERSPECTIVES = ['Offense on Top', 'Offense on bottom']
 export const DEFAULT_PLAY_PERSPECTIVE = PLAY_PERSPECTIVES[0]
 

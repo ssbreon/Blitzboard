@@ -39,6 +39,7 @@ import {
   flattenDrawings,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
+  isGreenZoneOnlyCategory,
   isExtendedFieldWindow,
   markerStyleVars,
   normalizeDrawings,
@@ -158,7 +159,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const initialCategory = record.category || categoryOptions[0]
   const initialFieldDecoration = record.fieldDecoration || FIELD_DECORATIONS[0]
   const initialFieldOrientation = record.fieldOrientation || FIELD_ORIENTATIONS[0]
-  const initialFieldZone = record.fieldZone || DEFAULT_FIELD_ZONE
+  const initialFieldZone = isGreenZoneOnlyCategory(initialCategory) ? DEFAULT_FIELD_ZONE : record.fieldZone || DEFAULT_FIELD_ZONE
   const initialPerspective = record.perspective || DEFAULT_PLAY_PERSPECTIVE
   const initialTheme = normalizeThemeId(record.initialTheme)
   const [name, setName] = useState(record.name)
@@ -364,7 +365,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCategory(design.category)
     setFieldDecoration(design.fieldDecoration)
     setFieldOrientation(design.fieldOrientation)
-    setFieldZone(design.fieldZone)
+    setFieldZone(isGreenZoneOnlyCategory(design.category) ? DEFAULT_FIELD_ZONE : design.fieldZone)
     setPerspective(design.perspective)
     setTheme(design.theme)
     setShowAssignments(Boolean(design.showAssignments))
