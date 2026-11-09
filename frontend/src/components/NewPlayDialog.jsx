@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
+import { applyPlayerLabelOption, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
 import { DEFAULT_FIELD_ZONE, FIELD_ZONES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
@@ -14,7 +14,9 @@ export function playCategoriesForCollection(category) {
   return PLAY_CATEGORIES
 }
 export const FIELD_DECORATIONS = ['None', 'Hash Marks', 'Hash Marks and Numbers']
+export const PLAYER_LABEL_OPTIONS = ['Show All Player Labels', 'No offensive line Labels', 'No labels']
 const DEFAULT_FIELD_DECORATION = FIELD_DECORATIONS[2]
+const DEFAULT_PLAYER_LABEL_OPTION = PLAYER_LABEL_OPTIONS[0]
 const DEFAULT_PLAY_NAME = 'New Play'
 export const FIELD_ORIENTATIONS = ['High School', 'NCAA', 'NFL']
 
@@ -22,18 +24,19 @@ function gameTypeLabel(gameType) {
   return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
 }
 
-export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES }) {
+export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName)
   const [gameType, setGameType] = useState(DEFAULT_GAME_TYPE)
   const [templateId, setTemplateId] = useState(DEFAULT_PLAY_TEMPLATE.id)
   const [category, setCategory] = useState(categoryOptions[0])
   const [fieldDecoration, setFieldDecoration] = useState(DEFAULT_FIELD_DECORATION)
+  const [playerLabelOption, setPlayerLabelOption] = useState(DEFAULT_PLAYER_LABEL_OPTION)
   const [fieldZone, setFieldZone] = useState(DEFAULT_FIELD_ZONE)
   const [fieldOrientation, setFieldOrientation] = useState(defaultFieldOrientation)
   const [themeId, setThemeId] = useState(defaultTheme)
   const template = getTemplatesForGameType(gameType).find((option) => option.id === templateId) || DEFAULT_PLAY_TEMPLATE
-  const previewMarkers = buildMarkersFromTemplate(template).map((marker) =>
+  const previewMarkers = applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
     defaultPerspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
   )
   const previewPlay = {
@@ -62,13 +65,14 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     }
     const trimmed = name.trim()
     if (!trimmed) return
-    onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone)
+    onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption)
     setStep(1)
     setName(initialName)
     setGameType(DEFAULT_GAME_TYPE)
     setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
     setFieldDecoration(DEFAULT_FIELD_DECORATION)
+    setPlayerLabelOption(DEFAULT_PLAYER_LABEL_OPTION)
     setFieldZone(DEFAULT_FIELD_ZONE)
     setFieldOrientation(defaultFieldOrientation)
     setThemeId(defaultTheme)
@@ -81,6 +85,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
     setCategory(categoryOptions[0])
     setFieldDecoration(DEFAULT_FIELD_DECORATION)
+    setPlayerLabelOption(DEFAULT_PLAYER_LABEL_OPTION)
     setFieldZone(DEFAULT_FIELD_ZONE)
     setFieldOrientation(defaultFieldOrientation)
     setThemeId(defaultTheme)
@@ -133,6 +138,14 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                     ))}
                   </select>
                 </label>
+                {showPlayerLabelOptions && (
+                  <label className="dialog-field">
+                    <span>Player Labels</span>
+                    <select value={playerLabelOption} onChange={(event) => setPlayerLabelOption(event.target.value)}>
+                      {PLAYER_LABEL_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                    </select>
+                  </label>
+                )}
               </>
             ) : (
               <>

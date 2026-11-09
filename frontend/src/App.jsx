@@ -28,7 +28,7 @@ import { PlayDesigner } from './components/PlayDesigner'
 import { PlaybookSlideshow } from './components/PlaybookSlideshow'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
-import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
+import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
 import { formatDate } from './utils/formatDate'
 import { BreadcrumbCacheContext } from './utils/breadcrumbCacheContext'
 import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
@@ -1322,7 +1322,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     await api.reorderPlays(parentId, rows.map((item) => item.id))
   }
 
-  async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone) {
+  async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption) {
     const { target, parentId, unit, groupingId } = newDialog
     setNewDialog(null)
     const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent?.id === parentId ? parent : null
@@ -1331,7 +1331,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
     const designerParentCategory = target === 'scoutPlay' ? playUnit : collectionCategory
     const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
-    const initialMarkers = buildMarkersFromTemplate(template).map((marker) =>
+    const initialMarkers = applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
       perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
     )
     let record =
@@ -1743,6 +1743,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         defaultFieldOrientation={defaults.fieldOrientation}
         defaultPerspective={defaultPlayPerspective(newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'Offense' : newDialog?.category || parent?.category)}
         categoryOptions={playCategoriesForCollection(newDialog?.unit || newDialog?.category || parent?.category)}
+        showPlayerLabelOptions={newDialog?.target === 'play'}
       />
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
       {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}

@@ -1758,3 +1758,14 @@ export function buildMarkersFromTemplate(template) {
   })
   return markers
 }
+
+export function applyPlayerLabelOption(markers, option) {
+  if (option === 'No labels') return markers.map((marker) => ({ ...marker, label: '' }))
+  if (option === 'No offensive line Labels') {
+    const offensiveLineLabels = new Set(['LT', 'LG', 'C', 'RG', 'RT'])
+    return markers.map((marker) =>
+      marker.team === 'offense' && offensiveLineLabels.has(marker.label) ? { ...marker, label: '' } : marker,
+    )
+  }
+  return markers
+}
