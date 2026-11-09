@@ -4,6 +4,7 @@
  * All Rights Reserved
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
@@ -141,11 +142,11 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
   )
 }
 
-function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onDragEvent, onDragEnd }) {
+function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onContextMenu, onDragEvent, onDragEnd }) {
   const eventKey = `${event.kind}-${event.id}`
   const eventClass = `schedule-event schedule-event-${event.kind === 'game' ? 'game' : event.eventType.toLowerCase().replaceAll(' ', '-')}`
   const isMoving = movingEventKey === eventKey
-  return <div className={eventClass}>
+  return <div className={eventClass} onContextMenu={(contextEvent) => onContextMenu(contextEvent, event)}>
     <button type="button" className="schedule-event-content" onClick={() => onOpenEvent(event)} title={`${calendarTime(event)} ${event.name}`}>
       {event.kind === 'game' ? <><span className="schedule-football" aria-hidden="true">🏈</span>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{gameEventLabel(event)}</span></> : <>{event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{event.name}</span></>}
     </button>
@@ -155,6 +156,66 @@ function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onDrag
       onDragEvent(event)
     }} onDragEnd={onDragEnd}>{isMoving ? <LoaderCircle size={15} className="schedule-event-saving-spinner" aria-hidden="true" /> : <GripVertical size={15} aria-hidden="true" />}</button>}
   </div>
+}
+
+function ScheduleEventContextMenu({ event, position, canDelete, onClose, onOpen, onDelete }) {
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    menuRef.current?.querySelector('button:not(:disabled)')?.focus({ preventScroll: true })
+
+    function handleOutsideClick(clickEvent) {
+      if (!menuRef.current?.contains(clickEvent.target)) onClose()
+    }
+    function handleKeyDown(keyEvent) {
+      if (keyEvent.key === 'Escape') {
+        keyEvent.preventDefault()
+        onClose()
+        position.trigger?.focus()
+      } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(keyEvent.key)) {
+        keyEvent.preventDefault()
+        const buttons = [...menuRef.current.querySelectorAll('button:not(:disabled)')]
+        const currentIndex = buttons.indexOf(document.activeElement)
+        const nextIndex = keyEvent.key === 'Home' ? 0 : keyEvent.key === 'End' ? buttons.length - 1
+          : (currentIndex + (keyEvent.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
+        buttons[nextIndex]?.focus()
+      } else if (keyEvent.key === 'Tab') {
+        onClose()
+      }
+    }
+    function closeOnViewportChange() {
+      onClose()
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('scroll', closeOnViewportChange, true)
+    window.addEventListener('resize', closeOnViewportChange)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('scroll', closeOnViewportChange, true)
+      window.removeEventListener('resize', closeOnViewportChange)
+    }
+  }, [onClose, position.trigger])
+
+  const actions = [
+    { key: 'open', label: 'Open', icon: FolderOpen, onClick: () => onOpen(event) },
+    ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: () => onDelete(event) }] : []),
+  ]
+
+  return createPortal(
+    <div className="toolbar-dropdown row-actions-dropdown" ref={menuRef} role="menu" tabIndex={-1}
+      style={{ position: 'fixed', top: position.top, right: position.right }}>
+      {actions.map((action) => <button key={action.key} type="button" role="menuitem"
+        className={action.destructive ? 'row-actions-destructive' : undefined}
+        onClick={() => { onClose(); action.onClick() }}>
+        <action.icon className="menu-item-icon" aria-hidden="true" />
+        {action.label}
+      </button>)}
+    </div>,
+    document.body
+  )
 }
 
 function ScheduleDays({ month, mode, eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey, onDropTarget, onMoveEvent, onAddEvent, ...eventProps }) {
@@ -223,6 +284,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
   const [eventToDelete, setEventToDelete] = useState(null)
+  const [eventContextMenu, setEventContextMenu] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
@@ -280,6 +342,17 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   function openEvent(event) {
     if (event.kind === 'game') onOpenGame(event)
     else setDialog({ event })
+  }
+
+  function openEventContextMenu(contextEvent, event) {
+    contextEvent.preventDefault()
+    const menuHeight = (canDelete ? 2 : 1) * 44 + 12
+    const top = contextEvent.clientY + menuHeight <= window.innerHeight
+      ? contextEvent.clientY + 4 : Math.max(8, contextEvent.clientY - menuHeight - 4)
+    setEventContextMenu({
+      event,
+      position: { top, right: Math.max(8, window.innerWidth - contextEvent.clientX), trigger: contextEvent.currentTarget },
+    })
   }
 
   function moveCalendar(direction) {
@@ -356,7 +429,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const calendarProps = {
     eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey,
     onDropTarget: setDropTargetDate, onMoveEvent: moveEventToDate,
-    onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent,
+    onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent, onContextMenu: openEventContextMenu,
     onDragEvent: setDraggedEvent, onDragEnd: () => { setDraggedEvent(null); setDropTargetDate(null) },
   }
 
@@ -428,9 +501,20 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           getRowIcon={(event) => EVENT_TYPE_ICONS[event.eventType] || Clock3}
           rowClassName={(event) => event.eventDate < todayKey ? 'schedule-grid-row-past' : undefined}
           onRowDoubleClick={openEvent}
-          rowActions={(event) => [{ label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) }]}
+          rowActions={(event) => [
+            { key: 'open', label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) },
+            ...(canDelete ? [{ key: `delete-${event.id}`, label: 'Delete', icon: Trash2, destructive: true, onClick: () => setEventToDelete(event) }] : []),
+          ]}
         />}
       </section>}
+      {eventContextMenu && <ScheduleEventContextMenu
+        event={eventContextMenu.event}
+        position={eventContextMenu.position}
+        canDelete={canDelete}
+        onClose={() => setEventContextMenu(null)}
+        onOpen={openEvent}
+        onDelete={setEventToDelete}
+      />}
       {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
       {eventToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}
