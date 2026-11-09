@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 const listPath = /^\/(?:playbooks|game-plans|schedule-events)(?:\/[^/]+\/(?:plays|rows|groupings|scout-plays)(?:\/[^/]+\/slides)?)?$/
 
 export function createBreadcrumbCache() {

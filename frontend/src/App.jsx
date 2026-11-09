@@ -1,9 +1,15 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, Info, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { clearPendingInvitation, createApi, getAuthenticationError, isDevelopmentAuth, isEntraAuth, isSignedOut, pendingInvitation, resetSession, selectedDevelopmentPlan, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
+import { AboutDialog } from './components/AboutDialog'
 import { TeamInvitationDialog } from './components/TeamInvitationDialog'
 import { StartupPage } from './components/StartupPage'
 import { LoadingIndicator } from './components/LoadingIndicator'
@@ -237,7 +243,7 @@ function timezoneColumns(columns, timezone) {
   return columns.map((column) => column.render === formatDate ? { ...column, render: (value) => formatDate(value, timezone) } : column)
 }
 
-function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, onSignOut, busy, switchingSubscription, searchApi, onSearchOpen, searchBusy }) {
+function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, onSignOut, onAbout, busy, switchingSubscription, searchApi, onSearchOpen, searchBusy }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
@@ -335,6 +341,8 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
                 <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 {workspace?.kind === 'team' && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
                 {!workspace?.alphaEnabled && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
+                <div className="account-menu-divider" role="separator" />
+                <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onAbout() }}><Info className="menu-item-icon" aria-hidden="true" />About Blitzboard...</button>
                 <div className="account-menu-divider" role="separator" />
                 <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onSignOut() }}><LogOut className="menu-item-icon" aria-hidden="true" />Sign Out</button>
               </div>
@@ -1101,6 +1109,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [view, setView] = useState(ROOT_VIEWS.includes(storedBreadcrumb?.view) ? storedBreadcrumb.view : 'playbooks')
   const [scheduleDisplayMode, setScheduleDisplayMode] = useState('calendar')
   const [accountDialog, setAccountDialog] = useState(null)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [parent, setParent] = useState(null)
   const [gameCard, setGameCard] = useState(null)
   const [gamePlanUnit, setGamePlanUnit] = useState(storedBreadcrumb?.gamePlanUnit || 'Offense')
@@ -1627,6 +1636,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         searchBusy={searchOpening || restoring}
         onWorkspaceChange={onWorkspaceChange}
         onSignOut={onSignOut}
+        onAbout={() => setAboutOpen(true)}
         onNavigate={(nextView) => requestLeave(() => {
           setSlideshow(false)
           if (['settings', 'profile', 'billing', 'team'].includes(nextView)) {
@@ -1932,6 +1942,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onDismiss={() => requestLeave(() => setAccountDialog(null), `Close ${accountDialog}`)}
         onSaved={() => setAccountDialog(null)}
       />}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
       {deleteConfirmation && <DeleteConfirmationDialog
         message={deleteConfirmation.message}
         onCancel={() => setDeleteConfirmation(null)}

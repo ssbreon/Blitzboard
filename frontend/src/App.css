@@ -34,9 +34,19 @@ button:active:not(:disabled):not([role^='menuitem']) {
 
 .startup-page {
   min-height: 100svh;
+  display: flex;
+  flex-direction: column;
   background: var(--form-bg);
   color: var(--text-h);
   text-align: left;
+}
+
+.startup-copyright {
+  margin-top: auto;
+  padding: 18px 5%;
+  color: var(--text);
+  font-size: 12px;
+  text-align: center;
 }
 
 .startup-brand {
@@ -1684,6 +1694,52 @@ html.is-drilling-through * {
     svg {
       flex: none;
     }
+  }
+}
+
+.about-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.about-dialog-content {
+  padding: 4px 0;
+  text-align: center;
+
+  p {
+    margin: 0;
+    line-height: 1.55;
+  }
+
+  p + p {
+    margin-top: 16px;
+  }
+}
+
+.about-support {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+
+  h3,
+  p {
+    margin: 0;
+  }
+
+  h3 {
+    font-size: 15px;
+  }
+
+  p,
+  a {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  a {
+    color: var(--navy-light);
+    overflow-wrap: anywhere;
   }
 }
 

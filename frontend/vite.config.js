@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import react from '@vitejs/plugin-react'
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'

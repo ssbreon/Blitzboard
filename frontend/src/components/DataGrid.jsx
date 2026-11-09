@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Archive, ArrowDown, ArrowUp, Check, Folder, FolderOpen, FolderPlus, GripVertical, Info, LoaderCircle, MoreVertical, RefreshCw, Search, ThumbsUp, X } from 'lucide-react'

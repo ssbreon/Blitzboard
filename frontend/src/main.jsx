@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

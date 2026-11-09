@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { useState } from 'react'
 import { ArrowRight, Check, UserRound, Users } from 'lucide-react'
 
@@ -60,5 +65,6 @@ export function StartupPage({ development = false, cloudAuth = false, invitation
         </button>
       </div>
     </section>
+    <footer className="startup-copyright">© 2027 Breon Technologies LLC. All Rights Reserved.</footer>
   </main>
 }

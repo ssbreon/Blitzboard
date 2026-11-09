@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { createBreadcrumbCache } from '../utils/breadcrumbCache'
 import { createEntraSession } from './entra'
 

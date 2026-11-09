@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 // Field coordinates are percentages: x = 0 (left) to 100 (right), y = 0 (top) to 100 (bottom).
 const PLAY_TEMPLATE_DEFINITIONS = [
   // 1) Pro Set vs 4-3 Over

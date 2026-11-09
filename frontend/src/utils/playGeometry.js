@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 // Shared field geometry used by both the interactive designer and the read-only print renderer.
 
 // Fixed on-screen size (px) for the block tool's perpendicular endcap, independent of field scaling.

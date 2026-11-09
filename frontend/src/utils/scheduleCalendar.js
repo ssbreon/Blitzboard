@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 export const ScheduleView = Object.freeze({ WEEK: 'week', MONTH: 'month', QUARTER: 'quarter', YEAR: 'year' })
 const pad = (value) => String(value).padStart(2, '0')
 const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`

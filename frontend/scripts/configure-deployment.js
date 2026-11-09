@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { readFile, writeFile } from 'node:fs/promises'
 
 const apiBaseUrl = process.env.VITE_API_BASE_URL

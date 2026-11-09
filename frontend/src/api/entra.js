@@ -1,3 +1,8 @@
+/*
+ * Blitzboard Studio
+ * Copyright (c) 2027 Breon Technologies LLC
+ * All Rights Reserved
+ */
 import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser'
 
 export function createEntraSession(settings, createClient = (config) => new PublicClientApplication(config), origin = location.origin) {
