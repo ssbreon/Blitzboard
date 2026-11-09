@@ -205,6 +205,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [draftTemplateId, setDraftTemplateId] = useState(initialTemplateId)
   const [draftGameType, setDraftGameType] = useState(initialGameType)
   const [draftCategory, setDraftCategory] = useState(initialCategory)
+  const settingsTemplates = getTemplatesForGameType(draftGameType, draftCategory)
+  const settingsTemplateIds = new Set(settingsTemplates.map((template) => template.id))
+  const settingsTemplateGroups = Object.entries(PLAY_TEMPLATES[draftGameType] || {}).map(([family, templates]) => [
+    family,
+    templates.filter((template) => settingsTemplateIds.has(template.id)),
+  ]).filter(([, templates]) => templates.length > 0)
   const [savedName, setSavedName] = useState(record.name)
   const [savedMarkers, setSavedMarkers] = useState(record.initialMarkers || [])
   const [savedDrawings, setSavedDrawings] = useState(normalizeDrawings(record.initialDrawings))
@@ -681,7 +687,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   function openSettings() {
     setDraftName(name)
     setDraftGameType(gameType)
-    setDraftTemplateId(templateId)
+    const templates = getTemplatesForGameType(gameType, category)
+    setDraftTemplateId(templates.some((template) => template.id === templateId) ? templateId : templates[0]?.id || '')
     setDraftCategory(category)
     setSettingsOpen(true)
   }
@@ -707,7 +714,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   function handleSettingsSave(event) {
     event.preventDefault()
-    if (!draftName.trim()) return
+    if (!draftName.trim() || !settingsTemplateIds.has(draftTemplateId)) return
     if (!activeSlideId) {
       const appliedName = draftName.trim()
       setName(appliedName)
@@ -1528,7 +1535,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             </label>
             <label className="dialog-field">
               <span>Category</span>
-              <select value={draftCategory} onChange={(event) => setDraftCategory(event.target.value)}>
+              <select value={draftCategory} onChange={(event) => {
+                const nextCategory = event.target.value
+                const templates = getTemplatesForGameType(draftGameType, nextCategory)
+                setDraftCategory(nextCategory)
+                setDraftTemplateId(templates.some((template) => template.id === draftTemplateId) ? draftTemplateId : templates[0]?.id || '')
+              }}>
                 {categoryOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
@@ -1543,7 +1555,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 onChange={(event) => {
                   const nextGameType = event.target.value
                   setDraftGameType(nextGameType)
-                  setDraftTemplateId(getTemplatesForGameType(nextGameType)[0].id)
+                  setDraftTemplateId(getTemplatesForGameType(nextGameType, draftCategory)[0]?.id || '')
                 }}
               >
                 {Object.keys(PLAY_TEMPLATES).map((option) => <option key={option} value={option}>{gameTypeLabel(option)}</option>)}
@@ -1551,8 +1563,9 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             </label>
             <label className="dialog-field">
               <span>Template</span>
-              <select value={draftTemplateId} onChange={(event) => setDraftTemplateId(event.target.value)}>
-                {Object.entries(PLAY_TEMPLATES[draftGameType] || {}).map(([family, templates]) => (
+              <select value={draftTemplateId} required disabled={settingsTemplates.length === 0} onChange={(event) => setDraftTemplateId(event.target.value)}>
+                {!draftTemplateId && <option value="">Select template</option>}
+                {settingsTemplateGroups.map(([family, templates]) => (
                   <optgroup key={family} label={templates[0].formationFamilyLabel}>
                     {templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}
                   </optgroup>

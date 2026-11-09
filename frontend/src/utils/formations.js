@@ -1711,7 +1711,154 @@ const PLAY_TEMPLATE_DEFINITIONS = [
   },
 ]
 
-export const PLAY_TEMPLATES = PLAY_TEMPLATE_DEFINITIONS.reduce((gameTypes, template) => {
+function positionsFromRows(rows) {
+  return rows.flatMap(({ y, xPositions }) => xPositions.map((xPosition) => ({ x: xPosition, y })))
+}
+
+const SPECIAL_TEAMS_OFFENSE_FORMATIONS = {
+  balancedKickoff: {
+    positionLabels: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'K'],
+    positions: positionsFromRows([
+      { y: 46, xPositions: [5, 15, 24, 33, 42, 58, 67, 76, 85, 95] },
+      { y: 70, xPositions: [50] },
+    ]),
+  },
+  shieldPunt: {
+    positionLabels: ['LE', 'LT', 'LG', 'LS', 'RG', 'RT', 'RE', 'W', 'W', 'PP', 'P'],
+    positions: positionsFromRows([
+      { y: 48, xPositions: [20, 30, 40, 50, 60, 70, 80] },
+      { y: 55, xPositions: [8, 92] },
+      { y: 62, xPositions: [50] },
+      { y: 76, xPositions: [50] },
+    ]),
+  },
+  spreadPunt: {
+    positionLabels: ['LT', 'LG', 'LS', 'RG', 'RT', 'G', 'G', 'W', 'W', 'PP', 'P'],
+    positions: positionsFromRows([
+      { y: 48, xPositions: [30, 40, 50, 60, 70] },
+      { y: 43, xPositions: [8, 92] },
+      { y: 56, xPositions: [20, 80] },
+      { y: 64, xPositions: [50] },
+      { y: 77, xPositions: [50] },
+    ]),
+  },
+  patProtection: {
+    positionLabels: ['TE', 'LT', 'LG', 'C', 'RG', 'RT', 'TE', 'W', 'W', 'H', 'K'],
+    positions: positionsFromRows([
+      { y: 50, xPositions: [20, 30, 40, 50, 60, 70, 80] },
+      { y: 49, xPositions: [8, 92] },
+      { y: 63, xPositions: [50] },
+      { y: 74, xPositions: [52] },
+    ]),
+  },
+  onsideKick: {
+    positionLabels: ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'K'],
+    positions: positionsFromRows([
+      { y: 46, xPositions: [5, 15, 24, 33, 42, 58, 67, 76, 85, 95] },
+      { y: 70, xPositions: [50] },
+    ]),
+  },
+}
+
+const SPECIAL_TEAMS_DEFENSE_FORMATIONS = {
+  return5222: {
+    positionLabels: ['F', 'F', 'F', 'F', 'F', 'B', 'B', 'B', 'B', 'R', 'R'],
+    positions: positionsFromRows([
+      { y: 35, xPositions: [18, 34, 50, 66, 82] },
+      { y: 48, xPositions: [40, 60] },
+      { y: 60, xPositions: [40, 60] },
+      { y: 72, xPositions: [42, 58] },
+    ]),
+  },
+  return5321: {
+    positionLabels: ['F', 'F', 'F', 'F', 'F', 'B', 'B', 'B', 'B', 'B', 'R'],
+    positions: positionsFromRows([
+      { y: 35, xPositions: [18, 34, 50, 66, 82] },
+      { y: 49, xPositions: [30, 50, 70] },
+      { y: 62, xPositions: [40, 60] },
+      { y: 74, xPositions: [50] },
+    ]),
+  },
+  puntReturn: {
+    positionLabels: ['G', 'G', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'R', 'R'],
+    positions: positionsFromRows([
+      { y: 38, xPositions: [24, 40, 60, 76] },
+      { y: 50, xPositions: [18, 40, 60, 82] },
+      { y: 62, xPositions: [35] },
+      { y: 74, xPositions: [42, 58] },
+    ]),
+  },
+  puntBlock: {
+    positionLabels: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'B', 'B', 'B', 'B'],
+    positions: positionsFromRows([
+      { y: 35, xPositions: [10, 23, 36, 50, 64, 77, 90] },
+      { y: 48, xPositions: [35, 65] },
+      { y: 62, xPositions: [35, 65] },
+    ]),
+  },
+  baseBlock: {
+    positionLabels: ['E', 'T', 'T', 'E', 'E', 'S', 'M', 'W', 'C', 'FS', 'C'],
+    positions: positionsFromRows([
+      { y: 36, xPositions: [20, 35, 50, 65, 80] },
+      { y: 49, xPositions: [30, 50, 70] },
+      { y: 65, xPositions: [25, 50, 75] },
+    ]),
+  },
+  heavyBlock: {
+    positionLabels: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'B', 'B', 'B', 'B'],
+    positions: positionsFromRows([
+      { y: 35, xPositions: [12, 25, 37, 50, 63, 75, 88] },
+      { y: 50, xPositions: [32, 44, 56, 68] },
+    ]),
+  },
+  handsTeam: {
+    positionLabels: ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+    positions: positionsFromRows([
+      { y: 40, xPositions: [25, 40, 60, 75] },
+      { y: 53, xPositions: [20, 40, 60, 80] },
+      { y: 68, xPositions: [35, 50, 65] },
+    ]),
+  },
+}
+
+const SPECIAL_TEAMS_TEMPLATE_CONFIGS = [
+  ['11v11-balanced-kickoff-vs-5-2-2-2-return', 'Balanced Kickoff vs 5-2-2-2 Return', ['Kickoff', 'Kickoff Return'], 'balancedKickoff', 'return5222'],
+  ['11v11-balanced-kickoff-vs-5-3-2-1-return', 'Balanced Kickoff vs 5-3-2-1 Return', ['Kickoff', 'Kickoff Return'], 'balancedKickoff', 'return5321'],
+  ['11v11-shield-punt-vs-base-return', 'Shield Punt vs Base Return', ['Punt', 'Punt Return'], 'shieldPunt', 'puntReturn'],
+  ['11v11-shield-punt-vs-punt-block', 'Shield Punt vs Punt Block', ['Punt', 'Punt Return'], 'shieldPunt', 'puntBlock'],
+  ['11v11-spread-punt-vs-base-return', 'Spread Punt vs Base Return', ['Punt', 'Punt Return'], 'spreadPunt', 'puntReturn'],
+  ['11v11-spread-punt-vs-punt-block', 'Spread Punt vs Punt Block', ['Punt', 'Punt Return'], 'spreadPunt', 'puntBlock'],
+  ['11v11-pat-fg-protection-vs-base-block', 'PAT-FG Protection vs Base Block', ['PAT/FG', 'PAT/FG Block'], 'patProtection', 'baseBlock'],
+  ['11v11-pat-fg-protection-vs-heavy-block', 'PAT-FG Protection vs Heavy Block', ['PAT/FG', 'PAT/FG Block'], 'patProtection', 'heavyBlock'],
+  ['11v11-onside-kick-vs-hands-team', 'Onside Kick vs Hands Team', ['Onside Kick', 'Hands Team'], 'onsideKick', 'handsTeam'],
+]
+
+const SPECIAL_TEAMS_TEMPLATE_DEFINITIONS = SPECIAL_TEAMS_TEMPLATE_CONFIGS.map(([id, label, categories, offenseKey, defenseKey]) => {
+  const offenseFormation = SPECIAL_TEAMS_OFFENSE_FORMATIONS[offenseKey]
+  const defenseFormation = SPECIAL_TEAMS_DEFENSE_FORMATIONS[defenseKey]
+  return {
+    id,
+    legacyIds: [],
+    label,
+    gameType: '11v11',
+    formationCategory: 'special_teams',
+    defenseFront: null,
+    defenseFrontLabel: null,
+    formationFamily: 'special_teams',
+    formationFamilyLabel: 'Special Teams',
+    categories,
+    position_labels: {
+      offense: offenseFormation.positionLabels,
+      defense: defenseFormation.positionLabels,
+    },
+    offense: offenseFormation.positions,
+    defense: defenseFormation.positions,
+  }
+})
+
+const ALL_PLAY_TEMPLATE_DEFINITIONS = [...PLAY_TEMPLATE_DEFINITIONS, ...SPECIAL_TEAMS_TEMPLATE_DEFINITIONS]
+
+export const PLAY_TEMPLATES = ALL_PLAY_TEMPLATE_DEFINITIONS.reduce((gameTypes, template) => {
   const { gameType, formationFamily } = template
   gameTypes[gameType] ??= {}
   gameTypes[gameType][formationFamily] ??= []
@@ -1725,8 +1872,25 @@ export const ALL_PLAY_TEMPLATES = Object.values(PLAY_TEMPLATES).flatMap((familie
 export const DEFAULT_GAME_TYPE = '11v11'
 export const DEFAULT_PLAY_TEMPLATE = PLAY_TEMPLATES[DEFAULT_GAME_TYPE].pro_set[0]
 
-export function getTemplatesForGameType(gameType) {
-  return Object.values(PLAY_TEMPLATES[gameType] || {}).flat()
+const SPECIAL_TEAMS_TEMPLATE_CATEGORIES = new Set([
+  'Kickoff',
+  'Kickoff Return',
+  'Punt',
+  'Punt Return',
+  'PAT/FG',
+  'PAT/FG Block',
+  'Onside Kick',
+  'Hands Team',
+])
+
+export function getTemplatesForGameType(gameType, category) {
+  const templates = Object.values(PLAY_TEMPLATES[gameType] || {}).flat()
+  if (category === undefined) return templates
+  if (!gameType || !category) return []
+  if (gameType === '11v11' && SPECIAL_TEAMS_TEMPLATE_CATEGORIES.has(category)) {
+    return templates.filter((template) => template.categories?.includes(category))
+  }
+  return templates.filter((template) => !template.categories)
 }
 
 export function findPlayTemplate(id) {

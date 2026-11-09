@@ -284,7 +284,6 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
   const [eventToDelete, setEventToDelete] = useState(null)
-  const [eventContextMenu, setEventContextMenu] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
@@ -342,17 +341,6 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   function openEvent(event) {
     if (event.kind === 'game') onOpenGame(event)
     else setDialog({ event })
-  }
-
-  function openEventContextMenu(contextEvent, event) {
-    contextEvent.preventDefault()
-    const menuHeight = (canDelete ? 2 : 1) * 44 + 12
-    const top = contextEvent.clientY + menuHeight <= window.innerHeight
-      ? contextEvent.clientY + 4 : Math.max(8, contextEvent.clientY - menuHeight - 4)
-    setEventContextMenu({
-      event,
-      position: { top, right: Math.max(8, window.innerWidth - contextEvent.clientX), trigger: contextEvent.currentTarget },
-    })
   }
 
   function moveCalendar(direction) {
@@ -429,7 +417,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const calendarProps = {
     eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey,
     onDropTarget: setDropTargetDate, onMoveEvent: moveEventToDate,
-    onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent, onContextMenu: openEventContextMenu,
+    onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent,
     onDragEvent: setDraggedEvent, onDragEnd: () => { setDraggedEvent(null); setDropTargetDate(null) },
   }
 
@@ -501,20 +489,9 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           getRowIcon={(event) => EVENT_TYPE_ICONS[event.eventType] || Clock3}
           rowClassName={(event) => event.eventDate < todayKey ? 'schedule-grid-row-past' : undefined}
           onRowDoubleClick={openEvent}
-          rowActions={(event) => [
-            { key: 'open', label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) },
-            ...(canDelete ? [{ key: `delete-${event.id}`, label: 'Delete', icon: Trash2, destructive: true, onClick: () => setEventToDelete(event) }] : []),
-          ]}
+          rowActions={(event) => [{ label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) }]}
         />}
       </section>}
-      {eventContextMenu && <ScheduleEventContextMenu
-        event={eventContextMenu.event}
-        position={eventContextMenu.position}
-        canDelete={canDelete}
-        onClose={() => setEventContextMenu(null)}
-        onOpen={openEvent}
-        onDelete={setEventToDelete}
-      />}
       {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
       {eventToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}

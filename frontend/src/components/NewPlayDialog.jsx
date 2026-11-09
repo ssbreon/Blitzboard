@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { applyPlayerLabelOption, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
+import { applyPlayerLabelOption, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
-import { DEFAULT_FIELD_ZONE, FIELD_ZONES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
+import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 
 export const OFFENSE_PLAY_CATEGORIES = ['Formation', 'Shift/Motion', 'Run', 'Pass', 'Play-Action Pass', 'RPO', 'Gadget', 'Generic']
 export const PLAY_CATEGORIES = ['Front', 'Stunt', 'Blitz', 'Coverage', 'Play Call']
-export const SPECIAL_TEAMS_PLAY_CATEGORIES = ['Kickoff', 'Kick Return', 'Punt', 'Punt Return', 'Field Goal', 'Extra Point', 'Generic']
+export const SPECIAL_TEAMS_PLAY_CATEGORIES = ['Kickoff', 'Punt', 'PAT/FG', 'Onside Kick', 'Kickoff Return', 'Punt Return', 'PAT/FG Block', 'Hands Team']
 export function playCategoriesForCollection(category) {
   if (category === 'Offense') return OFFENSE_PLAY_CATEGORIES
   if (category === 'Special Teams') return SPECIAL_TEAMS_PLAY_CATEGORIES
@@ -27,18 +27,27 @@ function gameTypeLabel(gameType) {
 export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName)
-  const [gameType, setGameType] = useState(DEFAULT_GAME_TYPE)
-  const [templateId, setTemplateId] = useState(DEFAULT_PLAY_TEMPLATE.id)
-  const [category, setCategory] = useState(categoryOptions[0])
+  const [gameType, setGameType] = useState('')
+  const [templateId, setTemplateId] = useState('')
+  const [category, setCategory] = useState('')
   const [fieldDecoration, setFieldDecoration] = useState(DEFAULT_FIELD_DECORATION)
   const [playerLabelOption, setPlayerLabelOption] = useState(DEFAULT_PLAYER_LABEL_OPTION)
   const [fieldZone, setFieldZone] = useState(DEFAULT_FIELD_ZONE)
   const [fieldOrientation, setFieldOrientation] = useState(defaultFieldOrientation)
   const [themeId, setThemeId] = useState(defaultTheme)
-  const template = getTemplatesForGameType(gameType).find((option) => option.id === templateId) || DEFAULT_PLAY_TEMPLATE
-  const previewMarkers = applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
-    defaultPerspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
-  )
+  const perspective = SPECIAL_TEAMS_PLAY_CATEGORIES.includes(category) ? defaultPlayPerspective(category) : defaultPerspective
+  const availableTemplates = getTemplatesForGameType(gameType, category)
+  const availableTemplateIds = new Set(availableTemplates.map((option) => option.id))
+  const availableTemplateGroups = Object.entries(PLAY_TEMPLATES[gameType] || {}).map(([family, templates]) => [
+    family,
+    templates.filter((option) => availableTemplateIds.has(option.id)),
+  ]).filter(([, templates]) => templates.length > 0)
+  const template = availableTemplates.find((option) => option.id === templateId)
+  const previewMarkers = template
+    ? applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
+        perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
+      )
+    : []
   const previewPlay = {
     name,
     gameType,
@@ -48,7 +57,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     fieldOrientation,
     fieldZone,
     theme: themeId,
-    perspective: defaultPerspective,
+    perspective,
     markers: previewMarkers,
     drawings: [],
     textAnnotations: [],
@@ -60,17 +69,18 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
   function handleSubmit(event) {
     event.preventDefault()
     if (step === 1) {
+      if (!category || !gameType || !templateId) return
       setStep(2)
       return
     }
     const trimmed = name.trim()
     if (!trimmed) return
-    onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption)
+    onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption, perspective)
     setStep(1)
     setName(initialName)
-    setGameType(DEFAULT_GAME_TYPE)
-    setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
-    setCategory(categoryOptions[0])
+    setGameType('')
+    setTemplateId('')
+    setCategory('')
     setFieldDecoration(DEFAULT_FIELD_DECORATION)
     setPlayerLabelOption(DEFAULT_PLAYER_LABEL_OPTION)
     setFieldZone(DEFAULT_FIELD_ZONE)
@@ -81,9 +91,9 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
   function handleCancel() {
     setStep(1)
     setName(initialName)
-    setGameType(DEFAULT_GAME_TYPE)
-    setTemplateId(DEFAULT_PLAY_TEMPLATE.id)
-    setCategory(categoryOptions[0])
+    setGameType('')
+    setTemplateId('')
+    setCategory('')
     setFieldDecoration(DEFAULT_FIELD_DECORATION)
     setPlayerLabelOption(DEFAULT_PLAYER_LABEL_OPTION)
     setFieldZone(DEFAULT_FIELD_ZONE)
@@ -111,7 +121,16 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                 </label>
                 <label className="dialog-field">
                   <span>Category</span>
-                  <select value={category} onChange={(event) => setCategory(event.target.value)}>
+                  <select
+                    value={category}
+                    required
+                    onChange={(event) => {
+                      const nextCategory = event.target.value
+                      setCategory(nextCategory)
+                      setTemplateId(getTemplatesForGameType(gameType, nextCategory)[0]?.id || '')
+                    }}
+                  >
+                    <option value="">Select category</option>
                     {categoryOptions.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>
@@ -119,19 +138,27 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                   <span>Game Type</span>
                   <select
                     value={gameType}
+                    required
                     onChange={(event) => {
                       const nextGameType = event.target.value
                       setGameType(nextGameType)
-                      setTemplateId(getTemplatesForGameType(nextGameType)[0].id)
+                      setTemplateId(getTemplatesForGameType(nextGameType, category)[0]?.id || '')
                     }}
                   >
+                    <option value="">Select game type</option>
                     {Object.keys(PLAY_TEMPLATES).map((option) => <option key={option} value={option}>{gameTypeLabel(option)}</option>)}
                   </select>
                 </label>
                 <label className="dialog-field">
                   <span>Template</span>
-                  <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-                    {Object.entries(PLAY_TEMPLATES[gameType] || {}).map(([family, templates]) => (
+                  <select
+                    value={templateId}
+                    required
+                    disabled={!category || !gameType || availableTemplates.length === 0}
+                    onChange={(event) => setTemplateId(event.target.value)}
+                  >
+                    <option value="">Select template</option>
+                    {availableTemplateGroups.map(([family, templates]) => (
                       <optgroup key={family} label={templates[0].formationFamilyLabel}>
                         {templates.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                       </optgroup>

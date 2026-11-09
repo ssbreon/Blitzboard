@@ -1332,12 +1332,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     await api.reorderPlays(parentId, rows.map((item) => item.id))
   }
 
-  async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption) {
+  async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption, selectedPerspective) {
     const { target, parentId, unit, groupingId } = newDialog
     setNewDialog(null)
     const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent?.id === parentId ? parent : null
     const collectionCategory = newDialog.category || parent?.category
-    const perspective = defaultPlayPerspective(target === 'scoutPlay' || newDialog.practiceScript ? 'Offense' : collectionCategory)
+    const perspective = target === 'scoutPlay' || newDialog.practiceScript
+      ? defaultPlayPerspective('Offense')
+      : selectedPerspective || defaultPlayPerspective(collectionCategory)
     const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
     const designerParentCategory = target === 'scoutPlay' ? playUnit : collectionCategory
     const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE

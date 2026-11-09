@@ -59,7 +59,9 @@ export const PLAY_PERSPECTIVES = ['Offense on Top', 'Offense on bottom']
 export const DEFAULT_PLAY_PERSPECTIVE = PLAY_PERSPECTIVES[0]
 
 export function defaultPlayPerspective(category) {
-  return category === 'Offense' ? PLAY_PERSPECTIVES[1] : PLAY_PERSPECTIVES[0]
+  return ['Offense', 'Kickoff', 'Punt', 'PAT/FG', 'Onside Kick'].includes(category)
+    ? PLAY_PERSPECTIVES[1]
+    : PLAY_PERSPECTIVES[0]
 }
 
 function screenFieldPercent(percent, perspective) {
