@@ -69,6 +69,8 @@ export function ErrorDialogProvider({ children }) {
   const details = current ? [
     current.error.message || String(current.error),
     current.error.code != null ? `Error code: ${current.error.code}` : '',
+    current.error.errorCode != null ? `Provider error code: ${current.error.errorCode}` : '',
+    current.error.subError != null ? `Provider sub-error: ${current.error.subError}` : '',
     current.error.status != null ? `HTTP status: ${current.error.status}` : '',
   ].filter(Boolean).join('\n') : ''
 

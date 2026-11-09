@@ -2018,7 +2018,14 @@ function AppContent() {
         || identity.workspaces[0]
       if (!workspace) throw new Error('No accessible workspace')
       return loadWorkspace(workspace.id)
-    }).catch((failure) => { if (active) { resetSession(); setSignedOut(true); setError(failure); setLoading(false) } })
+    }).catch((failure) => {
+      if (active) {
+        resetSession()
+        setSignedOut(true)
+        setError(failure.code === 'AUTH_INTERACTION_REQUIRED' ? null : failure)
+        setLoading(false)
+      }
+    })
     return () => { active = false; generation.current += 1 }
   }, [signedOut])
 

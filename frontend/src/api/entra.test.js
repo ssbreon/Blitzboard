@@ -77,6 +77,14 @@ test('Entra interaction-required errors do not trigger redirects that discard wo
   assert.equal(login(), undefined)
 })
 
+test('Entra silent iframe timeouts request interactive sign-in', async () => {
+  for (const subError of ['monitor_window_timeout', 'redirect_bridge_timeout']) {
+    const timeout = Object.assign(new Error('timed_out'), { errorCode: 'timed_out', subError })
+    const { session } = fixture({ accounts: [{ homeAccountId: 'coach' }], tokenError: timeout })
+    await assert.rejects(session.accessToken(), (error) => error.code === 'AUTH_INTERACTION_REQUIRED')
+  }
+})
+
 test('Entra rejects missing configuration, untrusted authorities, and external callbacks', () => {
   for (const invalid of [{}, { ...settings, VITE_ENTRA_AUTHORITY: 'https://attacker.example/tenant' },
     { ...settings, VITE_ENTRA_REDIRECT_URI: 'https://attacker.example/' },

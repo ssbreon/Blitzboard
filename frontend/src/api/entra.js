@@ -60,7 +60,8 @@ export function createEntraSession(settings, createClient = (config) => new Publ
         if (!result.accessToken || result.account?.homeAccountId !== account.homeAccountId) throw new Error('The authentication account changed; sign in again')
         return result.accessToken
       } catch (error) {
-        if (error instanceof InteractionRequiredAuthError) {
+        if (error instanceof InteractionRequiredAuthError
+          || (error.errorCode === 'timed_out' && ['monitor_window_timeout', 'redirect_bridge_timeout'].includes(error.subError))) {
           // Avoid interrupting work with an automatic redirect when interaction is needed.
           const failure = new Error('Your sign-in needs to be renewed. Sign out and sign in again after saving your changes.')
           failure.code = 'AUTH_INTERACTION_REQUIRED'
