@@ -10,8 +10,10 @@ import {
   endZoneBandsForWindow,
   fixedSizeEllipse,
   goalLinePositionsForWindow,
-  fieldWindowForZone,
+  fieldWindowForPlay,
+  fieldWindowStyle,
   flattenDrawings,
+  isExtendedFieldWindow,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
   markerStyleVars,
@@ -62,19 +64,21 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
   const showHashMarks = Boolean(play.fieldDecoration) && play.fieldDecoration !== 'None'
   const showYardNumbers = play.fieldDecoration === 'Hash Marks and Numbers'
   const xPositions = hashMarkXPositions(play.fieldOrientation)
-  const fieldWindow = fieldWindowForZone(play.fieldZone, perspective)
+  const fieldWindow = fieldWindowForPlay(play, perspective)
   const yPositions = hashMarkYPositionsForWindow(fieldWindow, perspective)
   const yardNumbers = showYardNumbers ? yardNumbersForWindow(fieldWindow, perspective) : []
   const yardNumberX = yardNumberXPositions(play.fieldOrientation)
   const endZoneBands = showYardNumbers ? endZoneBandsForWindow(fieldWindow, perspective) : []
   const goalLinePositions = showYardNumbers ? goalLinePositionsForWindow(fieldWindow, perspective) : []
   const losPercent = fieldWindow.losPercent
+  const windowStyle = fieldWindowStyle(fieldWindow)
+  const extendedClass = isExtendedFieldWindow(fieldWindow) ? ' extended-window' : ''
 
   return (
     <div
       ref={fieldRef}
-      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass} zone-windowed ${className}`.trim()}
-      style={{ '--drawing-size-scale': drawingSizeScale }}
+      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass} zone-windowed${extendedClass} ${className}`.trim()}
+      style={{ '--drawing-size-scale': drawingSizeScale, ...windowStyle }}
     >
       <span className="play-designer-los-line" style={{ top: `${losPercent}%` }} aria-hidden="true" />
       {endZoneBands.map((band) => (

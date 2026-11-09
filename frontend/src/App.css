@@ -498,13 +498,13 @@ html.is-drilling-through * {
   border-top:2px solid var(--navy);
   border-bottom:1px solid var(--navy);
   background:
-    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 0, rgba(255, 255, 255, 0.8) 1px, transparent 1px, transparent 12.5%),
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 0, rgba(255, 255, 255, 0.8) 1px, transparent 1px, transparent var(--field-band-size, 12.5%)),
     repeating-linear-gradient(
       to bottom,
       #2f6b3c 0,
-      #2f6b3c 12.5%,
-      #356f41 12.5%,
-      #356f41 25%
+      #2f6b3c var(--field-band-size, 12.5%),
+      #356f41 var(--field-band-size, 12.5%),
+      #356f41 calc(var(--field-band-size, 12.5%) * 2)
     );
   overflow: hidden;
   cursor: default;
@@ -532,7 +532,7 @@ html.is-drilling-through * {
 
   &.printer-friendly {
     background:
-      repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0, rgba(0, 0, 0, 0.35) 1px, transparent 1px, transparent 12.5%),
+      repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0, rgba(0, 0, 0, 0.35) 1px, transparent 1px, transparent var(--field-band-size, 12.5%)),
       #fff;
 
     &::before {
@@ -544,9 +544,9 @@ html.is-drilling-through * {
     background: repeating-linear-gradient(
       to bottom,
       #171717 0,
-      #171717 12.5%,
-      #222 12.5%,
-      #222 25%
+      #171717 var(--field-band-size, 12.5%),
+      #222 var(--field-band-size, 12.5%),
+      #222 calc(var(--field-band-size, 12.5%) * 2)
     );
 
     &::before {
@@ -570,6 +570,13 @@ html.is-drilling-through * {
   &.zone-windowed::before {
     display: none;
   }
+}
+
+/* Kicking plays show a longer stretch of field, so the field narrows to keep its proportions. */
+.play-designer-field.extended-window {
+  width: calc(100% * var(--field-width-scale, 1));
+  margin-inline: auto;
+  align-self: center;
 }
 
 .play-designer-slides {
@@ -1920,7 +1927,7 @@ html.is-drilling-through * {
 
 .new-play-preview-field {
   width: 100%;
-  aspect-ratio: 2 / 1;
+  aspect-ratio: calc(2 * var(--field-width-scale, 1));
   flex: none;
   min-height: 0;
   border-radius: 4px;
@@ -4659,8 +4666,8 @@ html.is-drilling-through * {
 
 .print-sheet .print-field {
   flex: none;
-  width: 100%;
-  aspect-ratio: var(--print-field-aspect-ratio, 2.25);
+  width: calc(100% * var(--field-width-scale, 1));
+  aspect-ratio: calc(var(--print-field-aspect-ratio, 2.25) * var(--field-width-scale, 1));
   min-height: 0;
   margin-block: 0;
   border-left: 2px solid var(--navy);
@@ -4920,7 +4927,7 @@ html.is-drilling-through * {
 }
 
 .slideshow-canvas .play-field-view {
-  width: 100%;
+  width: calc(100% * var(--field-width-scale, 1));
   min-height: 0;
   touch-action: auto;
 }
@@ -6454,11 +6461,11 @@ html.is-drilling-through * {
 
 .schedule-grid-play-preview .play-field-view {
   flex: none;
-  width: min(210px, 100%);
+  width: calc(min(210px, 100%) * var(--field-width-scale, 1));
   height: auto;
   min-height: 0;
   margin: 0;
-  aspect-ratio: 2.25;
+  aspect-ratio: calc(2.25 * var(--field-width-scale, 1));
   border-radius: 2px;
 }
 
@@ -6558,10 +6565,10 @@ html.is-drilling-through * {
 
 .schedule-install-add-preview .play-field-view,
 .schedule-selected-install-preview .play-field-view {
-  width: 100%;
+  width: calc(100% * var(--field-width-scale, 1));
   height: 100%;
   min-height: 0;
-  margin: 0;
+  margin: 0 auto;
   border: 0;
   border-radius: 2px;
 }

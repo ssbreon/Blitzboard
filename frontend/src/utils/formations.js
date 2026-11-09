@@ -1715,12 +1715,19 @@ function positionsFromRows(rows) {
   return rows.flatMap(({ y, xPositions }) => xPositions.map((xPosition) => ({ x: xPosition, y })))
 }
 
+// Converts yards from the line of scrimmage (positive = kicking side) into template y values for the
+// standard Green Zone window (LOS at 37.5%, 2.5% per yard); kicking windows rescale them by yardage.
+function kickingRowY(yardsFromLos, team) {
+  const percent = 37.5 - 2.5 * yardsFromLos
+  return team === 'offense' ? 85 - percent : percent
+}
+
 const SPECIAL_TEAMS_OFFENSE_FORMATIONS = {
   balancedKickoff: {
-    positionLabels: ['L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'K'],
+    positionLabels: ['L1', 'L2', 'L3', 'L4', 'L5', 'R5', 'R4', 'R3', 'R2', 'R1', 'K'],
     positions: positionsFromRows([
-      { y: 46, xPositions: [5, 15, 24, 33, 42, 58, 67, 76, 85, 95] },
-      { y: 70, xPositions: [50] },
+      { y: kickingRowY(1, 'offense'), xPositions: [5, 15, 24, 33, 42, 58, 67, 76, 85, 95] },
+      { y: kickingRowY(5, 'offense'), xPositions: [50] },
     ]),
   },
   shieldPunt: {
@@ -1762,21 +1769,21 @@ const SPECIAL_TEAMS_OFFENSE_FORMATIONS = {
 
 const SPECIAL_TEAMS_DEFENSE_FORMATIONS = {
   return5222: {
-    positionLabels: ['F', 'F', 'F', 'F', 'F', 'B', 'B', 'B', 'B', 'R', 'R'],
+    positionLabels: ['T', 'G', 'C', 'G', 'T', 'E', 'E', 'FB', 'FB', 'R1', 'R2'],
     positions: positionsFromRows([
-      { y: 35, xPositions: [18, 34, 50, 66, 82] },
-      { y: 48, xPositions: [40, 60] },
-      { y: 60, xPositions: [40, 60] },
-      { y: 72, xPositions: [42, 58] },
+      { y: kickingRowY(-12, 'defense'), xPositions: [18, 34, 50, 66, 82] },
+      { y: kickingRowY(-22, 'defense'), xPositions: [35, 65] },
+      { y: kickingRowY(-34, 'defense'), xPositions: [40, 60] },
+      { y: kickingRowY(-48, 'defense'), xPositions: [35, 65] },
     ]),
   },
   return5321: {
-    positionLabels: ['F', 'F', 'F', 'F', 'F', 'B', 'B', 'B', 'B', 'B', 'R'],
+    positionLabels: ['T', 'G', 'C', 'G', 'T', 'E', 'M', 'E', 'FB', 'FB', 'RB'],
     positions: positionsFromRows([
-      { y: 35, xPositions: [18, 34, 50, 66, 82] },
-      { y: 49, xPositions: [30, 50, 70] },
-      { y: 62, xPositions: [40, 60] },
-      { y: 74, xPositions: [50] },
+      { y: kickingRowY(-12, 'defense'), xPositions: [18, 34, 50, 66, 82] },
+      { y: kickingRowY(-22, 'defense'), xPositions: [30, 50, 70] },
+      { y: kickingRowY(-34, 'defense'), xPositions: [40, 60] },
+      { y: kickingRowY(-48, 'defense'), xPositions: [50] },
     ]),
   },
   puntReturn: {

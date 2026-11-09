@@ -32,10 +32,6 @@ const YARD_NUMBER_BOTTOM_EDGE_FEET = {
   NFL: 36,
 }
 
-export const HASH_MARK_Y_POSITIONS = Array.from({ length: 8 }, (_, band) =>
-  [2.5, 5, 7.5, 10].map((offset) => band * 12.5 + offset),
-).flat()
-
 export function hashMarkXPositions(fieldOrientation) {
   const feet = HASH_MARK_DISTANCE_FEET[fieldOrientation] || HASH_MARK_DISTANCE_FEET['High School']
   const percent = (feet / FIELD_WIDTH_FEET) * 100
@@ -70,7 +66,20 @@ function screenFieldPercent(percent, perspective) {
 
 const FIELD_LENGTH_YARDS = 100
 const END_ZONE_YARDS = 10
-const WINDOW_YARDS = 40 // matches the 8 alternating 5-yard bands painted on the field background
+const WINDOW_YARDS = 40 // standard window; the field background paints one band per 5 yards
+const YARD_BAND_YARDS = 5
+
+// Kicking plays show from just behind the kicking spot to the receiving team's goal line.
+export const KICKING_PLAY_CATEGORIES = ['Kickoff', 'Kickoff Return', 'Punt', 'Punt Return', 'Onside Kick', 'Hands Team']
+const KICKOFF_PLAY_CATEGORIES = new Set(['Kickoff', 'Kickoff Return', 'Onside Kick', 'Hands Team'])
+// Kicking team's own yard line for the kickoff spot, by level (Field Orientation).
+const KICKOFF_SPOT_YARD_LINE = {
+  'High School': 40,
+  NCAA: 35,
+  NFL: 35,
+}
+const KICKING_WINDOW_BEHIND_LOS_YARDS = 15
+const KICKING_WINDOW_END_ZONE_YARDS = 5
 
 const FIELD_ZONE_LOS_YARDS = {
   'Green Zone': 60, // offense's own 40 yard line
@@ -105,7 +114,54 @@ export function fieldWindowForZone(fieldZone, perspective = DEFAULT_PLAY_PERSPEC
     top -= bottom - maxBottom
     bottom = maxBottom
   }
-  return { top, bottom, los, losPercent: screenFieldPercent(((los - top) / WINDOW_YARDS) * 100, perspective) }
+  return buildFieldWindow(top, bottom, los, perspective)
+}
+
+function buildFieldWindow(top, bottom, los, perspective) {
+  const yards = bottom - top
+  return { top, bottom, los, yards, losPercent: screenFieldPercent(((los - top) / yards) * 100, perspective) }
+}
+
+// Kicking categories extend the window from behind the kicking spot to the receiving end zone;
+// kickoffs use the level's kickoff spot while punts use the Field Zone line of scrimmage.
+export function fieldWindowForPlay(play = {}, perspective = DEFAULT_PLAY_PERSPECTIVE) {
+  if (!KICKING_PLAY_CATEGORIES.includes(play.category)) return fieldWindowForZone(play.fieldZone, perspective)
+  const los = KICKOFF_PLAY_CATEGORIES.has(play.category)
+    ? FIELD_LENGTH_YARDS - (KICKOFF_SPOT_YARD_LINE[play.fieldOrientation] ?? KICKOFF_SPOT_YARD_LINE['High School'])
+    : fieldZoneLosYards(play.fieldZone)
+  const top = -KICKING_WINDOW_END_ZONE_YARDS
+  const bottom = Math.min(los + KICKING_WINDOW_BEHIND_LOS_YARDS, FIELD_LENGTH_YARDS + END_ZONE_YARDS)
+  if (bottom - top <= WINDOW_YARDS) return fieldWindowForZone(play.fieldZone, perspective)
+  return buildFieldWindow(top, bottom, los, perspective)
+}
+
+export function isExtendedFieldWindow(window) {
+  return window.yards > WINDOW_YARDS
+}
+
+// Narrows the field so a longer window keeps the standard window's yards-per-pixel proportions.
+export function fieldWindowStyle(window) {
+  if (!isExtendedFieldWindow(window)) return {}
+  return {
+    '--field-width-scale': WINDOW_YARDS / window.yards,
+    '--field-band-size': `${(YARD_BAND_YARDS / window.yards) * 100}%`,
+  }
+}
+
+export function fieldWidthScale(window) {
+  return isExtendedFieldWindow(window) ? WINDOW_YARDS / window.yards : 1
+}
+
+// Re-positions markers laid out for the standard Green Zone window (top-perspective percents)
+// so they keep the same yardage from the line of scrimmage inside another window.
+export function fitMarkersToWindow(markers, window) {
+  if (!isExtendedFieldWindow(window)) return markers
+  const reference = fieldWindowForZone(DEFAULT_FIELD_ZONE, PLAY_PERSPECTIVES[0])
+  return markers.map((marker) => {
+    const yardsFromLos = reference.top + ((100 - marker.y) / 100) * reference.yards - reference.los
+    const yard = window.los + yardsFromLos
+    return { ...marker, y: 100 - ((yard - window.top) / window.yards) * 100 }
+  })
 }
 
 // Yard-line markers (0..100 in 10-yard steps) visible within the window, using standard football
@@ -119,7 +175,7 @@ export function yardNumbersForWindow(window, perspective = DEFAULT_PLAY_PERSPECT
     const label = isGoalLine ? 'G' : yard <= 50 ? yard : FIELD_LENGTH_YARDS - yard
     let arrow = isGoalLine || yard === 50 ? null : yard < 50 ? 'up' : 'down'
     if (perspective === PLAY_PERSPECTIVES[0] && arrow) arrow = arrow === 'up' ? 'down' : 'up'
-    const percent = ((yard - window.top) / WINDOW_YARDS) * 100
+    const percent = ((yard - window.top) / window.yards) * 100
     numbers.push({ yard, percent: screenFieldPercent(percent, perspective), label, arrow })
   }
   return numbers
@@ -136,8 +192,8 @@ export function endZoneBandsForWindow(window, perspective = DEFAULT_PLAY_PERSPEC
     const start = Math.max(band.start, window.top)
     const end = Math.min(band.end, window.bottom)
     if (end > start) {
-      const top = ((start - window.top) / WINDOW_YARDS) * 100
-      const height = ((end - start) / WINDOW_YARDS) * 100
+      const top = ((start - window.top) / window.yards) * 100
+      const height = ((end - start) / window.yards) * 100
       bands.push({ top: perspective === PLAY_PERSPECTIVES[0] ? 100 - top - height : top, height })
     }
   }
@@ -147,15 +203,19 @@ export function endZoneBandsForWindow(window, perspective = DEFAULT_PLAY_PERSPEC
 export function goalLinePositionsForWindow(window, perspective = DEFAULT_PLAY_PERSPECTIVE) {
   return [0, FIELD_LENGTH_YARDS]
     .filter((yard) => yard >= window.top && yard <= window.bottom)
-    .map((yard) => screenFieldPercent(((yard - window.top) / WINDOW_YARDS) * 100, perspective))
+    .map((yard) => screenFieldPercent(((yard - window.top) / window.yards) * 100, perspective))
 }
 
-// Filters the fixed hash-mark tick grid down to ticks that fall on the playable field (excludes end zones).
+// One hash-mark tick per yard on the playable field (excludes end zones and 5-yard lines).
 export function hashMarkYPositionsForWindow(window, perspective = DEFAULT_PLAY_PERSPECTIVE) {
-  return HASH_MARK_Y_POSITIONS.filter((percent) => {
-    const yard = window.top + (percent / 100) * WINDOW_YARDS
-    return yard >= 0 && yard <= FIELD_LENGTH_YARDS
-  }).map((percent) => screenFieldPercent(percent, perspective))
+  const positions = []
+  const first = Math.ceil(Math.max(window.top, 0))
+  const last = Math.min(window.bottom, FIELD_LENGTH_YARDS)
+  for (let yard = first; yard <= last; yard += 1) {
+    if (yard % YARD_BAND_YARDS === 0) continue
+    positions.push(screenFieldPercent(((yard - window.top) / window.yards) * 100, perspective))
+  }
+  return positions
 }
 
 export const DRAWING_TOOLS = [

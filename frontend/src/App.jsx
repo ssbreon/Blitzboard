@@ -31,7 +31,7 @@ import { TeamSchedule } from './components/TeamSchedule'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
 import { formatDate } from './utils/formatDate'
 import { BreadcrumbCacheContext } from './utils/breadcrumbCacheContext'
-import { defaultPlayPerspective, PLAY_PERSPECTIVES } from './utils/playGeometry'
+import { defaultPlayPerspective, fieldWindowForPlay, fitMarkersToWindow, PLAY_PERSPECTIVES } from './utils/playGeometry'
 import './App.css'
 
 const STATUS_COLUMN = { key: 'recordStatus', header: 'Status', render: (value) => value ?? 'Active' }
@@ -1343,7 +1343,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     const playUnit = target === 'scoutPlay' ? unit || collectionCategory : undefined
     const designerParentCategory = target === 'scoutPlay' ? playUnit : collectionCategory
     const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
-    const initialMarkers = applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
+    const templateMarkers = fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay({ category, fieldZone, fieldOrientation }))
+    const initialMarkers = applyPlayerLabelOption(templateMarkers, playerLabelOption).map((marker) =>
       perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
     )
     let record =

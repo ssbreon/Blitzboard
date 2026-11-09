@@ -31,11 +31,15 @@ import {
   decorationPreviewVars,
   endZoneBandsForWindow,
   goalLinePositionsForWindow,
-  fieldWindowForZone,
+  fieldWindowForPlay,
+  fieldWindowStyle,
+  fieldWidthScale,
+  fitMarkersToWindow,
   fixedSizeEllipse,
   flattenDrawings,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
+  isExtendedFieldWindow,
   markerStyleVars,
   normalizeDrawings,
   normalizeTextAnnotations,
@@ -247,7 +251,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const hashXPositions = hashMarkXPositions(fieldOrientation)
   const showHashMarks = fieldDecoration !== FIELD_DECORATIONS[0]
   const showYardNumbers = fieldDecoration === FIELD_DECORATIONS[2]
-  const fieldWindow = fieldWindowForZone(fieldZone, perspective)
+  const fieldWindow = fieldWindowForPlay({ category, fieldZone, fieldOrientation }, perspective)
   const hashYPositions = hashMarkYPositionsForWindow(fieldWindow, perspective)
   const yardNumbers = showYardNumbers ? yardNumbersForWindow(fieldWindow, perspective) : []
   const yardNumberX = yardNumberXPositions(fieldOrientation)
@@ -693,11 +697,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSettingsOpen(true)
   }
 
-  function applyTemplate(nextTemplateId) {
+  function applyTemplate(nextTemplateId, nextCategory = category) {
     if (nextTemplateId === templateId) return
     const template = findPlayTemplate(nextTemplateId) || DEFAULT_PLAY_TEMPLATE
     setTemplateId(template.id)
-    setMarkers(buildMarkersFromTemplate(template))
+    setMarkers(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay({ category: nextCategory, fieldZone, fieldOrientation })))
     setDrawings(normalizeDrawings())
     setTextAnnotations([])
     setZones([])
@@ -722,7 +726,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     setGameType(draftGameType)
     setCategory(draftCategory)
-    applyTemplate(draftTemplateId)
+    applyTemplate(draftTemplateId, draftCategory)
     setSettingsOpen(false)
   }
 
@@ -785,7 +789,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   function restartPlay() {
     const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
-    setMarkers(buildMarkersFromTemplate(template))
+    setMarkers(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindow))
     setDrawings(normalizeDrawings())
     setTextAnnotations([])
     setZones([])
@@ -1516,6 +1520,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             fieldOrientation,
             fieldZone,
             perspective,
+            category,
             parentCategory: record.parentCategory,
             showAssignments,
           }}
@@ -1743,7 +1748,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 onClick={() => {
                   setMenuOpen(false)
                   const fieldRect = fieldRef.current?.getBoundingClientRect()
-                  if (fieldRect?.width && fieldRect?.height) setPrintFieldAspectRatio(fieldRect.width / fieldRect.height)
+                  if (fieldRect?.width && fieldRect?.height) setPrintFieldAspectRatio(fieldRect.width / fieldWidthScale(fieldWindow) / fieldRect.height)
                   setPrintOpen(true)
                 }}
               >
@@ -2033,7 +2038,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       <div
         ref={fieldRef}
         id="play-designer-field"
-        className={`play-designer-field${activeTool !== 'select' ? ' drawing' : ''}${themeClass}${fieldDecorationClass} zone-windowed`}
+        className={`play-designer-field${activeTool !== 'select' ? ' drawing' : ''}${themeClass}${fieldDecorationClass} zone-windowed${isExtendedFieldWindow(fieldWindow) ? ' extended-window' : ''}`}
+        style={fieldWindowStyle(fieldWindow)}
         onClick={handleFieldClick}
         onDoubleClick={handleFieldDoubleClick}
         onPointerDown={handleFieldPointerDown}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
-import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
+import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONES, fieldWindowForPlay, fitMarkersToWindow, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 
@@ -44,7 +44,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
   ]).filter(([, templates]) => templates.length > 0)
   const template = availableTemplates.find((option) => option.id === templateId)
   const previewMarkers = template
-    ? applyPlayerLabelOption(buildMarkersFromTemplate(template), playerLabelOption).map((marker) =>
+    ? applyPlayerLabelOption(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay({ category, fieldZone, fieldOrientation })), playerLabelOption).map((marker) =>
         perspective === PLAY_PERSPECTIVES[1] ? { ...marker, y: 100 - marker.y } : marker,
       )
     : []
