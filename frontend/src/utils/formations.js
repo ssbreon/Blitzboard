@@ -1715,8 +1715,8 @@ function positionsFromRows(rows) {
   return rows.flatMap(({ y, xPositions }) => xPositions.map((xPosition) => ({ x: xPosition, y })))
 }
 
-// Converts yards from the line of scrimmage (positive = kicking side) into template y values for the
-// standard Green Zone window (LOS at 37.5%, 2.5% per yard); kicking windows rescale them by yardage.
+// Converts yards from the line of scrimmage (positive = kicking side) into template y values, which
+// use a 40-yard layout window (LOS at 37.5%, 2.5% per yard); fitMarkersToWindow maps them to the play's window.
 function kickingRowY(yardsFromLos, team) {
   const percent = 37.5 - 2.5 * yardsFromLos
   return team === 'offense' ? 85 - percent : percent
@@ -1904,15 +1904,30 @@ export function findPlayTemplate(id) {
   return ALL_PLAY_TEMPLATES.find((template) => template.id === id || template.legacyIds?.includes(id))
 }
 
+// Scrimmage templates were laid out with ~3 ft line splits; widen the box so larger player symbols
+// don't overlap on a true-proportion field while keeping wide players inside the sidelines.
+const BOX_HALF_WIDTH = 10
+const BOX_SPREAD = 1.9
+
+function spreadTemplateX(x) {
+  const offset = x - 50
+  const distance = Math.abs(offset)
+  const spread = distance <= BOX_HALF_WIDTH
+    ? distance * BOX_SPREAD
+    : BOX_HALF_WIDTH * BOX_SPREAD + (distance - BOX_HALF_WIDTH) * ((50 - BOX_HALF_WIDTH * BOX_SPREAD) / (50 - BOX_HALF_WIDTH))
+  return Math.round((50 + Math.sign(offset) * spread) * 100) / 100
+}
+
 export function buildMarkersFromTemplate(template) {
   const markers = []
   const labels = template.position_labels
+  const templateX = template.formationFamily === 'special_teams' ? (x) => x : spreadTemplateX
   template.offense.forEach((pos, index) => {
     const label = labels.offense[index] || 'O'
     markers.push({
       id: `offense-${index}`,
       label,
-      x: pos.x,
+      x: templateX(pos.x),
       y: 85 - pos.y,
       team: 'offense',
       ...(label === 'C' ? { shape: 'rectangle' } : {}),
@@ -1922,7 +1937,7 @@ export function buildMarkersFromTemplate(template) {
     markers.push({
       id: `defense-${index}`,
       label: labels.defense[index] || 'D',
-      x: pos.x,
+      x: templateX(pos.x),
       y: pos.y,
       team: 'defense',
     })

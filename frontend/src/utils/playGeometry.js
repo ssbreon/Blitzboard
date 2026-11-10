@@ -72,8 +72,9 @@ function screenFieldPercent(percent, perspective) {
 
 const FIELD_LENGTH_YARDS = 100
 const END_ZONE_YARDS = 10
-const WINDOW_YARDS = 40 // standard window; the field background paints one band per 5 yards
+const WINDOW_YARDS = 35 // standard window; the field background paints one band per 5 yards
 const YARD_BAND_YARDS = 5
+const YARD_NUMBER_EDGE_CLEARANCE_YARDS = 2.5
 
 // Kicking plays show from just behind the kicking spot to the receiving team's goal line.
 export const KICKING_PLAY_CATEGORIES = ['Kickoff', 'Kickoff Return', 'Punt', 'Punt Return', 'Onside Kick', 'Hands Team']
@@ -94,25 +95,27 @@ const FIELD_ZONE_LOS_YARDS = {
   'Gold Zone': 5, // defense's 5 yard line
 }
 
-const FIELD_ZONE_WINDOW_YARDS = {
-  'Green Zone': { defenseSide: 25, offenseSide: 15 },
-  'Red Zone': { defenseSide: 25, offenseSide: 15 },
-}
+const ZONE_WINDOW_YARDS = { defenseSide: 25, offenseSide: 10 }
+// PAT/FG kickers line up ~10 yards deep, so those plays need more room behind the line.
+const DEEP_BACKFIELD_CATEGORIES = new Set(['PAT/FG', 'PAT/FG Block'])
+const DEEP_BACKFIELD_WINDOW_YARDS = { defenseSide: 20, offenseSide: 15 }
+
+// Layout space of the formation templates: a 40-yard window with the LOS 25 yards from the defense edge.
+const TEMPLATE_WINDOW = { top: 35, los: 60, yards: 40 }
 
 export function fieldZoneLosYards(fieldZone) {
   return FIELD_ZONE_LOS_YARDS[fieldZone] ?? FIELD_ZONE_LOS_YARDS[DEFAULT_FIELD_ZONE]
 }
 
-// Computes the visible 40-yard window (absolute field yards, defense goal line = 0) for a Field
-// Zone. The line of scrimmage stays centered unless that would reveal space beyond the end
+// Computes the visible 35-yard window (absolute field yards, defense goal line = 0) for a Field
+// Zone. The line of scrimmage keeps its offset unless that would reveal space beyond the end
 // zones, in which case the window shifts just enough to stay within the playable field.
-export function fieldWindowForZone(fieldZone, perspective = DEFAULT_PLAY_PERSPECTIVE) {
+export function fieldWindowForZone(fieldZone, perspective = DEFAULT_PLAY_PERSPECTIVE, zoneWindow = ZONE_WINDOW_YARDS) {
   const los = fieldZoneLosYards(fieldZone)
   const minTop = -END_ZONE_YARDS
   const maxBottom = FIELD_LENGTH_YARDS + END_ZONE_YARDS
-  const zoneWindow = FIELD_ZONE_WINDOW_YARDS[fieldZone]
-  let top = los - (zoneWindow?.defenseSide ?? WINDOW_YARDS / 2)
-  let bottom = los + (zoneWindow?.offenseSide ?? WINDOW_YARDS / 2)
+  let top = los - zoneWindow.defenseSide
+  let bottom = los + zoneWindow.offenseSide
   if (top < minTop) {
     bottom += minTop - top
     top = minTop
@@ -131,40 +134,40 @@ function buildFieldWindow(top, bottom, los, perspective) {
 // Kicking categories extend the window from behind the kicking spot to the receiving end zone;
 // kickoffs use the level's kickoff spot while punts use the Field Zone line of scrimmage.
 export function fieldWindowForPlay(play = {}, perspective = DEFAULT_PLAY_PERSPECTIVE) {
-  if (!KICKING_PLAY_CATEGORIES.includes(play.category)) return fieldWindowForZone(play.fieldZone, perspective)
+  if (!KICKING_PLAY_CATEGORIES.includes(play.category)) return scrimmageWindow(play, perspective)
   const los = KICKOFF_PLAY_CATEGORIES.has(play.category)
     ? FIELD_LENGTH_YARDS - (KICKOFF_SPOT_YARD_LINE[play.fieldOrientation] ?? KICKOFF_SPOT_YARD_LINE['High School'])
     : fieldZoneLosYards(play.fieldZone)
   const top = -KICKING_WINDOW_END_ZONE_YARDS
   const bottom = Math.min(los + KICKING_WINDOW_BEHIND_LOS_YARDS, FIELD_LENGTH_YARDS + END_ZONE_YARDS)
-  if (bottom - top <= WINDOW_YARDS) return fieldWindowForZone(play.fieldZone, perspective)
+  if (bottom - top <= WINDOW_YARDS) return scrimmageWindow(play, perspective)
   return buildFieldWindow(top, bottom, los, perspective)
 }
 
-export function isExtendedFieldWindow(window) {
-  return window.yards > WINDOW_YARDS
+function scrimmageWindow(play, perspective) {
+  return DEEP_BACKFIELD_CATEGORIES.has(play.category)
+    ? fieldWindowForZone(play.fieldZone, perspective, DEEP_BACKFIELD_WINDOW_YARDS)
+    : fieldWindowForZone(play.fieldZone, perspective)
 }
 
-// Narrows the field so a longer window keeps the standard window's yards-per-pixel proportions.
+// Width:height of the visible window on a real field (53⅓ yards sideline to sideline).
+export function fieldAspectRatio(window) {
+  return FIELD_WIDTH_FEET / 3 / window.yards
+}
+
+// Real field proportions plus one background band per 5 yards.
 export function fieldWindowStyle(window) {
-  if (!isExtendedFieldWindow(window)) return {}
   return {
-    '--field-width-scale': WINDOW_YARDS / window.yards,
+    '--field-aspect-ratio': fieldAspectRatio(window),
     '--field-band-size': `${(YARD_BAND_YARDS / window.yards) * 100}%`,
   }
 }
 
-export function fieldWidthScale(window) {
-  return isExtendedFieldWindow(window) ? WINDOW_YARDS / window.yards : 1
-}
-
-// Re-positions markers laid out for the standard Green Zone window (top-perspective percents)
-// so they keep the same yardage from the line of scrimmage inside another window.
+// Re-positions template markers (top-perspective percents of the template layout window) so they
+// keep the same yardage from the line of scrimmage inside the play's window.
 export function fitMarkersToWindow(markers, window) {
-  if (!isExtendedFieldWindow(window)) return markers
-  const reference = fieldWindowForZone(DEFAULT_FIELD_ZONE, PLAY_PERSPECTIVES[0])
   return markers.map((marker) => {
-    const yardsFromLos = reference.top + ((100 - marker.y) / 100) * reference.yards - reference.los
+    const yardsFromLos = TEMPLATE_WINDOW.top + ((100 - marker.y) / 100) * TEMPLATE_WINDOW.yards - TEMPLATE_WINDOW.los
     const yard = window.los + yardsFromLos
     return { ...marker, y: 100 - ((yard - window.top) / window.yards) * 100 }
   })
@@ -176,7 +179,8 @@ export function fitMarkersToWindow(markers, window) {
 export function yardNumbersForWindow(window, perspective = DEFAULT_PLAY_PERSPECTIVE) {
   const numbers = []
   for (let yard = 0; yard <= FIELD_LENGTH_YARDS; yard += 10) {
-    if (yard < window.top || yard > window.bottom) continue
+    // Skip numbers that would be cut in half at the window's edge.
+    if (yard < window.top + YARD_NUMBER_EDGE_CLEARANCE_YARDS || yard > window.bottom - YARD_NUMBER_EDGE_CLEARANCE_YARDS) continue
     const isGoalLine = yard === 0 || yard === FIELD_LENGTH_YARDS
     const label = isGoalLine ? 'G' : yard <= 50 ? yard : FIELD_LENGTH_YARDS - yard
     let arrow = isGoalLine || yard === 50 ? null : yard < 50 ? 'up' : 'down'

@@ -161,7 +161,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   overscroll-behavior-y: contain;
   scrollbar-gutter: stable;
   padding: 0px 2px 2px 2px;
-  background: var(--primary-tab);
+  background: var(--gray-gutter);
 
   @media (max-width: 1024px) {
     padding: 16px 20px 24px;
@@ -572,11 +572,28 @@ html.is-drilling-through * {
   }
 }
 
-/* Kicking plays show a longer stretch of field, so the field narrows to keep its proportions. */
-.play-designer-field.extended-window {
-  width: calc(100% * var(--field-width-scale, 1));
-  margin-inline: auto;
-  align-self: center;
+/* The designer field keeps real field proportions and grows as large as the canvas allows. */
+.play-designer-field-frame {
+  container-type: size;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-grow: 1;
+  min-height: 240px;
+}
+
+.play-designer-field-frame > .play-designer-field {
+  --field-width: min(100cqw, 100cqh * var(--field-aspect-ratio));
+  flex: none;
+  min-height: 0;
+  margin-inline: 0;
+}
+
+/* Every view sizes the field via --field-width; the height follows real field proportions. */
+.play-designer-field.zone-windowed {
+  box-sizing: border-box;
+  width: var(--field-width, 100%);
+  aspect-ratio: var(--field-aspect-ratio);
 }
 
 .play-designer-slides {
@@ -584,16 +601,19 @@ html.is-drilling-through * {
   top: 0;
   z-index: 20;
   display: flex;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
   flex: none;
   box-sizing: border-box;
+  width: min(var(--field-display-width, 100%), 100%);
   height: 42px;
   min-height: 38px;
-  padding: 0 8px 4px;
+  margin-inline: auto;
+  padding: 0;
   overflow: hidden;
   border-top: 0;
   background: var(--primary-tab);
+  padding-left: 10px;
 }
 
 .play-designer-assignments-toggle {
@@ -636,11 +656,12 @@ html.is-drilling-through * {
 
 .play-designer-sheet-tabs {
   display: flex;
-  align-self: stretch;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  width: max-content;
+  max-width: calc(100% - 140px);
   overflow-x: auto;
   scrollbar-width: none;
 
@@ -654,7 +675,7 @@ html.is-drilling-through * {
   align-items: center;
   flex: none;
   max-width: 240px;
-  border-radius: 0 0 5px 5px;
+  border-radius: 4px;
   background: #3a5d8c;
 }
 
@@ -668,11 +689,11 @@ html.is-drilling-through * {
   flex: none;
   gap: 8px;
   max-width: 190px;
-  height: 34px;
-  padding: 0 14px;
+  height: 32px;
+  padding: 0 12px;
   overflow: hidden;
   border: 0;
-  border-radius: 0 0 5px 5px;
+  border-radius: 4px;
   background: #3a5d8c;
   box-shadow: none !important;
   color: #fff;
@@ -740,14 +761,17 @@ html.is-drilling-through * {
 .play-designer-add-adjustment {
   gap: 6px;
   max-width: none;
-  margin-left: 2px;
+  flex: none;
+  height: 32px;
+  margin-left: 6px;
+  padding-inline: 8px;
   background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.35);
-  border-top: 0;
+  border: 0;
   color: rgba(255, 255, 255, 0.75);
 
   &:hover:not(:disabled) {
-    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 
   &:disabled {
@@ -758,7 +782,7 @@ html.is-drilling-through * {
 
 @media (max-width: 640px) {
   .play-designer-slides {
-    padding-inline: 4px;
+    width: min(var(--field-display-width, 100%), 100%);
   }
 
   .play-designer-tab {
@@ -857,7 +881,8 @@ html.is-drilling-through * {
   color: transparent;
   -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
   font-family: Oswald, sans-serif; /* Georgia, 'Times New Roman', Times, serif; */
-  font-size: 50px;
+  /* Painted numbers are 6 ft tall; the field is 160 ft wide (1 ft = 0.625cqi). */
+  font-size: 4.7cqi;
   font-weight: 500;
   fill: transparent;
   stroke: #bdbdbd;
@@ -882,7 +907,7 @@ html.is-drilling-through * {
 /* Green Field theme paints muted gray numbers with a soft dark outline, like a painted field. */
 .play-designer-field:not(.printer-friendly):not(.blackboard) .play-designer-yard-number {
   color: #d1d5db;
-  -webkit-text-stroke: 2px #4b5563;
+  -webkit-text-stroke: max(0.5px, 0.3cqi) #4b5563;
 }
 
 .play-designer-yard-arrow {
@@ -890,17 +915,17 @@ html.is-drilling-through * {
   transform: translate(-50%, -50%);
   color: transparent;
   -webkit-text-stroke: 1px rgba(255, 255, 255, 0.5);
-  font-size: 14px;
+  font-size: 1.4cqi;
   line-height: 1;
   pointer-events: none;
   z-index: 1;
 
   &.up {
-    margin-top: -38px;
+    margin-top: -3.6cqi;
   }
 
   &.down {
-    margin-top: 38px;
+    margin-top: 3.6cqi;
   }
 }
 
@@ -1306,8 +1331,8 @@ html.is-drilling-through * {
 }
 
 .play-designer-marker {
-  --marker-size: clamp(12px, 1.35cqi, 26px);
-  --marker-font-size: clamp(8.5px, 0.775cqi, 13.5px);
+  --marker-size: max(4px, 2.38cqi);
+  --marker-font-size: max(3px, 1.4cqi);
 
   position: absolute;
   z-index: 2;
@@ -1320,7 +1345,7 @@ html.is-drilling-through * {
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 var(--marker-font-size)/1 var(--sans);
+  font: 700 var(--marker-font-size)/1 Oswald, var(--sans);
   color: var(--marker-text-color, #fff);
   cursor: grab;
   user-select: none;
@@ -1350,7 +1375,7 @@ html.is-drilling-through * {
     --team-color: #fff;
     --decoration-color: #374151;
     --marker-decoration-light-color: #fff;
-    --marker-text-color: #000;
+    --marker-text-color: #333;
     --marker-border-color: #000;
   }
 
@@ -1358,7 +1383,7 @@ html.is-drilling-through * {
     --team-color: #fff;
     --decoration-color: #374151;
     --marker-decoration-light-color: #fff;
-    --marker-text-color: #000;
+    --marker-text-color: #333;
     --marker-border-color: #000;
   }
 
@@ -1367,7 +1392,7 @@ html.is-drilling-through * {
     --team-color: #fff;
     --decoration-color: #000;
     --marker-decoration-light-color: #fff;
-    --marker-text-color: #000;
+    --marker-text-color: #333;
     --marker-border-color: #fff;
   }
 
@@ -1926,32 +1951,11 @@ html.is-drilling-through * {
 }
 
 .new-play-preview-field {
-  width: 100%;
-  aspect-ratio: calc(2 * var(--field-width-scale, 1));
+  --field-width: min(100%, 300px * var(--field-aspect-ratio));
   flex: none;
   min-height: 0;
+  margin-inline: auto;
   border-radius: 4px;
-
-  .play-designer-marker {
-    --marker-size: clamp(9px, 1.8cqi, 22px);
-    --marker-font-size: clamp(6.5px, 1.05cqi, 11.5px);
-  }
-
-  .play-designer-yard-number {
-    font-size: clamp(14px, 3.2cqi, 40px);
-  }
-
-  .play-designer-yard-arrow {
-    font-size: clamp(5px, 1cqi, 12px);
-
-    &.up {
-      margin-top: -3cqi;
-    }
-
-    &.down {
-      margin-top: 3cqi;
-    }
-  }
 }
 
 .new-play-preview-name {
@@ -3564,7 +3568,7 @@ html.is-drilling-through * {
 .data-grid-loading {
   flex: 1;
   padding: 16px;
-  background: gray;
+  background: var(--gray-gutter);
   color: #fff;
 }
 
@@ -4102,7 +4106,7 @@ html.is-drilling-through * {
   border: 1px solid var(--grid-chrome);
   border-top: none;
   border-bottom: none;
-  background: gray;
+  background: var(--gray-gutter);
 
 }
 
@@ -4626,6 +4630,7 @@ html.is-drilling-through * {
 }
 
 .print-cell {
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4665,39 +4670,12 @@ html.is-drilling-through * {
 }
 
 .print-sheet .print-field {
+  --field-width: min(100cqw, var(--print-field-height) * var(--field-aspect-ratio));
   flex: none;
-  width: calc(100% * var(--field-width-scale, 1));
-  aspect-ratio: calc(var(--print-field-aspect-ratio, 2.25) * var(--field-width-scale, 1));
   min-height: 0;
-  margin-block: 0;
+  margin-inline: auto;
   border-left: 2px solid var(--navy);
   border-right: 2px solid var(--navy);
-
-  .play-designer-marker {
-    --marker-size: 17px;
-    --marker-font-size: 7.5px;
-
-    border-width: 1.5px;
-  }
-}
-
-.print-sheet .print-field .play-designer-yard-number {
-  font-size: calc(50px * var(--drawing-size-scale, 1));
-}
-
-.print-grid:not(.per-page-4) .print-field {
-  height: var(--print-field-height);
-  aspect-ratio: auto;
-}
-
-.print-grid.per-page-2 .print-field .play-designer-marker {
-  --marker-size: 13px;
-  --marker-font-size: 6.5px;
-}
-
-.print-grid.per-page-4 .print-field .play-designer-marker {
-  --marker-size: 10px;
-  --marker-font-size: 5.5px;
 }
 
 .print-grid.per-page-2 .print-field .play-designer-text-annotation {
@@ -4921,14 +4899,19 @@ html.is-drilling-through * {
 }
 
 .slideshow-canvas {
+  container-type: size;
   display: flex;
   flex: 1;
+  align-items: center;
+  justify-content: center;
   min-height: 0;
 }
 
 .slideshow-canvas .play-field-view {
-  width: calc(100% * var(--field-width-scale, 1));
+  --field-width: min(100cqw, 100cqh * var(--field-aspect-ratio));
+  flex: none;
   min-height: 0;
+  margin-inline: 0;
   touch-action: auto;
 }
 
@@ -5120,7 +5103,7 @@ html.is-drilling-through * {
 .schedule-grid-view .data-grid-table-wrap {
   flex: 1;
   max-height: none;
-  background: gray;
+  background: var(--gray-gutter);
 
 }
 
@@ -5618,7 +5601,7 @@ html.is-drilling-through * {
   flex: 1;
   min-height: 280px;
   padding: 16px;
-  background: gray;
+  background: var(--gray-gutter);
   color: #fff;
 }
 
@@ -6460,12 +6443,10 @@ html.is-drilling-through * {
 }
 
 .schedule-grid-play-preview .play-field-view {
+  --field-width: calc(94px * var(--field-aspect-ratio));
   flex: none;
-  width: calc(min(210px, 100%) * var(--field-width-scale, 1));
-  height: auto;
   min-height: 0;
-  margin: 0;
-  aspect-ratio: calc(2.25 * var(--field-width-scale, 1));
+  margin-inline: 0;
   border-radius: 2px;
 }
 
@@ -6561,14 +6542,14 @@ html.is-drilling-through * {
   width: 100%;
   aspect-ratio: 2.3;
   overflow: hidden;
+  container-type: size;
 }
 
 .schedule-install-add-preview .play-field-view,
 .schedule-selected-install-preview .play-field-view {
-  width: calc(100% * var(--field-width-scale, 1));
-  height: 100%;
+  --field-width: min(100cqw, 100cqh * var(--field-aspect-ratio));
   min-height: 0;
-  margin: 0 auto;
+  margin-inline: auto;
   border: 0;
   border-radius: 2px;
 }

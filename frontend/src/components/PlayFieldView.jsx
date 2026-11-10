@@ -13,7 +13,6 @@ import {
   fieldWindowForPlay,
   fieldWindowStyle,
   flattenDrawings,
-  isExtendedFieldWindow,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
   markerStyleVars,
@@ -72,12 +71,11 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
   const goalLinePositions = showYardNumbers ? goalLinePositionsForWindow(fieldWindow, perspective) : []
   const losPercent = fieldWindow.losPercent
   const windowStyle = fieldWindowStyle(fieldWindow)
-  const extendedClass = isExtendedFieldWindow(fieldWindow) ? ' extended-window' : ''
 
   return (
     <div
       ref={fieldRef}
-      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass} zone-windowed${extendedClass} ${className}`.trim()}
+      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass} zone-windowed ${className}`.trim()}
       style={{ '--drawing-size-scale': drawingSizeScale, ...windowStyle }}
     >
       <span className="play-designer-los-line" style={{ top: `${losPercent}%` }} aria-hidden="true" />

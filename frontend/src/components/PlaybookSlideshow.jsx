@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from '../utils/formations'
-import { defaultPlayPerspective } from '../utils/playGeometry'
+import { defaultPlayPerspective, fieldWindowForPlay, fitMarkersToWindow } from '../utils/playGeometry'
 import { loadSlideshowDetails, loadSlideshowRows } from '../utils/slideshow'
 import { PlayFieldView } from './PlayFieldView'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -41,7 +41,7 @@ export function PlaybookSlideshow({ api, collection }) {
   const play = details && {
     ...details.play,
     ...adjustment,
-    markers: Array.isArray(adjustment?.markers) ? adjustment.markers : details.play.markers || buildMarkersFromTemplate(findPlayTemplate(details.play.template) || DEFAULT_PLAY_TEMPLATE),
+    markers: Array.isArray(adjustment?.markers) ? adjustment.markers : details.play.markers || fitMarkersToWindow(buildMarkersFromTemplate(findPlayTemplate(details.play.template) || DEFAULT_PLAY_TEMPLATE), fieldWindowForPlay(details.play)),
     drawings: adjustment?.drawings || details.play.drawings,
     textAnnotations: adjustment?.textAnnotations || details.play.textAnnotations,
     zones: adjustment?.zones || details.play.zones,

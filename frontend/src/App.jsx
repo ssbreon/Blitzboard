@@ -1451,7 +1451,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         name: row.name,
         gameType: row.gameType || template.gameType,
         readOnly,
-        initialMarkers: row.markers || buildMarkersFromTemplate(template),
+        initialMarkers: row.markers || fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay(row)),
         initialDrawings: row.drawings,
         initialTextAnnotations: row.textAnnotations,
         initialZones: row.zones,

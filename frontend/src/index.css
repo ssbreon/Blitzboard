@@ -21,6 +21,7 @@
   --secondary-button: #eaeaea;
   --secondary-button-border: #a6a6a6;
   --primary-tab: var(--navy-light);
+  --gray-gutter: gray;
   --accent-bg: rgba(214, 59, 0, 0.1);
   --accent-border: rgba(214, 59, 0, 0.5);
   --social-bg: rgba(244, 243, 236, 0.5);

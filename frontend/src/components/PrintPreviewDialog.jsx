@@ -79,7 +79,7 @@ function printFieldHeight(sheet, orientation, perPage, showTitle) {
   return (sheet.height - footerSpace - PRINT_GRID_GAP - perPage * (titleSpace + PRINT_CELL_VERTICAL_INSETS)) / perPage
 }
 
-export function PrintPreviewDialog({ play, plays, collection, parentCollectionName, onClose, fieldAspectRatio = 2.25 }) {
+export function PrintPreviewDialog({ play, plays, collection, parentCollectionName, onClose }) {
   const items = play ? [play] : plays || []
   const [printedDate] = useState(() => new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date()))
   const [pageSizeId, setPageSizeId] = useState(PAGE_SIZES[0].id)
@@ -273,7 +273,7 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
                         `plays-${index}`,
                         <div className={`print-grid per-page-${perPage}`} style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
                           {page.plays.map((item) => (
-                            <div key={item.id || item.name} className="print-cell" style={{ '--print-field-aspect-ratio': fieldAspectRatio, '--print-field-height': `${fieldHeight}px` }}>
+                            <div key={item.id || item.name} className="print-cell" style={{ '--print-field-height': `${fieldHeight}px` }}>
                               {showTitle && <h1 className="print-sheet-title">{item.name}</h1>}
                               <PlayFieldView
                                 play={{ ...item, perspective: item.perspective || defaultPlayPerspective(collection?.category) }}

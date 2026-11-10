@@ -33,14 +33,12 @@ import {
   goalLinePositionsForWindow,
   fieldWindowForPlay,
   fieldWindowStyle,
-  fieldWidthScale,
   fitMarkersToWindow,
   fixedSizeEllipse,
   flattenDrawings,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
   isGreenZoneOnlyCategory,
-  isExtendedFieldWindow,
   markerStyleVars,
   normalizeDrawings,
   normalizeTextAnnotations,
@@ -206,7 +204,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draftName, setDraftName] = useState(name)
   const [printOpen, setPrintOpen] = useState(false)
-  const [printFieldAspectRatio, setPrintFieldAspectRatio] = useState(2.25)
   const [draftTemplateId, setDraftTemplateId] = useState(initialTemplateId)
   const [draftGameType, setDraftGameType] = useState(initialGameType)
   const [draftCategory, setDraftCategory] = useState(initialCategory)
@@ -1526,7 +1523,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             showAssignments,
           }}
           parentCollectionName={record.parentCollectionName}
-          fieldAspectRatio={printFieldAspectRatio}
           onClose={() => setPrintOpen(false)}
         />
       )}
@@ -1748,8 +1744,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 role="menuitem"
                 onClick={() => {
                   setMenuOpen(false)
-                  const fieldRect = fieldRef.current?.getBoundingClientRect()
-                  if (fieldRect?.width && fieldRect?.height) setPrintFieldAspectRatio(fieldRect.width / fieldWidthScale(fieldWindow) / fieldRect.height)
                   setPrintOpen(true)
                 }}
               >
@@ -2036,10 +2030,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </div>
       </div>
       )}
+      <div className="play-designer-field-frame">
       <div
         ref={fieldRef}
         id="play-designer-field"
-        className={`play-designer-field${activeTool !== 'select' ? ' drawing' : ''}${themeClass}${fieldDecorationClass} zone-windowed${isExtendedFieldWindow(fieldWindow) ? ' extended-window' : ''}`}
+        className={`play-designer-field${activeTool !== 'select' ? ' drawing' : ''}${themeClass}${fieldDecorationClass} zone-windowed`}
         style={fieldWindowStyle(fieldWindow)}
         onClick={handleFieldClick}
         onDoubleClick={handleFieldDoubleClick}
@@ -2461,10 +2456,15 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         )}
       </div>
       </div>
+      </div>
       <div className="play-designer-details">
       {record.kind === 'play' && (
         <>
-          <div className={`play-designer-slides${themeClass}`} aria-busy={slidesLoading}>
+          <div
+            className={`play-designer-slides${themeClass}`}
+            style={{ '--field-display-width': `${fieldPxSize.width}px` }}
+            aria-busy={slidesLoading}
+          >
             <div className="play-designer-sheet-tabs" role="tablist" aria-label="Play adjustments">
               <button
                 type="button"
