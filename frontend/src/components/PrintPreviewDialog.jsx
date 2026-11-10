@@ -79,7 +79,7 @@ function printFieldHeight(sheet, orientation, perPage, showTitle) {
   return (sheet.height - footerSpace - PRINT_GRID_GAP - perPage * (titleSpace + PRINT_CELL_VERTICAL_INSETS)) / perPage
 }
 
-export function PrintPreviewDialog({ play, plays, collection, parentCollectionName, onClose }) {
+export function PrintPreviewDialog({ api, play, plays, collection, parentCollectionName, onClose }) {
   const items = play ? [play] : plays || []
   const [printedDate] = useState(() => new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date()))
   const [pageSizeId, setPageSizeId] = useState(PAGE_SIZES[0].id)
@@ -90,6 +90,7 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
   const [includeGroupings, setIncludeGroupings] = useState(true)
   const [includeAssignments, setIncludeAssignments] = useState(true)
   const [scale, setScale] = useState(1)
+  const [teamLogo, setTeamLogo] = useState(null)
   const stageRef = useRef(null)
 
   const pageSize = PAGE_SIZES.find((size) => size.id === pageSizeId) || PAGE_SIZES[0]
@@ -97,6 +98,9 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
   const columns = gridColumns(perPage, orientation)
   const drawingSizeScale = PRINT_MARKER_SIZES[perPage] / DESIGNER_MARKER_SIZE
   const fieldHeight = printFieldHeight(sheet, orientation, perPage, showTitle)
+  const teamLogoUrl = titlePage && collection?.kind === 'playbook' && teamLogo?.collectionId === collection.id
+    ? teamLogo.url
+    : null
   const assignmentsCategory = (item) => item.parentCategory || item.unit || collection?.category
   const hasAssignments = items.some((item) => assignmentPlayers(item.markers, assignmentsCategory(item))
     .some((marker) => typeof marker.assignment === 'string' && marker.assignment.trim()))
@@ -112,6 +116,23 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  useEffect(() => {
+    let active = true
+    let objectUrl = null
+    if (!titlePage || collection?.kind !== 'playbook' || !api?.workspaceLogo) return () => { active = false }
+
+    api.workspaceLogo().then((logo) => {
+      if (!active || !logo) return
+      objectUrl = URL.createObjectURL(logo)
+      setTeamLogo({ collectionId: collection.id, url: objectUrl })
+    }).catch(() => {})
+
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [api, collection?.id, collection?.kind, titlePage])
 
   useLayoutEffect(() => {
     const el = stageRef.current
@@ -225,6 +246,7 @@ export function PrintPreviewDialog({ play, plays, collection, parentCollectionNa
                     'title-page',
                     <div className="print-title-page">
                       <div className="print-title-main">
+                        {collection.kind === 'playbook' && teamLogoUrl && <img className="print-title-logo" src={teamLogoUrl} alt={`${collection.name} logo`} />}
                         <h1>{collection.name}</h1>
                         <p className="print-title-meta">
                           {[collection.category, collection.year].filter(Boolean).join(' \u00b7 ')}

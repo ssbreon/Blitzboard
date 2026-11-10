@@ -1771,6 +1771,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {printPlay && <PrintPreviewDialog play={printPlay.play} parentCollectionName={printPlay.collectionName} onClose={() => setPrintPlay(null)} />}
       {printCollection && (
         <PrintPreviewDialog
+          api={api}
           plays={printCollection.plays}
           collection={printCollection.collection}
           onClose={() => setPrintCollection(null)}

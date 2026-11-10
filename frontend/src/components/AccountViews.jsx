@@ -3,8 +3,8 @@
  * Copyright (c) 2027 Breon Technologies LLC
  * All Rights Reserved
  */
-import { useEffect, useState } from 'react'
-import { ArrowRightLeft, Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Users, UserRound, Settings } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ArrowRightLeft, Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
@@ -33,11 +33,17 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [billing, setBilling] = useState(null)
   const [billingTab, setBillingTab] = useState('membership')
   const [teamTab, setTeamTab] = useState('workspace')
+  const [logoFile, setLogoFile] = useState(null)
+  const [logoPreview, setLogoPreview] = useState(null)
+  const [hasStoredLogo, setHasStoredLogo] = useState(false)
+  const [logoRemoved, setLogoRemoved] = useState(false)
+  const logoPreviewUrl = useRef(null)
+  const logoInput = useRef(null)
   const [loading, setLoading] = useState(view === 'team' || view === 'billing')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState('')
-  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm)
+  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm) || (view === 'team' && Boolean(logoFile || logoRemoved))
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
   const teamEditable = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.settings'))
@@ -46,6 +52,16 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const canTransfer = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.transfer_ownership'))
   const ownerCount = members.filter((member) => member.role === 'owner').length
   const subscriptionPlan = workspace.subscription.kind || workspace.kind
+
+  function replaceLogoPreview(file) {
+    if (logoPreviewUrl.current) URL.revokeObjectURL(logoPreviewUrl.current)
+    logoPreviewUrl.current = file ? URL.createObjectURL(file) : null
+    setLogoPreview(logoPreviewUrl.current)
+  }
+
+  useEffect(() => () => {
+    if (logoPreviewUrl.current) URL.revokeObjectURL(logoPreviewUrl.current)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -56,9 +72,15 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           if (!active) return
           const invitationResult = canInvite ? await api.invitations() : { items: [] }
           if (!active) return
+          const logo = await api.workspaceLogo()
+          if (!active) return
           setMembers(memberResult.items)
           setInvitations(invitationResult.items)
           setDeliveryMode(invitationResult.deliveryMode)
+          setHasStoredLogo(Boolean(logo))
+          setLogoFile(null)
+          setLogoRemoved(false)
+          replaceLogoPreview(logo)
         } else if (view === 'billing') {
           const result = await api.billing()
           if (active) setBilling(result)
@@ -93,6 +115,16 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       } else if (view === 'team') {
         const { name, ...defaults } = form
         onWorkspaceUpdated(await api.updateWorkspace({ name, defaults }))
+        if (logoFile) {
+          await api.uploadWorkspaceLogo(logoFile)
+          setHasStoredLogo(true)
+        } else if (logoRemoved) {
+          await api.deleteWorkspaceLogo()
+          setHasStoredLogo(false)
+          replaceLogoPreview(null)
+        }
+        setLogoFile(null)
+        setLogoRemoved(false)
       }
       setSavedForm(form)
       setNotice('Saved')
@@ -114,6 +146,33 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   function change(key, value) {
     setForm((current) => ({ ...current, [key]: value }))
     setNotice('')
+  }
+
+  function selectTeamLogo(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setError(new Error('Choose a PNG, JPEG, or WebP image'))
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError(new Error('Team logos must be 2 MB or smaller'))
+      return
+    }
+    setError(null)
+    setNotice('')
+    setLogoFile(file)
+    setLogoRemoved(false)
+    replaceLogoPreview(file)
+  }
+
+  function removeTeamLogo() {
+    setError(null)
+    setNotice('')
+    setLogoFile(null)
+    setLogoRemoved(hasStoredLogo)
+    replaceLogoPreview(null)
   }
 
   function handleBillingTabKeyDown(event) {
@@ -267,6 +326,24 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
         <form className="account-form" onSubmit={save}>
           <fieldset disabled={saving || !teamEditable}>
             <label className="dialog-field"><span>Team name</span><input required maxLength={120} value={form.name} onChange={(event) => change('name', event.target.value)} /></label>
+            <div className="dialog-field team-logo-upload">
+              <span>Team logo</span>
+              <div className="team-logo-picker">
+                <input ref={logoInput} type="file" accept="image/png,image/jpeg,image/webp" onChange={selectTeamLogo} hidden />
+                <button type="button" className="dialog-cancel" disabled={saving || !teamEditable} onClick={() => logoInput.current?.click()}>
+                  <Upload size={16} aria-hidden="true" />{hasStoredLogo && !logoRemoved ? 'Replace logo' : 'Choose logo'}
+                </button>
+              </div>
+            </div>
+            <div className="team-logo-controls">
+              <div className="team-logo-preview" aria-live="polite">
+                {logoPreview
+                  ? <img src={logoPreview} alt={`${workspace.name} logo preview`} />
+                  : <span>{loading ? 'Loading logo...' : 'No logo uploaded'}</span>}
+              </div>
+              {(logoPreview || hasStoredLogo) && <button type="button" className="dialog-cancel" disabled={saving || !teamEditable} onClick={removeTeamLogo}><Trash2 size={16} aria-hidden="true" />Remove logo</button>}
+            </div>
+            <p className="team-logo-help">PNG, JPEG, or WebP. Maximum 2 MB; images are optimized to 2048 pixels.</p>
             {preferences}
           </fieldset>
         </form>

@@ -181,6 +181,33 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
       if (mutation) onMutationState?.(-1)
     }
   }
+  const logoRequest = async (method, file) => {
+    const mutation = method !== 'GET'
+    if (mutation) onMutationState?.(1)
+    try {
+      const response = await fetch(`${baseUrl}/api/workspace/logo`, {
+        method,
+        ...(file ? { body: file } : {}),
+        headers: {
+          ...(file ? { 'Content-Type': file.type } : {}),
+          ...await authenticationHeaders('/workspace/logo'),
+          ...(workspaceId ? { 'X-Workspace-Id': workspaceId } : {}),
+        },
+      })
+      if (!response.ok) {
+        if (method === 'GET' && response.status === 404) return null
+        const detail = await response.json().catch(() => ({}))
+        const error = new Error(detail.error?.message || `Request failed with ${response.status}`)
+        error.code = detail.error?.code
+        error.status = response.status
+        error.diagnosticId = detail.error?.diagnosticId
+        throw error
+      }
+      return method === 'GET' ? response.blob() : null
+    } finally {
+      if (mutation) onMutationState?.(-1)
+    }
+  }
   const client = {
   breadcrumbCache: cache,
   health: () => request('/health'),
@@ -190,6 +217,9 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   workspaces: () => request('/workspaces'),
   workspace: () => request('/workspace'),
   updateWorkspace: (payload) => request('/workspace', { method: 'PATCH', body: JSON.stringify(payload) }),
+  workspaceLogo: () => logoRequest('GET'),
+  uploadWorkspaceLogo: (file) => logoRequest('POST', file),
+  deleteWorkspaceLogo: () => logoRequest('DELETE'),
   members: () => request('/workspace/members'),
   transferOwnership: (userId) => request('/workspace/ownership/transfer', { method: 'POST', body: JSON.stringify({ userId }) }),
   invitations: () => request('/workspace/invitations'),

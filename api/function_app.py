@@ -19,6 +19,7 @@ from azure.identity import DefaultAzureCredential
 import azure.functions as func
 import accounts
 import authentication
+import team_logos
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -609,6 +610,42 @@ def dispatch(req, user, workspace, role):
         return response({"items": items})
 
     owner_id = user["userId"]
+
+    if path == ["workspace", "logo"]:
+        if workspace is None or workspace.get("kind") != "team":
+            return response({"error": {"code": "NOT_FOUND", "message": "Team logo was not found"}}, 404)
+        if method == "GET":
+            try:
+                logo = team_logos.read_logo(workspace["id"])
+            except team_logos.StorageUnavailable:
+                return response({"error": {"code": "STORAGE_NOT_CONFIGURED", "message": "Team logo storage is not configured"}}, 503)
+            if logo is None:
+                return response({"error": {"code": "NOT_FOUND", "message": "Team logo was not found"}}, 404)
+            data, content_type = logo
+            return func.HttpResponse(
+                body=data,
+                status_code=200,
+                mimetype=content_type,
+                headers={"Cache-Control": "private, max-age=300", "X-Content-Type-Options": "nosniff"},
+            )
+        if method in {"POST", "DELETE"}:
+            accounts.require_permission(workspace, role, accounts.Permission.WORKSPACE_SETTINGS)
+            if method == "DELETE":
+                try:
+                    team_logos.delete_logo(workspace["id"])
+                except team_logos.StorageUnavailable:
+                    return response({"error": {"code": "STORAGE_NOT_CONFIGURED", "message": "Team logo storage is not configured"}}, 503)
+                return func.HttpResponse(status_code=204)
+            try:
+                data, content_type = team_logos.validate_logo(req.get_body(), req.headers.get("Content-Type", ""))
+            except ValueError as error:
+                return response({"error": {"code": "VALIDATION_ERROR", "message": str(error)}}, 400)
+            try:
+                team_logos.upload_logo(workspace["id"], data, content_type)
+            except team_logos.StorageUnavailable:
+                return response({"error": {"code": "STORAGE_NOT_CONFIGURED", "message": "Team logo storage is not configured"}}, 503)
+            return func.HttpResponse(status_code=204)
+        return response({"error": {"code": "METHOD_NOT_ALLOWED", "message": "Method not allowed"}}, 405)
 
     account_result = accounts.account_route(storage, user, workspace, role, path, method, body(req) if method in {"POST", "PATCH"} else {})
     if account_result is not None:

@@ -2689,6 +2689,50 @@ html.is-drilling-through * {
   color: var(--text-h);
 }
 
+.team-logo-picker {
+  display: flex;
+  align-items: center;
+}
+
+.team-logo-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.team-logo-preview {
+  display: grid;
+  place-items: center;
+  flex: 0 0 96px;
+  width: 96px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 8px;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.team-logo-preview img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.team-logo-help {
+  margin: -10px 0 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .account-invite-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 110px auto;
@@ -4765,6 +4809,15 @@ html.is-drilling-through * {
     letter-spacing: 0.5px;
     color: #000;
   }
+}
+
+.print-title-logo {
+  display: block;
+  width: 160px;
+  height: 160px;
+  max-width: 100%;
+  margin: 0 auto 8px;
+  object-fit: contain;
 }
 
 .print-title-meta {

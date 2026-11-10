@@ -420,6 +420,25 @@ workspace-specific designer saves, and Cosmos create/delete quota accounting.
 
 ### Storage and Failure Recovery
 
+Team logos use a private `team-logos` Blob container. Local development uses the
+Azurite service from `docker-compose.yml`; set `AZURITE_BLOB_ENDPOINT` only if the
+emulator is not reachable at `http://127.0.0.1:10000/devstoreaccount1`.
+
+For Azure, use the existing `blitzboarddevstore01` StorageV2 account. Create a
+private blob container named `team-logos`, enable the Function App's system-assigned
+managed identity, and grant it **Storage Blob Data Contributor** on that container.
+Set these Function App settings, then restart the Function App:
+
+| Setting | Value |
+| --- | --- |
+| `BLOB_STORAGE_ACCOUNT_URL` | `https://blitzboarddevstore01.blob.core.windows.net` |
+| `BLOB_STORAGE_CONTAINER` | `team-logos` |
+
+Do not put the storage URL or credentials in frontend settings. Azure uses the
+Function App identity; the local Azurite account is emulator-only. Uploads are
+limited to PNG, JPEG, or WebP files up to 2 MB and are resized to at most 2048 px.
+The API authorizes reads for workspace members and upload/removal for Team Owners.
+
 The schema manifest is `api/migrations/003-workspace-accounts-schema.json`.
 Existing content keeps its entity-type partition and immutable `ownerId`; new
 content adds `workspaceId` and `createdBy`. Legacy owner-only records resolve only

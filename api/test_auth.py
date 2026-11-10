@@ -1,10 +1,13 @@
 import json
 import os
 import unittest
+from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 from unittest.mock import Mock, patch
 from urllib.parse import urlparse, parse_qs
+
+from PIL import Image
 
 os.environ["AUTH_MODE"] = "development"
 os.environ["DEV_AUTH_SECRET"] = "test-secret"
@@ -21,24 +24,30 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 class FakeRequest:
-    def __init__(self, method, path, user_id=None, payload=None):
+    def __init__(self, method, path, user_id=None, payload=None, raw_body=None, content_type=None):
         self.method = method
         self.route_params = {"path": path}
         self.params = {}
         self.headers = {}
         self.payload = payload
+        self.raw_body = raw_body or b""
+        if content_type:
+            self.headers["Content-Type"] = content_type
         if user_id:
-            self.headers = {
+            self.headers.update({
                 "X-Dev-User": user_id,
                 "X-Dev-Auth-Secret": "test-secret",
-            }
+            })
 
     def get_json(self):
         return self.payload
 
+    def get_body(self):
+        return self.raw_body
 
-def call_api(method, path, user_id=None, payload=None, workspace_id=None):
-    request = FakeRequest(method, path, user_id, payload)
+
+def call_api(method, path, user_id=None, payload=None, workspace_id=None, raw_body=None, content_type=None):
+    request = FakeRequest(method, path, user_id, payload, raw_body, content_type)
     if workspace_id:
         request.headers["X-Workspace-Id"] = workspace_id
     return function_app.api(request)
@@ -994,6 +1003,63 @@ class AuthenticationTests(unittest.TestCase):
             "userId": "coach-b", "workspaceId": team["id"], "role": role,
         })
         return team
+
+    def test_team_logo_upload_read_and_delete(self):
+        team = self.team_fixture()
+        with patch.object(function_app.team_logos, "validate_logo", return_value=(b"normalized", "image/png")) as validate, \
+             patch.object(function_app.team_logos, "upload_logo") as upload, \
+             patch.object(function_app.team_logos, "read_logo", return_value=(b"normalized", "image/png")) as read, \
+             patch.object(function_app.team_logos, "delete_logo") as delete:
+            uploaded = call_api("POST", "workspace/logo", "local-coach", workspace_id=team["id"], raw_body=b"raw", content_type="image/png")
+            self.assertEqual(uploaded.status_code, 204)
+            validate.assert_called_once_with(b"raw", "image/png")
+            upload.assert_called_once_with(team["id"], b"normalized", "image/png")
+
+            fetched = call_api("GET", "workspace/logo", "coach-b", workspace_id=team["id"])
+            self.assertEqual(fetched.status_code, 200)
+            self.assertEqual(fetched.get_body(), b"normalized")
+            self.assertEqual(fetched.mimetype, "image/png")
+            self.assertEqual(fetched.headers["X-Content-Type-Options"], "nosniff")
+            read.assert_called_once_with(team["id"])
+
+            removed = call_api("DELETE", "workspace/logo", "local-coach", workspace_id=team["id"])
+            self.assertEqual(removed.status_code, 204)
+            delete.assert_called_once_with(team["id"])
+
+    def test_team_logo_mutations_require_workspace_settings_permission(self):
+        team = self.team_fixture()
+        with patch.object(function_app.team_logos, "validate_logo") as validate, \
+             patch.object(function_app.team_logos, "upload_logo") as upload, \
+             patch.object(function_app.team_logos, "delete_logo") as delete:
+            uploaded = call_api("POST", "workspace/logo", "coach-b", workspace_id=team["id"], raw_body=b"raw", content_type="image/png")
+            removed = call_api("DELETE", "workspace/logo", "coach-b", workspace_id=team["id"])
+        self.assertEqual(uploaded.status_code, 403)
+        self.assertEqual(removed.status_code, 403)
+        validate.assert_not_called()
+        upload.assert_not_called()
+        delete.assert_not_called()
+
+    def test_team_logo_upload_rejects_invalid_image_bytes(self):
+        team = self.team_fixture()
+        result = call_api("POST", "workspace/logo", "local-coach", workspace_id=team["id"], raw_body=b"not an image", content_type="image/png")
+        self.assertEqual(result.status_code, 400)
+        self.assertEqual(response_json(result)["error"]["code"], "VALIDATION_ERROR")
+
+    def test_team_logo_upload_accepts_and_normalizes_png(self):
+        team = self.team_fixture()
+        image_buffer = BytesIO()
+        Image.new("RGBA", (8, 8), (24, 80, 120, 255)).save(image_buffer, format="PNG")
+        with patch.object(function_app.team_logos, "upload_logo") as upload:
+            result = call_api(
+                "POST", "workspace/logo", "local-coach", workspace_id=team["id"],
+                raw_body=image_buffer.getvalue(), content_type="image/png",
+            )
+        self.assertEqual(result.status_code, 204)
+        uploaded_data = upload.call_args.args[1]
+        uploaded_type = upload.call_args.args[2]
+        self.assertEqual(uploaded_type, "image/png")
+        with Image.open(BytesIO(uploaded_data)) as uploaded_image:
+            self.assertEqual(uploaded_image.size, (8, 8))
 
     def test_staff_members_include_coaching_titles(self):
         team = self.team_fixture()

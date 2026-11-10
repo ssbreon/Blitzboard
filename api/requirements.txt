@@ -1,7 +1,9 @@
 azure-functions
 azure-cosmos
 azure-identity
+azure-storage-blob>=12,<13
 debugpy
 cryptography
+Pillow>=10,<13
 tzdata
 PyJWT[crypto]>=2.10.1,<3
