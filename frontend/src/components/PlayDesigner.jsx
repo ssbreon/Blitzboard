@@ -1095,10 +1095,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setActiveChain((current) => current && { ...current, points: [...current.points, offset] })
   }
 
-  function handleFieldDoubleClick(event) {
-    event.preventDefault()
+  function finishDrawingPath(trimLastPoint = false) {
     if (activeTool === 'select' || !activeChain) return
-    const points = activeChain.points.length > 0 ? activeChain.points.slice(0, -1) : activeChain.points
+    const points = trimLastPoint && activeChain.points.length > 0
+      ? activeChain.points.slice(0, -1)
+      : activeChain.points
     if (points.length > 0) {
       const newDrawing = activeChain.motionId
         ? { id: crypto.randomUUID(), motionId: activeChain.motionId, points }
@@ -1118,6 +1119,11 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     setActiveChain(null)
     setCursorPos(null)
+  }
+
+  function handleFieldDoubleClick(event) {
+    event.preventDefault()
+    finishDrawingPath(true)
   }
 
   function handleFieldPointerDown(event) {
@@ -1606,7 +1612,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </div>
       )}
       <div className="play-designer-canvas" ref={canvasRef}>
-      <div className="play-designer-toolbar" role="toolbar" aria-label="Drawing tools">
+      <div className="play-designer-toolbar" role="toolbar" aria-label="Drawing tools" onClick={() => finishDrawingPath()}>
         {toolButton(DRAWING_TOOLS[0])}
         <div className="play-designer-drawing-tools" role="group" aria-label="Path tools">
           {DRAWING_TOOLS.slice(1).filter((tool) => tool.id !== 'line').map(toolButton)}
@@ -1763,7 +1769,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </div>
       </div>
       {pathAppearanceVisible ? (
-      <div className={`player-appearance-panel${selectedDrawing.type === 'line' ? ' line-appearance-panel' : ''}`} aria-label={`Appearance for ${selectedPathTool.label} path`}>
+      <div className={`player-appearance-panel${selectedDrawing.type === 'line' ? ' line-appearance-panel' : ''}`} aria-label={`Appearance for ${selectedPathTool.label} path`} onClick={() => finishDrawingPath()}>
         <span className="player-label-field">{selectedPathTool.label}</span>
         <div className="player-appearance-group" role="group" aria-label="Path color">
           <button
@@ -1827,7 +1833,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         )}
       </div>
       ) : textAppearanceVisible ? (
-      <div className="player-appearance-panel" aria-label="Text appearance">
+      <div className="player-appearance-panel" aria-label="Text appearance" onClick={() => finishDrawingPath()}>
         <span className="player-label-field">Text</span>
         <div className="player-appearance-group" role="group" aria-label="Text color">
           <button
@@ -1890,7 +1896,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </div>
       </div>
       ) : zoneAppearanceVisible ? (
-      <div className="player-appearance-panel" aria-label="Zone appearance">
+      <div className="player-appearance-panel" aria-label="Zone appearance" onClick={() => finishDrawingPath()}>
         <span className="player-label-field">Zone</span>
         <div className="player-appearance-group" role="group" aria-label="Zone fill">
           {ZONE_FILLS.map((fill) => {
@@ -1943,6 +1949,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         className={`player-appearance-panel${appearanceEnabled ? '' : ' disabled'}`}
         aria-label={appearanceEnabled ? `Appearance for ${selectedMarker.label || 'player'}` : 'Player appearance'}
         aria-disabled={!appearanceEnabled}
+        onClick={() => finishDrawingPath()}
       >
         <label className="player-label-field">
           <span>Player</span>
