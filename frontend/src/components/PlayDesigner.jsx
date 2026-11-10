@@ -2163,11 +2163,15 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 onPointerDown={(event) => handleTextPointerDown(event, annotation.id)}
                 onClick={(event) => event.stopPropagation()}
                 onKeyDown={(event) => event.stopPropagation()}
-                onBlur={() => {
+                onBlur={(event) => {
+                  const focusRemainsWithinAnnotation = event.currentTarget.parentElement?.contains(event.relatedTarget)
                   if (!annotation.text.trim()) {
                     setTextAnnotations((current) => current.filter((item) => item.id !== annotation.id))
-                    setSelectedTextId(null)
-                    setEditingTextId(null)
+                    setSelectedTextId((current) => (current === annotation.id ? null : current))
+                    setEditingTextId((current) => (current === annotation.id ? null : current))
+                  } else if (!focusRemainsWithinAnnotation) {
+                    setSelectedTextId((current) => (current === annotation.id ? null : current))
+                    setEditingTextId((current) => (current === annotation.id ? null : current))
                   }
                 }}
                 aria-label="Text annotation"
