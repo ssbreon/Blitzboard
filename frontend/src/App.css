@@ -613,7 +613,7 @@ html.is-drilling-through * {
   overflow: hidden;
   border-top: 0;
   background: var(--primary-tab);
-  padding-left: 10px;
+  padding-left: 5px;
 }
 
 .play-designer-assignments-toggle {
@@ -624,14 +624,17 @@ html.is-drilling-through * {
   gap: 6px;
   height: 34px;
   max-width: 45%;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 0 0 5px 5px;
+  margin-left: auto;
+  padding: 0 12px 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 5px;
   background: #3a5d8c;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
   color: #fff;
   font-size: 12px;
   letter-spacing: 0;
   cursor: pointer;
+  margin-right: 5px;
 
   span {
     min-width: 0;
@@ -3837,7 +3840,7 @@ html.is-drilling-through * {
 
 .play-layout-dropdown {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   width: min(900px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
@@ -3911,12 +3914,19 @@ html.is-drilling-through * {
   margin-bottom: 10px;
 
   h2 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     margin: 0;
     color: var(--navy);
     font-size: 15px;
     line-height: 1.3;
     font-weight: 600;
     text-align: left;
+
+    svg {
+      flex: none;
+    }
   }
 }
 
@@ -3950,21 +3960,25 @@ html.is-drilling-through * {
   }
 }
 
-.play-assignments.is-undocked {
+.play-assignments:is(.is-undocked, .is-popover) {
   position: fixed;
   z-index: 80;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
-  width: min(560px, calc(100vw - 24px));
+  width: min(640px, calc(100vw - 24px));
   max-height: min(70dvh, 640px);
   padding: 8px;
   border: 1px solid var(--form-border);
   border-radius: 6px;
   background: rgba(235, 238, 241, 0.88);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(1px);
   color-scheme: light;
+
+  &[hidden] {
+    display: none;
+  }
 
   .play-assignments-header {
     flex: none;
@@ -3982,8 +3996,41 @@ html.is-drilling-through * {
     background: rgba(234, 234, 234, 0.7);
   }
 
+  .play-assignments-table tbody th.is-selected {
+    background: var(--navy-light);
+    color: #fff;
+  }
+
   textarea {
     background: rgba(255, 255, 255, 0.8);
+  }
+
+  &.is-popover {
+    .play-assignments-body {
+      flex: 1;
+    }
+
+    &::before {
+      position: absolute;
+      left: var(--assignment-pointer-x, 50%);
+      width: 12px;
+      height: 12px;
+      background: rgba(235, 238, 241, 0.88);
+      content: '';
+      transform: translateX(-50%) rotate(45deg);
+    }
+
+    &.pointer-bottom::before {
+      bottom: -7px;
+      border-right: 1px solid var(--form-border);
+      border-bottom: 1px solid var(--form-border);
+    }
+
+    &.pointer-top::before {
+      top: -7px;
+      border-top: 1px solid var(--form-border);
+      border-left: 1px solid var(--form-border);
+    }
   }
 }
 
@@ -4047,13 +4094,23 @@ html.is-drilling-through * {
     overflow-wrap: anywhere;
   }
 
-  th:first-child {
-    width: 56px;
+  th {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
+  col:first-child {
+    width: 72px;
+  }
+
+  col:nth-child(2) {
+    width: 24%;
   }
 
   tbody th {
     vertical-align: middle;
     background: var(--secondary-button);
+    cursor: pointer;
   }
 
   textarea {

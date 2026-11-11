@@ -7,7 +7,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
-import { Check, ChevronDown, ChevronUp, Circle, ExternalLink, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Undo2, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, ClipboardList, ExternalLink, FlipHorizontal2, FlipVertical2, LayoutGrid, Pencil, Play, Plus, Printer, RotateCcw, Undo2, X } from 'lucide-react'
 import { api as defaultApi } from '../api'
 import { PlayDiagramIcon } from './PlayDiagramIcon'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
@@ -16,7 +16,7 @@ import { PlayerAssignments } from './PlayerAssignments'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { findPlayTemplate, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, PLAY_TEMPLATES, buildMarkersFromTemplate } from '../utils/formations'
 import { PLAY_THEMES, getTheme, normalizeThemeId } from '../utils/themes'
-import { assignmentTeam, updatePlayerAssignment } from '../utils/playerAssignments'
+import { assignmentTeam, updatePlayerAlignment, updatePlayerAssignment } from '../utils/playerAssignments'
 import {
   BLITZ_FIRST_SEGMENT_DASH,
   DEFAULT_PLAY_PERSPECTIVE,
@@ -137,19 +137,17 @@ function adjustmentDesign(slide, fallback) {
     fieldZone: slide.fieldZone || fallback.fieldZone,
     perspective: slide.perspective || fallback.perspective,
     theme: normalizeThemeId(slide.theme || fallback.theme),
-    showAssignments: slide.showAssignments ?? fallback.showAssignments ?? false,
+    showAssignments: true,
   }
 }
 
 export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, onNameApplied, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
   const drawingMaskId = useId()
   const assignmentsId = `${drawingMaskId}-assignments`
-  const [assignmentsInView, setAssignmentsInView] = useState(false)
+  const [assignmentsOpen, setAssignmentsOpen] = useState(false)
   const [assignmentsUndocked, setAssignmentsUndocked] = useState(false)
-  const wasAssignmentsUndockedRef = useRef(false)
   const assignmentsRef = useRef(null)
-  const canvasRef = useRef(null)
-  const designerRef = useRef(null)
+  const assignmentsAnchorRef = useRef(null)
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplate = findPlayTemplate(record.template)
   const initialGameType = record.gameType || initialTemplate?.gameType || DEFAULT_GAME_TYPE
@@ -177,7 +175,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [fieldZone, setFieldZone] = useState(initialFieldZone)
   const [perspective, setPerspective] = useState(initialPerspective)
   const [theme, setTheme] = useState(initialTheme)
-  const [showAssignments, setShowAssignments] = useState(Boolean(record.showAssignments))
+  const showAssignments = true
   const [selectedId, setSelectedId] = useState(null)
   const [selectedDrawing, setSelectedDrawing] = useState(null)
   const [pathDrag, setPathDrag] = useState(null)
@@ -226,7 +224,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [savedFieldZone, setSavedFieldZone] = useState(initialFieldZone)
   const [savedPerspective, setSavedPerspective] = useState(initialPerspective)
   const [savedTheme, setSavedTheme] = useState(initialTheme)
-  const [savedShowAssignments, setSavedShowAssignments] = useState(Boolean(record.showAssignments))
   const [slides, setSlides] = useState([])
   const [slidesLoadError, setSlidesLoadError] = useState(false)
   const [slideDraftTitles, setSlideDraftTitles] = useState({})
@@ -321,7 +318,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     fieldZone: savedFieldZone,
     perspective: savedPerspective,
     theme: savedTheme,
-    showAssignments: savedShowAssignments,
+    showAssignments: true,
   }
   const savedActiveDesign = activeSlide ? adjustmentDesign(activeSlide, savedBaseDesign) : savedBaseDesign
   const currentDesign = {
@@ -365,7 +362,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setFieldZone(isGreenZoneOnlyCategory(design.category) ? DEFAULT_FIELD_ZONE : design.fieldZone)
     setPerspective(design.perspective)
     setTheme(design.theme)
-    setShowAssignments(Boolean(design.showAssignments))
     setSelectedId(null)
     setMultiSelectedIds([])
     setSelectedDrawing(null)
@@ -497,7 +493,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         setSavedFieldZone(fieldZone)
         setSavedPerspective(perspective)
         setSavedTheme(theme)
-        setSavedShowAssignments(showAssignments)
       }
       delete slideDraftsRef.current[activeSlideId || 'base']
       return true
@@ -913,6 +908,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   function drawingAnchor(drawing) {
     return resolveDrawingAnchor(drawing, drawings, markers)
+  }
+
+  function selectAssignmentMarker(id) {
+    setMultiSelectedIds([])
+    setSelectedId(id)
+    setSelectedDrawing(null)
+    setSelectedTextId(null)
+    setSelectedZoneId(null)
   }
 
   function handleMarkerPointerDown(event, id) {
@@ -1377,59 +1380,13 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const isEmpty = markers.length === 0 && allDrawings.length === 0 && textAnnotations.length === 0 && zones.length === 0
   const assignmentsAvailable = Boolean(assignmentTeam(record.parentCategory))
 
-  useEffect(() => {
-    const designer = designerRef.current
-    if (!designer || !assignmentsAvailable || !showAssignments || assignmentsUndocked) return undefined
-    function updateAssignmentNavigation() {
-      const assignments = assignmentsRef.current?.getBoundingClientRect()
-      const top = designer.getBoundingClientRect().top + designer.clientTop
-      const height = designer.clientHeight
-      setAssignmentsInView(Boolean(assignments && (
-        assignments.top <= top + height / 2 || assignments.bottom <= top + height + 1
-      )))
-    }
-    updateAssignmentNavigation()
-    designer.addEventListener('scroll', updateAssignmentNavigation, { passive: true })
-    window.addEventListener('resize', updateAssignmentNavigation)
-    return () => {
-      designer.removeEventListener('scroll', updateAssignmentNavigation)
-      window.removeEventListener('resize', updateAssignmentNavigation)
-    }
-  }, [assignmentsAvailable, showAssignments, assignmentsUndocked])
-
-  function scrollToAssignments() {
-    const designer = designerRef.current
-    const target = assignmentsRef.current
-    if (!designer || !target) return
-    const top = designer.scrollTop + target.getBoundingClientRect().top
-      - designer.getBoundingClientRect().top - designer.clientTop
-      - (Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0)
-    designer.scrollTo({ behavior: 'instant', top })
+  function navigateAssignments() {
+    setAssignmentsOpen((current) => !current)
   }
 
-  useEffect(() => {
-    if (!showAssignments) return
-    if (assignmentsUndocked) {
-      designerRef.current?.scrollTo({ top: 0, behavior: 'instant' })
-    } else if (wasAssignmentsUndockedRef.current) {
-      scrollToAssignments()
-    }
-    wasAssignmentsUndockedRef.current = assignmentsUndocked
-  }, [assignmentsUndocked, showAssignments])
-
-  function navigateAssignments() {
-    if (assignmentsUndocked) {
-      assignmentsRef.current?.focus({ preventScroll: true })
-      return
-    }
-    const designer = designerRef.current
-    const target = assignmentsInView ? canvasRef.current : assignmentsRef.current
-    if (!designer || !target) return
-    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
-    const top = assignmentsInView ? 0 : designer.scrollTop
-      + target.getBoundingClientRect().top - designer.getBoundingClientRect().top - designer.clientTop
-      - (Number.parseFloat(window.getComputedStyle(target).scrollMarginTop) || 0)
-    designer.scrollTo({ behavior, top })
+  function handleAssignmentsUndockedChange(undocked) {
+    setAssignmentsUndocked(undocked)
+    setAssignmentsOpen(true)
   }
 
   function toolButton(tool) {
@@ -1481,7 +1438,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   return (
-    <section ref={designerRef} className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
+    <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
       {parentSettingsBreadcrumbTarget && onEditParentSettings && createPortal(
         <button
           type="button"
@@ -1611,7 +1568,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           </form>
         </div>
       )}
-      <div className="play-designer-canvas" ref={canvasRef}>
+      <div className="play-designer-canvas">
       <div className="play-designer-toolbar" role="toolbar" aria-label="Drawing tools" onClick={() => finishDrawingPath()}>
         {toolButton(DRAWING_TOOLS[0])}
         <div className="play-designer-drawing-tools" role="group" aria-label="Path tools">
@@ -1719,7 +1676,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               {layoutColumn('Perspective', PLAY_PERSPECTIVES.map((value) => ({ value, label: value })), perspective, setPerspective)}
               {layoutColumn('Field Orientation', FIELD_ORIENTATIONS.map((value) => ({ value, label: value })), fieldOrientation, setFieldOrientation)}
               {layoutColumn('Theme', PLAY_THEMES.map(({ id, label }) => ({ value: id, label })), theme, setTheme)}
-              {assignmentsAvailable && layoutColumn('Assignments Table', [{ value: true, label: 'Show' }, { value: false, label: 'Hide' }], showAssignments, setShowAssignments)}
             </div>
           )}
           {menuOpen && (
@@ -2551,33 +2507,43 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 <span>Add Adjustment</span>
               </button>
             </div>
-            {assignmentsAvailable && showAssignments && (
+            {assignmentsAvailable && (
               <button
                 type="button"
                 className="play-designer-assignments-toggle"
+                ref={assignmentsAnchorRef}
                 aria-controls={assignmentsId}
-                aria-label={assignmentsUndocked ? 'Focus player assignments' : assignmentsInView ? 'Back to play field' : 'Go to player assignments'}
-                title={assignmentsUndocked ? 'Focus player assignments' : assignmentsInView ? 'Back to play field' : 'Go to player assignments'}
+                aria-expanded={assignmentsOpen}
+                aria-label={assignmentsOpen ? 'Close player assignments' : 'Open player assignments'}
+                title={assignmentsOpen ? 'Close player assignments' : 'Open player assignments'}
                 onClick={navigateAssignments}
               >
+                <ClipboardList size={16} aria-hidden="true" />
                 <span>Player Assignments</span>
-                {assignmentsUndocked ? <ExternalLink size={16} aria-hidden="true" /> : assignmentsInView ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
+                {assignmentsUndocked && <ExternalLink size={16} aria-hidden="true" />}
               </button>
             )}
           </div>
         </>
       )}
-      {assignmentsAvailable && showAssignments && (
+      {assignmentsAvailable && (
         <PlayerAssignments
           id={assignmentsId}
           sectionRef={assignmentsRef}
+          anchorRef={assignmentsAnchorRef}
+          fieldHeight={fieldPxSize.height}
+          open={assignmentsOpen}
           markers={markers}
+          selectedMarkerId={selectedId}
+          onSelectMarker={selectAssignmentMarker}
           parentCategory={record.parentCategory}
           readOnly={readOnly}
           saving={saving}
           undocked={assignmentsUndocked}
-          onUndockedChange={setAssignmentsUndocked}
+          onUndockedChange={handleAssignmentsUndockedChange}
+          onOpenChange={setAssignmentsOpen}
           onChange={(markerId, value) => setMarkers((current) => updatePlayerAssignment(current, markerId, value))}
+          onAlignmentChange={(markerId, value) => setMarkers((current) => updatePlayerAlignment(current, markerId, value))}
         />
       )}
       </div>

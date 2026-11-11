@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
-import { assignmentPanelPosition, assignmentPlayers, assignmentPrintPages, assignmentTeam, updatePlayerAssignment } from './playerAssignments.js'
+import { assignmentPanelPosition, assignmentPlayers, assignmentPrintPages, assignmentTeam, updatePlayerAlignment, updatePlayerAssignment } from './playerAssignments.js'
 
 const markers = [
   { id: 'receiver', label: 'X', team: 'offense', x: 10, y: 50 },
@@ -45,6 +45,17 @@ test('assignments follow marker IDs without changing labels, coordinates or othe
   assert.equal(Object.hasOwn(cleared[2], 'assignment'), false)
 })
 
+test('alignment notes follow marker IDs and clear without changing other marker data', () => {
+  const updated = updatePlayerAlignment(markers, 'corner-right', 'Outside shade')
+  assert.equal(updated[1].alignment, undefined)
+  assert.equal(updated[2].alignment, 'Outside shade')
+  assert.equal(markers[2].alignment, undefined)
+  assert.equal(updated[0], markers[0])
+  assert.equal(updated[2].assignment, undefined)
+  const cleared = updatePlayerAlignment(updated, 'corner-right', '')
+  assert.equal(Object.hasOwn(cleared[2], 'alignment'), false)
+})
+
 test('print pages omit blank and opposing assignments and split long entries without losing text', () => {
   const assigned = markers.map((marker) => ({ ...marker, assignment: marker.team === 'defense' ? 'Defend' : ' ' }))
   assert.deepEqual(assignmentPrintPages(assigned, 'Offense', { width: 720, height: 960 }), [])
@@ -76,24 +87,28 @@ test('designer renders only its unit assignments, respects visibility and preven
     }))
     const offense = render()
     assert.ok(offense.includes('Player Assignments'))
-    assert.ok(offense.includes('aria-label="Go to player assignments"'))
+    assert.ok(offense.includes('aria-label="Open player assignments"'))
+    assert.ok(offense.includes('aria-expanded="false"'))
     assert.ok(offense.includes('aria-label="Docked" title="Docked" aria-pressed="true"'))
     assert.ok(offense.includes('aria-label="Undocked" title="Undocked" aria-pressed="false"'))
-    assert.equal((offense.match(/<textarea/g) || []).length, 2)
+    assert.equal((offense.match(/<textarea/g) || []).length, 4)
+    assert.ok(offense.includes('scope="col">Alignment</th>'))
     assert.ok(offense.includes('>X</label>'))
     assert.ok(offense.includes('>Q</label>'))
     assert.ok(!offense.includes('>C</label>'))
     const defense = render({ parentCategory: 'Defense' })
-    assert.equal((defense.match(/<textarea/g) || []).length, 2)
+    assert.equal((defense.match(/<textarea/g) || []).length, 4)
     assert.ok(!defense.includes('>X</label>'))
     assert.ok(!render({ parentCategory: 'Special Teams' }).includes('Player Assignments'))
-    assert.ok(!render({ showAssignments: false }).includes('Player Assignments'))
-    assert.ok(!render({ showAssignments: false }).includes('Go to player assignments'))
-    assert.ok(!render({ parentCategory: 'Special Teams' }).includes('Go to player assignments'))
+    assert.ok(render({ showAssignments: false }).includes('Player Assignments'))
+    assert.ok(render({ showAssignments: false }).includes('Open player assignments'))
+    assert.ok(!render({ parentCategory: 'Special Teams' }).includes('Open player assignments'))
     const readOnly = render({}, { readOnly: true })
-    assert.equal((readOnly.match(/readOnly=""/g) || []).length, 2)
+    assert.equal((readOnly.match(/readOnly=""/g) || []).length, 4)
     const assigned = render({ initialMarkers: updatePlayerAssignment(markers, 'receiver', '<script>not executable</script>') })
     assert.ok(assigned.includes('&lt;script&gt;not executable&lt;/script&gt;'))
+    const aligned = render({ initialMarkers: updatePlayerAlignment(markers, 'receiver', 'Slot left') })
+    assert.ok(aligned.includes('Slot left</textarea>'))
   } finally {
     await server.close()
   }

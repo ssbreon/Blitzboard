@@ -10,14 +10,22 @@ export function assignmentPlayers(markers, parentCategory) {
   return (markers || []).filter((marker) => (marker.team || 'offense') === team)
 }
 
-export function updatePlayerAssignment(markers, markerId, assignment) {
+function updatePlayerText(markers, markerId, property, value) {
   return markers.map((marker) => {
     if (marker.id !== markerId) return marker
     const updated = { ...marker }
-    if (assignment) updated.assignment = assignment
-    else delete updated.assignment
+    if (value) updated[property] = value
+    else delete updated[property]
     return updated
   })
+}
+
+export function updatePlayerAssignment(markers, markerId, assignment) {
+  return updatePlayerText(markers, markerId, 'assignment', assignment)
+}
+
+export function updatePlayerAlignment(markers, markerId, alignment) {
+  return updatePlayerText(markers, markerId, 'alignment', alignment)
 }
 
 export function assignmentPrintPages(markers, parentCategory, { width, height }) {
