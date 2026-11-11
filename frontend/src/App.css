@@ -1008,7 +1008,8 @@ html.is-drilling-through * {
   }
 
   .play-designer-toolbar .play-designer-tool > span,
-  .play-designer-toolbar .play-layout-button > span {
+  .play-designer-toolbar .play-layout-button > span,
+  .play-designer-add-adjustment > span {
     display: none;
   }
 }
