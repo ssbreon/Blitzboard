@@ -284,29 +284,31 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
         <img className="app-bar-logo" src="/blitzboard-mark.svg" alt="" aria-hidden="true" />
         <span className="app-bar-wordmark">BLITZBOARD <span className="app-bar-wordmark-accent">Studio</span></span>
       </div>
-      <nav className="app-bar-nav" aria-label="Primary navigation">
-        {user && (
-          <>
-        <a
-          href="#playbooks"
-          className={`app-bar-link${activeView === 'playbooks' ? ' active' : ''}`}
-          onClick={(event) => navigate(event, 'playbooks')}
-        >
-          <LibraryBig size={17} strokeWidth={1.8} aria-hidden="true" />
-          Playbooks
-        </a>
-        <a
-          href="#team-schedule"
-          className={`app-bar-link${activeView === 'teamSchedule' ? ' active' : ''}`}
-          onClick={(event) => navigate(event, 'teamSchedule')}
-        >
-          <CalendarDays size={17} strokeWidth={1.8} aria-hidden="true" />
-          Schedule
-        </a>
-          </>
-        )}
-      </nav>
-      {user && searchApi && <GlobalSearch api={searchApi} onOpen={onSearchOpen} disabled={busy || switchingSubscription || searchBusy} />}
+      <div className="app-bar-tools">
+        <nav className="app-bar-nav" aria-label="Primary navigation">
+          {user && (
+            <>
+              <a
+                href="#playbooks"
+                className={`app-bar-link${activeView === 'playbooks' ? ' active' : ''}`}
+                onClick={(event) => navigate(event, 'playbooks')}
+              >
+                <LibraryBig size={17} strokeWidth={1.8} aria-hidden="true" />
+                Playbooks
+              </a>
+              <a
+                href="#team-schedule"
+                className={`app-bar-link${activeView === 'teamSchedule' ? ' active' : ''}`}
+                onClick={(event) => navigate(event, 'teamSchedule')}
+              >
+                <CalendarDays size={17} strokeWidth={1.8} aria-hidden="true" />
+                Schedule
+              </a>
+            </>
+          )}
+        </nav>
+        {user && searchApi && <GlobalSearch api={searchApi} onOpen={onSearchOpen} disabled={busy || switchingSubscription || searchBusy} />}
+      </div>
       {user && <div className="app-bar-account" ref={menuRef} onKeyDown={menuKeys}>
         <div className="app-bar-identity">
           <span className="app-bar-user-name" title={user.name}>{user.name}</span>

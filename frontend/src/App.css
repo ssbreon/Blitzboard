@@ -2184,6 +2184,14 @@ html.is-drilling-through * {
   color: var(--accent);
 }
 
+.app-bar-tools {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 1;
+  min-width: 0;
+}
+
 .app-bar-nav {
   display: flex;
   gap: 8px;
@@ -2288,13 +2296,18 @@ html.is-drilling-through * {
 
 @media (max-width: 1100px) {
   .app-bar { flex-wrap: wrap; }
-  .app-bar-nav { order: 3; flex: 1 1 100%; }
-  .global-search { order: 4; flex: 1 1 100%; }
+  .app-bar-tools { order: 3; flex: 1 1 100%; gap: 10px; }
+  .app-bar-nav { flex: 0 1 auto; min-width: 0; }
+  .global-search { flex: 1 1 180px; min-width: 130px; }
   .global-search-results { width: 100%; }
   .app-bar-account { margin-left: auto; }
 }
 
 @media (max-width: 400px) {
+  .app-bar-tools { gap: 4px; }
+  .app-bar-nav { flex: 0 0 auto; gap: 0; }
+  .app-bar-link { gap: 0; padding: 5px 0; font-size: 11px; }
+  .global-search { flex: 1 1 80px; min-width: 80px; }
   .global-search-results .data-grid-table th:nth-child(3) { width: 90px; }
   .global-search-results .data-grid-table th:nth-child(4) { width: 58px; }
 }
@@ -3074,7 +3087,7 @@ html.is-drilling-through * {
   .app-bar-wordmark { font-size: 15px; letter-spacing: 0; }
   .app-bar-wordmark-accent { display: block; }
   .app-bar-logo { height: 30px; }
-  .app-bar-nav { order: 3; flex-basis: 100%; }
+  .app-bar-tools { gap: 10px; }
   .app-bar-identity { max-width: 100px; }
   .app-bar-user-name { font-size: 12px; }
   .active-workspace-label { display: none; }
