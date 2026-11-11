@@ -996,6 +996,52 @@ html.is-drilling-through * {
   padding-left: 6px;
 }
 
+@media (max-width: 1360px) {
+  .play-designer-toolbar {
+    gap: 6px;
+    padding-right: 10px;
+  }
+
+  .play-designer-toolbar .play-designer-tool {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .play-designer-toolbar .play-designer-tool > span,
+  .play-designer-toolbar .play-layout-button > span {
+    display: none;
+  }
+}
+
+@media (min-width: 600px) and (max-width: 1024px) {
+  .play-designer-toolbar {
+    flex-wrap: nowrap;
+  }
+
+  .play-designer-toolbar > .play-designer-tool,
+  .play-designer-toolbar > .toolbar-menu,
+  .play-designer-toolbar-actions {
+    flex-shrink: 0;
+  }
+
+  .play-designer-drawing-tools {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .play-designer-history-tools {
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  .play-designer-history-tools .play-designer-tool {
+    flex: 0 0 auto;
+  }
+}
+
 .player-appearance-panel {
   display: flex;
   align-items: center;

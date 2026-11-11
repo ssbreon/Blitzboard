@@ -1579,6 +1579,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               className="play-designer-tool"
               onClick={undoLastDrawing}
               disabled={!canUndoDrawing}
+              aria-label="Undo"
               title="Undo"
             >
               <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -1591,6 +1592,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               className="play-designer-tool"
               onClick={redoLastDrawing}
               disabled={!canRedoDrawing}
+              aria-label="Redo"
               title="Redo"
             >
               <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -1605,6 +1607,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           className={`play-designer-tool text-tool${activeTool === 'text' ? ' active' : ''}`}
           onClick={() => startPlacementTool('text')}
           aria-pressed={activeTool === 'text'}
+          aria-label="Add Text"
           title="Add Text"
         >
           <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -1617,6 +1620,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           className={`play-designer-tool zone-tool${activeTool === 'zone' ? ' active' : ''}`}
           onClick={() => startPlacementTool('zone')}
           aria-pressed={activeTool === 'zone'}
+          aria-label="Add Zone"
           title="Add Zone"
         >
           <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -1629,6 +1633,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           className={`play-designer-tool line-tool${activeTool === 'line' ? ' active' : ''}`}
           onClick={() => startPlacementTool('line')}
           aria-pressed={activeTool === 'line'}
+          aria-label="Add Line"
           title="Add Line"
         >
           <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
@@ -1643,6 +1648,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           <button
             type="button"
             className="play-layout-button"
+            aria-label="Layout"
+            title="Layout"
             aria-haspopup="menu"
             aria-expanded={layoutOpen}
             onClick={() => {
