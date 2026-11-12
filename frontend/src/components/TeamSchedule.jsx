@@ -283,6 +283,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
+  const [eventContextMenu, setEventContextMenu] = useState(null)
   const [eventToDelete, setEventToDelete] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
@@ -341,6 +342,20 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   function openEvent(event) {
     if (event.kind === 'game') onOpenGame(event)
     else setDialog({ event })
+  }
+
+  function openEventContextMenu(contextEvent, event) {
+    contextEvent.preventDefault()
+    const actions = 1 + (canDelete ? 1 : 0)
+    const menuHeight = actions * 44 + 12
+    const top = contextEvent.clientY + 4 + menuHeight <= window.innerHeight
+      ? contextEvent.clientY + 4 : Math.max(8, contextEvent.clientY - menuHeight - 4)
+    setEventContextMenu({
+      event,
+      trigger: contextEvent.currentTarget.querySelector('.schedule-event-content'),
+      top,
+      right: Math.max(8, window.innerWidth - contextEvent.clientX),
+    })
   }
 
   function moveCalendar(direction) {
@@ -418,6 +433,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey,
     onDropTarget: setDropTargetDate, onMoveEvent: moveEventToDate,
     onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent,
+    onContextMenu: openEventContextMenu,
     onDragEvent: setDraggedEvent, onDragEnd: () => { setDraggedEvent(null); setDropTargetDate(null) },
   }
 
@@ -493,6 +509,14 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         />}
       </section>}
       {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+      {eventContextMenu && <ScheduleEventContextMenu
+        event={eventContextMenu.event}
+        position={eventContextMenu}
+        canDelete={canDelete}
+        onClose={() => setEventContextMenu(null)}
+        onOpen={openEvent}
+        onDelete={(event) => setEventToDelete(event)}
+      />}
       {eventToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}
         onCancel={() => setEventToDelete(null)}
