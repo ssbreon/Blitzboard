@@ -26,7 +26,7 @@ function renderGridCell(column, row) {
   )
 }
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
@@ -477,12 +477,18 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                         toggleGrouping(row.id)
                       }
                     } : undefined}
-                    onClick={(event) => selectRow(event, row)}
+                    onClick={(event) => {
+                      selectRow(event, row)
+                      if (onRowClick && row.rowType !== 'grouping' && !event.target.closest?.('button, a, input, select, textarea, [role="button"], [data-grid-no-select]')) {
+                        showDrillthroughWaitCursor()
+                        onRowClick(row)
+                      }
+                    }}
                     onContextMenu={rowActions ? (event) => {
                       const trigger = event.currentTarget.querySelector('.row-actions-button')
                       if (openRowMenu(row, trigger, { x: event.clientX, y: event.clientY })) event.preventDefault()
                     } : undefined}
-                    style={{ ...(row.rowType === 'grouping' || onRowDoubleClick ? { cursor: 'pointer' } : {}), ...(row._gridDirty ? { fontStyle: 'italic' } : {}) }}
+                    style={{ ...(row.rowType === 'grouping' || onRowDoubleClick || onRowClick ? { cursor: 'pointer' } : {}), ...(row._gridDirty ? { fontStyle: 'italic' } : {}) }}
                     className={[
                       row.rowType === 'grouping' && 'is-grouping-row',
                       selectedRowIds.has(row.id) && 'is-selected',
