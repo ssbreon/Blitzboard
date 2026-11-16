@@ -49,7 +49,11 @@ accounts.validate_environment(COSMOS_ENDPOINT)
 
 
 def with_record_status(entity_type, record):
-    if record is not None and entity_type in STATUS_TYPES:
+    if record is None:
+        return None
+    if entity_type in {"playbooks", "scoutPlays"}:
+        record = {key: value for key, value in record.items() if key != "workflowStatus"}
+    if entity_type in STATUS_TYPES:
         return {"recordStatus": "Active", **record}
     return record
 
@@ -487,9 +491,38 @@ def reorder_pages(entity_type, parent_id, payload):
     return response({"items": [{"id": item_id, "page": index} for index, item_id in enumerate(ids, start=1)]})
 
 
+def validate_preparation_links(entity_type, record):
+    workspace = request_workspace.get()
+    if entity_type == "scheduleEvents":
+        links = record.get("gamePlanIds", [])
+        if not isinstance(links, list) or any(not isinstance(item, str) for item in links) or len(set(links)) != len(links):
+            raise accounts.AccountError("VALIDATION_ERROR", "gamePlanIds must be a list of unique Game Plan IDs")
+        for game_id in links:
+            game = storage.get("gamePlans", game_id)
+            if game is None or not accounts.belongs(game, workspace):
+                raise accounts.AccountError("VALIDATION_ERROR", "Linked Game Plan was not found in this workspace")
+        if record.get("id"):
+            has_scripts = any(book.get("practiceEventId") == record["id"] for book in storage.list("playbooks", workspace_id=workspace["id"]))
+            if has_scripts and record.get("eventType") != "Practice":
+                raise accounts.AccountError("VALIDATION_ERROR", "An event with Practice Scripts must remain a Practice")
+            if has_scripts and not links:
+                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's scripts before unlinking its last Game Plan", 409)
+    if entity_type == "playbooks" and record.get("practiceEventId"):
+        if not isinstance(record["practiceEventId"], str):
+            raise accounts.AccountError("VALIDATION_ERROR", "practiceEventId must be a Practice event ID")
+        event = storage.get("scheduleEvents", record["practiceEventId"])
+        if event is None or not accounts.belongs(event, workspace) or event.get("eventType") != "Practice":
+            raise accounts.AccountError("VALIDATION_ERROR", "Practice Scripts require a Practice event in this workspace")
+        if not (record.get("gameCardId") or "").endswith("-scout"):
+            raise accounts.AccountError("VALIDATION_ERROR", "Only Practice Scripts may belong to a Practice event")
+
+
 def create_record(entity_type, payload, owner_id, parent_id=None):
     validate_record_status(entity_type, payload)
+    validate_preparation_links(entity_type, payload)
     payload = {key: value for key, value in payload.items() if key not in {"_etag", "_rid", "_self", "_ts", "_attachments"}}
+    if entity_type in {"playbooks", "scoutPlays"}:
+        payload.pop("workflowStatus", None)
     if entity_type in STATUS_TYPES:
         payload.setdefault("recordStatus", "Active")
     if entity_type in PAGED_TYPES:
@@ -513,6 +546,7 @@ def update_record(entity_type, item_id, payload):
     record = storage.get(entity_type, item_id)
     if record is None:
         return None
+    validate_preparation_links(entity_type, {**record, **payload})
     if entity_type in {"plays", "scoutPlays"}:
         expected_etag = payload.get("_etag")
         if not isinstance(expected_etag, str) or not expected_etag.strip() or expected_etag == "*":
@@ -521,19 +555,25 @@ def update_record(entity_type, item_id, payload):
             raise accounts.AccountError("RECORD_CHANGED", "This record has been changed by another person or process. Your changes have not been saved. Reopen the record to load the latest version before trying again.", 412)
         record["_etag"] = expected_etag
     immutable_fields = {"id", "ownerId", "workspaceId", "createdBy", "parentId", "entityType", "partitionKey", "createdAt", "page", "_etag", "_rid", "_self", "_ts", "_attachments"}
-    record.update({key: value for key, value in payload.items() if key not in immutable_fields})
+    record.update({key: value for key, value in payload.items()
+                   if key not in immutable_fields and not (entity_type in {"playbooks", "scoutPlays"} and key == "workflowStatus")})
     record["updatedAt"] = now()
     return response(storage.save(entity_type, record))
 
 
 def validate_schedule_event(payload, partial=False):
     allowed_types = {"Practice", "Film Review", "Team Meeting", "Other"}
+    allowed_dresses = {"Full Pads", "Half Pads", "Uppers", "Helmets"}
     if not partial and not {"name", "eventType", "eventDate"}.issubset(payload):
         return "name, eventType, and eventDate are required"
     if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip()):
         return "name must be a non-empty string"
     if "eventType" in payload and payload["eventType"] not in allowed_types:
         return "eventType must be Practice, Film Review, Team Meeting, or Other"
+    if "dress" in payload and payload["dress"] not in allowed_dresses | {""}:
+        return "dress must be Full Pads, Half Pads, Uppers, or Helmets"
+    if payload.get("dress") and payload.get("eventType") != "Practice":
+        return "dress is only valid for Practice events"
     if "eventDate" in payload:
         try:
             parsed_date = datetime.strptime(payload["eventDate"], "%Y-%m-%d").date()
@@ -664,30 +704,62 @@ def dispatch(req, user, workspace, role):
         if not (play_read or game_read):
             return forbidden()
         query = (req.params.get("q") or "").strip().casefold()
-        fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "unit", "category", "recordStatus", "workspaceId", "ownerId")
+        scope = req.params.get("scope") or "workspace"
+        if scope not in {"workspace", "gamePlan", "playbooks"}:
+            raise accounts.AccountError("VALIDATION_ERROR", "Search scope must be gamePlan, playbooks, or workspace; season search requires a configured season")
+        game_id = req.params.get("gamePlanId")
+        games = storage.list("gamePlans", owner_id=owner_id) if game_read else []
+        games_by_id = {game["id"]: game for game in games}
+        if scope == "gamePlan" and (not game_read or game_id not in games_by_id):
+            return not_found("Game plan", game_id)
+        fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "practiceEventId", "installPlays", "template", "unit", "category", "recordStatus", "workspaceId", "ownerId")
         books = storage.list("playbooks", owner_id=owner_id, fields=fields) if play_read else []
         books_by_id = {book["id"]: book for book in books}
+        events = storage.list("scheduleEvents", owner_id=owner_id) if game_read else []
+        practice_contexts = {event["id"]: set(event.get("gamePlanIds", [])) & games_by_id.keys()
+                             for event in events if event.get("eventType") == "Practice"}
+        direct_contexts = {}
+        for book in books:
+            direct_contexts[book["id"]] = (practice_contexts.get(book["practiceEventId"], set()) if book.get("practiceEventId")
+                                          else {book["gamePlanId"]} if book.get("gamePlanId") in games_by_id else set())
+        book_contexts = {book_id: set(contexts) for book_id, contexts in direct_contexts.items()}
+        reference_contexts = {}
+        for book in books:
+            for selection in book.get("installPlays", []):
+                reference_id = selection.get("playbookId")
+                if reference_id in books_by_id:
+                    book_contexts[reference_id].update(direct_contexts[book["id"]])
+                    reference_contexts.setdefault((reference_id, selection.get("playId")), set()).update(direct_contexts[book["id"]])
         results = []
         for entity_type, records in (
             ("playbooks", books),
-            ("gamePlans", storage.list("gamePlans", owner_id=owner_id, fields=fields) if game_read else []),
+            ("gamePlans", games),
             ("plays", storage.list("plays", owner_id=owner_id, fields=fields) if play_read else []),
             ("scoutPlays", storage.list("scoutPlays", owner_id=owner_id, fields=fields) if game_read else []),
         ):
             for record in records:
-                if query and query not in (record.get("name") or "").casefold():
+                if query and query not in " ".join(str(record.get(key) or "") for key in ("name", "template")).casefold():
                     continue
                 if entity_type == "playbooks":
                     card_id = record.get("gameCardId") or ""
                     label = "Install" if card_id.endswith("-installs") else "Practice Script" if card_id.endswith("-scout") else "Playbook"
+                    contexts = book_contexts[record["id"]]
                 elif entity_type == "plays":
                     book = books_by_id.get(record.get("parentId"))
                     if book is None:
                         continue
                     label = "Scout Play" if (book.get("gameCardId") or "").endswith("-scout") else "Play"
+                    contexts = direct_contexts[book["id"]] | reference_contexts.get((book["id"], record["id"]), set())
                 else:
                     label = "Game" if entity_type == "gamePlans" else "Scouting Report"
-                results.append({**record, "entityType": entity_type, "type": label})
+                    contexts = {record["id"] if entity_type == "gamePlans" else record.get("parentId")} & games_by_id.keys()
+                if scope == "gamePlan" and game_id not in contexts:
+                    continue
+                if scope == "playbooks" and entity_type not in {"playbooks", "plays"}:
+                    continue
+                context_rows = [{"id": context_id, "name": games_by_id[context_id].get("name", "Game Plan")} for context_id in sorted(contexts)]
+                result_record = {key: record[key] for key in fields if key in record and key != "installPlays"}
+                results.append({**result_record, "entityType": entity_type, "type": label, "gamePlanContexts": context_rows})
         results.sort(key=lambda item: ((item.get("name") or "").casefold(), item["type"], item["id"]))
         return response({"items": results[:SEARCH_RESULT_LIMIT], "query": query, "total": len(results), "limit": SEARCH_RESULT_LIMIT, "truncated": len(results) > SEARCH_RESULT_LIMIT})
 
@@ -714,11 +786,13 @@ def dispatch(req, user, workspace, role):
             return response(event)
         if method == "PATCH":
             payload = body(req)
-            error = validate_schedule_event(payload, partial=True)
+            error = validate_schedule_event({**event, **payload}, partial=True)
             if error:
                 return response({"error": {"code": "VALIDATION_ERROR", "message": error}}, 400)
             return update_record("scheduleEvents", event_id, payload)
         if method == "DELETE":
+            if any(book.get("practiceEventId") == event_id for book in storage.list("playbooks", owner_id=owner_id)):
+                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's scripts before deleting the event", 409)
             storage.delete("scheduleEvents", event_id)
             return func.HttpResponse(status_code=204)
 
@@ -765,6 +839,12 @@ def dispatch(req, user, workspace, role):
             if method == "PATCH":
                 return update_record("gamePlans", game_plan_id, body(req))
             if method == "DELETE":
+                linked_events = [event for event in storage.list("scheduleEvents", owner_id=owner_id) if game_plan_id in event.get("gamePlanIds", [])]
+                script_event_ids = {book.get("practiceEventId") for book in storage.list("playbooks", owner_id=owner_id) if book.get("practiceEventId")}
+                if any(event["id"] in script_event_ids and len(event["gamePlanIds"]) == 1 for event in linked_events):
+                    raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Link the practice to another Game Plan, or reassign or delete its scripts before deleting this Game Plan", 409)
+                for event in linked_events:
+                    storage.save("scheduleEvents", {**event, "gamePlanIds": [game_id for game_id in event["gamePlanIds"] if game_id != game_plan_id], "updatedAt": now()})
                 storage.delete_tree("gamePlans", game_plan_id)
                 return func.HttpResponse(status_code=204)
 

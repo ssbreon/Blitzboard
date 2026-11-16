@@ -5,14 +5,16 @@
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DialogCloseButton } from './DialogCloseButton'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
-import { ScheduleView, buildCalendarDays, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate } from '../utils/scheduleCalendar'
+import { PracticeSheet } from './PracticeSheet'
+import { ScheduleView, buildCalendarDays, defaultRelatedGameId, duplicateScheduleEventPayload, practiceGamePlans, practiceGamePlanRange, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate } from '../utils/scheduleCalendar'
+import { generatedPracticeScriptPayload } from '../utils/gamePlanWorkspace'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const SCHEDULE_VIEWS = Object.values(ScheduleView)
@@ -26,6 +28,7 @@ function savedScheduleView() {
   }
 }
 const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Other']
+const PRACTICE_DRESSES = ['Full Pads', 'Half Pads', 'Uppers', 'Helmets']
 const EVENT_TYPE_ICONS = {
   Game: Trophy,
   Practice: Dumbbell,
@@ -71,7 +74,7 @@ const scheduleGridColumns = [
   { key: 'gameSite', header: 'Site', render: (value) => value || '—' },
 ]
 
-function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame, canDelete, onCancel, onSave, onDelete }) {
+export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, canCreateGame, canDelete, onCancel, onSave, onDelete }) {
   const defaultEventDate = initialEvent?.eventDate || initialEvent?.gameDate || initialDate || dateKey(new Date())
   const isFridayDefault = !initialEvent && parseDate(defaultEventDate).getDay() === 5
   const [eventType, setEventType] = useState(initialEvent?.kind === 'game' ? 'Game' : initialEvent?.eventType || (isFridayDefault && canCreateGame ? 'Game' : 'Practice'))
@@ -82,16 +85,45 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
   const [location, setLocation] = useState(initialEvent?.location || '')
   const [gameSite, setGameSite] = useState(initialEvent?.gameSite || '')
   const [notes, setNotes] = useState(initialEvent?.notes || '')
+  const [dress, setDress] = useState(initialEvent?.dress || '')
+  const [practiceScriptUnit, setPracticeScriptUnit] = useState('No')
+  const [relatedGames, setRelatedGames] = useState([])
+  const [relatedGameId, setRelatedGameId] = useState('')
+  const [loadingRelatedGames, setLoadingRelatedGames] = useState(!initialEvent && eventType !== 'Game')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const isGame = eventType === 'Game'
 
+  useEffect(() => {
+    if (initialEvent || isGame) {
+      setRelatedGames([])
+      setRelatedGameId('')
+      setLoadingRelatedGames(false)
+      return undefined
+    }
+    let active = true
+    setRelatedGames([])
+    setRelatedGameId('')
+    setLoadingRelatedGames(true)
+    api.listGamePlans(undefined, undefined, false, practiceGamePlanRange(eventDate))
+      .then((result) => {
+        if (!active) return
+        const games = practiceGamePlans(eventDate, result.items)
+        setRelatedGames(games)
+        setRelatedGameId(defaultRelatedGameId(games))
+      })
+      .catch((failure) => { if (active) setError(failure) })
+      .finally(() => { if (active) setLoadingRelatedGames(false) })
+    return () => { active = false }
+  }, [api, eventDate, initialEvent, isGame])
+
   async function submit(event) {
     event.preventDefault()
+    if (loadingRelatedGames) return
     setSaving(true)
     setError(null)
     try {
-      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }) })
+      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }), ...(eventType === 'Practice' && { dress }), ...(!isGame && !initialEvent && relatedGameId && { relatedGameId }), ...(eventType === 'Practice' && !initialEvent && { practiceScriptUnit }) })
     } catch (failure) {
       setError(failure)
     } finally {
@@ -109,7 +141,7 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
         <div className="schedule-dialog-body">
           <label className="schedule-field">
             <span>Event type</span>
-            <select value={eventType} onChange={(event) => setEventType(event.target.value)} disabled={!canEdit || saving || Boolean(initialEvent)}>
+            <select value={eventType} onChange={(event) => { setEventType(event.target.value); if (event.target.value !== 'Practice') { setPracticeScriptUnit('No'); setDress('') } }} disabled={!canEdit || saving || Boolean(initialEvent)}>
               <option value="Game" disabled={!canCreateGame && initialEvent?.kind !== 'game'}>Game</option>
               {EVENT_TYPES.map((type) => <option value={type} key={type}>{type}</option>)}
             </select>
@@ -128,14 +160,31 @@ function ScheduleEventDialog({ initialEvent, initialDate, canEdit, canCreateGame
             {!isGame && <label className="schedule-field"><span>End</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={!canEdit || saving} /></label>}
           </div>
           {!isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
+          {eventType === 'Practice' && <label className="schedule-field"><span>Dress</span><select value={dress} onChange={(event) => setDress(event.target.value)} disabled={!canEdit || saving}><option value="">Select dress</option>{PRACTICE_DRESSES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}
           {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
+          </label>}
+          {!isGame && !initialEvent && <label className="schedule-field">
+            <span>Related Game</span>
+            <select value={relatedGameId} onChange={(event) => setRelatedGameId(event.target.value)} disabled={!canEdit || saving || loadingRelatedGames}>
+              <option value="">{loadingRelatedGames ? 'Loading games...' : 'No related game'}</option>
+              {relatedGames.map((game) => <option key={game.id} value={game.id}>{parseDate(game.gameDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {gameOpponent(game) || 'Game'}</option>)}
+            </select>
+          </label>}
+          {!initialEvent && eventType === 'Practice' && <label className="schedule-field">
+            <span>Generate Practice Script?</span>
+            <select value={practiceScriptUnit} onChange={(event) => setPracticeScriptUnit(event.target.value)} disabled={!canEdit || saving}>
+              <option value="No">No</option>
+              <option value="Offense">Offense (Scout Defense)</option>
+              <option value="Defense">Defense (Scout Offense)</option>
+              <option value="Special Teams">Special Teams</option>
+            </select>
           </label>}
           <ErrorDialog error={error} message="We couldn't save this event. Your changes are still here so you can try again." />
         </div>
         <footer className="schedule-dialog-actions">
           {initialEvent && canDelete && <button type="button" className="schedule-delete-button" onClick={onDelete} disabled={saving}><Trash2 size={16} /> Delete</button>}
           <button type="button" className="schedule-secondary-button" onClick={onCancel} disabled={saving}>Cancel</button>
-          {canEdit && <button type="submit" className="schedule-primary-button" disabled={saving}>{saving ? 'Saving…' : 'Save Event'}</button>}
+          {canEdit && <button type="submit" className="schedule-primary-button" disabled={saving || loadingRelatedGames}>{saving ? 'Saving…' : 'Save Event'}</button>}
         </footer>
       </form>
     </div>
@@ -158,7 +207,7 @@ function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onCont
   </div>
 }
 
-function ScheduleEventContextMenu({ event, position, canDelete, onClose, onOpen, onDelete }) {
+function ScheduleEventContextMenu({ event, position, canEdit, canDelete, onClose, onOpen, onDuplicate, onDelete }) {
   const menuRef = useRef(null)
 
   useEffect(() => {
@@ -201,6 +250,7 @@ function ScheduleEventContextMenu({ event, position, canDelete, onClose, onOpen,
 
   const actions = [
     { key: 'open', label: 'Open', icon: FolderOpen, onClick: () => onOpen(event) },
+    ...(event.kind !== 'game' && canEdit ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy, onClick: () => onDuplicate(event) }] : []),
     ...(canDelete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: () => onDelete(event) }] : []),
   ]
 
@@ -273,7 +323,7 @@ export function YearCalendar({ date, eventsByDate, onSelectMonth }) {
   </div>
 }
 
-export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated }) {
+export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, practiceSheetRevisionToken }) {
   const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState(savedScheduleView)
@@ -283,6 +333,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [error, setError] = useState(null)
   const [refresh, setRefresh] = useState(0)
   const [dialog, setDialog] = useState(null)
+  const [practiceRevision, setPracticeRevision] = useState(0)
   const [eventContextMenu, setEventContextMenu] = useState(null)
   const [eventToDelete, setEventToDelete] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
@@ -341,12 +392,13 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
 
   function openEvent(event) {
     if (event.kind === 'game') onOpenGame(event)
+    else if (event.eventType === 'Practice') onOpenPractice(event)
     else setDialog({ event })
   }
 
   function openEventContextMenu(contextEvent, event) {
     contextEvent.preventDefault()
-    const actions = 1 + (canDelete ? 1 : 0)
+    const actions = 1 + (event.kind !== 'game' && canEdit ? 1 : 0) + (canDelete ? 1 : 0)
     const menuHeight = actions * 44 + 12
     const top = contextEvent.clientY + 4 + menuHeight <= window.innerHeight
       ? contextEvent.clientY + 4 : Math.max(8, contextEvent.clientY - menuHeight - 4)
@@ -363,6 +415,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }
 
   async function saveEvent(values) {
+    setError(null)
     if (values.eventType === 'Game') {
       const payload = {
         name: `Game vs. ${values.name}`,
@@ -378,13 +431,36 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
       if (dialog.event?.kind === 'game') await api.updateGamePlan(dialog.event.id, payload)
       else await onCreateGame(payload)
     } else {
-      const payload = { name: values.name, eventType: values.eventType, eventDate: values.eventDate, startTime: values.startTime, endTime: values.endTime, location: values.location, notes: values.notes }
-      if (dialog.event?.kind === 'event') await api.updateScheduleEvent(dialog.event.id, payload)
-      else await api.createScheduleEvent(payload)
+      const payload = { name: values.name, eventType: values.eventType, eventDate: values.eventDate, startTime: values.startTime, endTime: values.endTime, location: values.location, notes: values.notes, ...(values.eventType === 'Practice' && { dress: values.dress }), ...(values.relatedGameId && { gamePlanIds: [values.relatedGameId] }) }
+      if (dialog.event?.kind === 'event') {
+        await api.updateScheduleEvent(dialog.event.id, payload)
+        if (dialog.event.id === practiceId) setPracticeRevision((value) => value + 1)
+      }
+      else {
+        const createdEvent = await api.createScheduleEvent(payload)
+        const scriptPayload = generatedPracticeScriptPayload(createdEvent, values.practiceScriptUnit)
+        if (scriptPayload) {
+          try {
+            await api.createPlaybook(scriptPayload)
+          } catch (failure) {
+            setError(new Error(`Practice created, but its Practice Script could not be created: ${failure.message}`))
+          }
+        }
+      }
     }
     setDialog(null)
     setRefresh((value) => value + 1)
     onWorkspaceUpdated?.()
+  }
+
+  async function duplicateEvent(event) {
+    try {
+      await api.createScheduleEvent(duplicateScheduleEventPayload(event))
+      setRefresh((value) => value + 1)
+      onWorkspaceUpdated?.()
+    } catch (failure) {
+      setError(failure)
+    }
   }
 
   async function moveEventToDate(event, destinationDate) {
@@ -436,6 +512,12 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     onContextMenu: openEventContextMenu,
     onDragEvent: setDraggedEvent, onDragEnd: () => { setDraggedEvent(null); setDropTargetDate(null) },
   }
+
+  if (practiceId) return <main className="team-schedule">
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
+    {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+    {eventToDelete && <DeleteConfirmationDialog message={`Are you sure you want to delete "${eventToDelete.name}"? This cannot be undone.`} onCancel={() => setEventToDelete(null)} onConfirm={async () => { await removeEvent(eventToDelete); setEventToDelete(null); onClosePractice() }} />}
+  </main>
 
   return (
     <main className="team-schedule">
@@ -508,13 +590,15 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           rowActions={(event) => [{ label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) }]}
         />}
       </section>}
-      {dialog && <ScheduleEventDialog initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+      {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
       {eventContextMenu && <ScheduleEventContextMenu
         event={eventContextMenu.event}
         position={eventContextMenu}
+        canEdit={canEdit}
         canDelete={canDelete}
         onClose={() => setEventContextMenu(null)}
         onOpen={openEvent}
+        onDuplicate={duplicateEvent}
         onDelete={(event) => setEventToDelete(event)}
       />}
       {eventToDelete && <DeleteConfirmationDialog

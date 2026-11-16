@@ -7,6 +7,42 @@ export const ScheduleView = Object.freeze({ WEEK: 'week', MONTH: 'month', QUARTE
 const pad = (value) => String(value).padStart(2, '0')
 const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 
+export function duplicateScheduleEventPayload(event) {
+  return {
+    name: `${event.name} (Copy)`,
+    eventType: event.eventType,
+    eventDate: event.eventDate,
+    startTime: event.startTime || '',
+    endTime: event.endTime || '',
+    location: event.location || '',
+    notes: event.notes || '',
+    ...(event.eventType === 'Practice' && event.dress ? { dress: event.dress } : {}),
+    ...(event.gamePlanIds?.length ? { gamePlanIds: [...event.gamePlanIds] } : {}),
+    ...(event.eventType === 'Practice' && event.practiceSheet ? { practiceSheet: structuredClone(event.practiceSheet) } : {}),
+  }
+}
+
+export function practiceGamePlanRange(practiceDate) {
+  const firstGameDate = new Date(`${practiceDate}T00:00:00Z`)
+  firstGameDate.setUTCDate(firstGameDate.getUTCDate() + 1)
+  const lastGameDate = new Date(firstGameDate)
+  lastGameDate.setUTCDate(lastGameDate.getUTCDate() + 6)
+  return {
+    start: firstGameDate.toISOString().slice(0, 10),
+    end: lastGameDate.toISOString().slice(0, 10),
+  }
+}
+
+export function practiceGamePlans(practiceDate, gamePlans) {
+  const { end } = practiceGamePlanRange(practiceDate)
+  return gamePlans
+    .filter((game) => game.gameDate > practiceDate && game.gameDate <= end && game.recordStatus !== 'Archived')
+}
+
+export function defaultRelatedGameId(games) {
+  return games.length === 1 ? games[0].id : ''
+}
+
 export function buildCalendarDays(date, mode) {
   if (mode === ScheduleView.WEEK) {
     const first = new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay())

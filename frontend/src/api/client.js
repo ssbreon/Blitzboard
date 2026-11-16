@@ -265,6 +265,7 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   updateGamePlan: (id, payload) => request(`/game-plans/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteGamePlan: (id) => request(`/game-plans/${id}`, { method: 'DELETE' }),
   listScheduleEvents: (range) => request(`/schedule-events${scheduleQuery(range)}`),
+  getScheduleEvent: (id) => request(`/schedule-events/${id}`),
   createScheduleEvent: (payload) => request('/schedule-events', { method: 'POST', body: JSON.stringify(payload) }),
   updateScheduleEvent: (id, payload) => request(`/schedule-events/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteScheduleEvent: (id) => request(`/schedule-events/${id}`, { method: 'DELETE' }),

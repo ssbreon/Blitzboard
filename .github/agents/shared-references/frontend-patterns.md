@@ -13,6 +13,18 @@
 
 **Frontend is not second-class.** Consumes shared types package, has own test gate, follows consistent patterns for data fetching, error handling, component structure. **Layout tokens from the plan are intent, not literal `<div>`s** — see [frontend-quality-bar.md](.github/agents/shared-references/frontend-quality-bar.md).
 
+## Rule: Reuse Filter Pill Patterns
+
+For category or unit filter groups, reuse the application's established DataGrid
+category-filter pattern instead of introducing a separate button appearance:
+
+- Use the `.data-grid-category-filter` group layout.
+- Use `.category-badge.category-filter-badge` for each option.
+- Derive badge colors with `getCategoryBadgeStyle`.
+- Expose the selected option with `aria-pressed` and the existing `.is-active` class.
+- Preserve the category pill hover and active treatments; do not substitute a
+  generic rectangular button or a tab's blue selected state.
+
 ---
 
 ## Rule: Consume Shared Types — No `any`

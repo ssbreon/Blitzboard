@@ -9,6 +9,7 @@ const SEARCH_DEBOUNCE_MS = 400
 const COLUMNS = [
   { key: 'name', header: 'Name' },
   { key: 'type', header: 'Type' },
+  { key: 'gamePlanContexts', header: 'Game Plan', render: (value) => value?.map((context) => context.name).join(', ') || '--' },
   { key: 'year', header: 'Year', render: (value) => value == null || value === '' ? '--' : value },
 ]
 const ICONS = { Playbook: BookOpen, Game: CalendarDays, Install: BookOpen, 'Practice Script': BookOpen, 'Scouting Report': ScanSearch, 'Scout Play': ScanSearch, Play: PlayDiagramIcon }
@@ -20,8 +21,9 @@ export function GlobalSearch({ api, onOpen, disabled }) {
   const containerRef = useRef(null)
   const inputRef = useRef(null)
   const term = query.trim()
-  const waitingForDebounce = Boolean(term) && result.query !== term
-  const loading = Boolean(term) && result.query === term && result.loading
+  const searchKey = term
+  const waitingForDebounce = Boolean(term) && result.query !== searchKey
+  const loading = Boolean(term) && result.query === searchKey && result.loading
   const showResults = open && Boolean(term) && !waitingForDebounce && !loading && !result.error
     && (result.items.length > 0 || result.truncated)
 
@@ -29,16 +31,16 @@ export function GlobalSearch({ api, onOpen, disabled }) {
     if (!term || !open) return undefined
     let active = true
     const timer = setTimeout(async () => {
-      setResult({ query: term, items: [], loading: true, error: null })
+      setResult({ query: searchKey, items: [], loading: true, error: null })
       try {
         const { items, total, limit, truncated } = await api.search(term)
-        if (active) setResult({ query: term, items, total, limit, truncated, loading: false, error: null })
+        if (active) setResult({ query: searchKey, items, total, limit, truncated, loading: false, error: null })
       } catch (error) {
-        if (active) setResult({ query: term, items: [], loading: false, error })
+        if (active) setResult({ query: searchKey, items: [], loading: false, error })
       }
     }, SEARCH_DEBOUNCE_MS)
     return () => { active = false; clearTimeout(timer) }
-  }, [api, term, open])
+  }, [api, term, open, searchKey])
 
   useEffect(() => {
     function dismiss(event) {
@@ -75,7 +77,7 @@ export function GlobalSearch({ api, onOpen, disabled }) {
     {showResults && <div id="global-search-results" className="global-search-results" role="dialog" aria-label="Search results" tabIndex={-1}>
       <p className="sr-only" role="status">{result.items.length} results</p>
       {result.truncated && <p className="data-grid-status" role="status">Showing the first {result.limit} of {result.total} matches. Refine your search.</p>}
-      <DataGrid key={term} title="Search results" columns={COLUMNS} items={result.items} compact suppressOpenHint getRowIcon={(row) => ICONS[row.type] || BookOpen} onRowClick={openRow} busy={disabled} />
+      <DataGrid key={searchKey} title="Search results" columns={COLUMNS} items={result.items} compact suppressOpenHint getRowIcon={(row) => ICONS[row.type] || BookOpen} onRowClick={openRow} busy={disabled} />
     </div>}
   </div>
 }

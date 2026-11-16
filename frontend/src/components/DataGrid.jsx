@@ -26,7 +26,7 @@ function renderGridCell(column, row) {
   )
 }
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, suppressOpenHint = false, onReorder, canReorderRows }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, hidePager = false, hideToolbar = false, onReorder, canReorderRows, className = '' }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
   const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   const [fetchedRows, setRows] = useState([])
@@ -207,6 +207,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const lastVisibleRow = showAllPages ? visibleRows.length : Math.min(visibleRows.length, (currentPage + 1) * PAGE_SIZE)
   // Page order is only meaningful against the full, unfiltered list.
   const canReorder = Boolean(onReorder) && !busy && !reordering && !selectedCategories.length && !namePrefix && !searchName && filteredRows.length === rows.length && !rows.some((row) => row._gridDeleted)
+  const canOpenRowsByDoubleClick = !className.split(/\s+/).includes('editable-data-grid')
   const hasRowIcons = Boolean(RowIcon || getRowIcon)
   const leadingColumns = (showPage ? 1 : 0) + (hasRowIcons ? 1 : 0)
 
@@ -318,9 +319,9 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   ))
 
   return (
-    <section className={`data-grid${compact ? ' data-grid-compact' : ''}`} aria-label={title}>
-      {!compact && <div className="data-grid-toolbar">
-        <div className="data-grid-toolbar-actions">
+    <section className={`data-grid${compact ? ' data-grid-compact' : ''}${className ? ` ${className}` : ''}`} aria-label={title}>
+      {!compact && !hideToolbar && <div className="data-grid-toolbar">
+        {toolbarContent ?? <div className="data-grid-toolbar-actions">
           <button type="button" className="toolbar-new-button" onClick={onNew} disabled={!onNew}>
             <svg className="toolbar-icon" viewBox="0 0 24 24" role="presentation" aria-hidden="true">
               <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z" />
@@ -366,7 +367,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
               })}
             </div>
           )}
-        </div>
+        </div>}
         <div className="toolbar-menu data-grid-toolbar-menu" ref={menuRef}>
           {statusFilter && selectedStatus === 'Archived' && (
             <span className="data-grid-archived-indicator" role="status" aria-label="Viewing archived records" title="Viewing archived records">
@@ -441,7 +442,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
             <table className={`data-grid-table${selectedRowIds.size > 1 ? ' is-multi-select' : ''}`}>
               <thead>
                 <tr>
-                  {showPage && <th className="data-grid-page-header" scope="col">Page</th>}
+                  {showPage && <th className="data-grid-page-header" scope="col">{pageLabel}</th>}
                   {hasRowIcons && <th className="data-grid-type-header" scope="col" aria-label="Type" />}
                   {columns.map((column) => (
                     <th key={column.key}>{column.header}</th>
@@ -466,7 +467,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     aria-selected={selectedRowIds.has(row.id)}
                     aria-expanded={row.rowType === 'grouping' ? !collapsedGroupingIds.has(row.id) : undefined}
                     tabIndex={row.rowType === 'grouping' ? 0 : undefined}
-                    onDoubleClick={row.rowType === 'grouping' ? () => toggleGrouping(row.id) : onRowDoubleClick ? () => {
+                    onDoubleClick={!canOpenRowsByDoubleClick ? undefined : row.rowType === 'grouping' ? () => toggleGrouping(row.id) : onRowDoubleClick ? () => {
                       showDrillthroughWaitCursor()
                       onRowDoubleClick(row)
                       dismissOpenHint()
@@ -555,7 +556,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     </>}
                     {rowActions && (
                       <td className="data-grid-actions-cell">
-                        <div className="row-actions">
+                        {row.rowType !== 'grouping' && <div className="row-actions">
                           <button
                             type="button"
                             className="row-actions-button"
@@ -628,7 +629,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                               </div>,
                               document.body
                             )}
-                        </div>
+                        </div>}
                       </td>
                     )}
                   </tr>
@@ -637,7 +638,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
               </tbody>
             </table>
           </div>
-          {(!compact || totalPages > 1) && <div className="data-grid-pager">
+          {!hidePager && (!compact || totalPages > 1) && <div className="data-grid-pager">
             <div className="data-grid-pager-summary">
               <span>
                 {filteredRows.length === 0

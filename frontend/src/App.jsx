@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ChevronRight, Copy, CreditCard, Folder, FolderOpen, FolderPlus, Info, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
+import { Archive, ArchiveRestore, BookOpen, CalendarDays, Check, ClipboardList, Copy, CreditCard, Folder, FolderOpen, FolderPlus, Info, LibraryBig, LoaderCircle, LogOut, Pencil, Plus, Presentation, Printer, Save, ScanSearch, Settings, Trash2, UserRound, Users, X } from 'lucide-react'
 import { api } from './api'
 import { clearPendingInvitation, createApi, getAuthenticationError, isDevelopmentAuth, isEntraAuth, isSignedOut, pendingInvitation, resetSession, selectedDevelopmentPlan, signIn, signOut } from './api/client'
 import { AccountViews } from './components/AccountViews'
@@ -28,7 +28,10 @@ import { PlayDesigner } from './components/PlayDesigner'
 import { PlaybookSlideshow } from './components/PlaybookSlideshow'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
+import { GamePlanHeader, GamePlanWorkspace } from './components/GamePlanWorkspace'
+import { PracticeScriptPlayGrid } from './components/PracticeScriptPlayGrid'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
+import { scoutPlayName } from './utils/gamePlanWorkspace'
 import { formatDate } from './utils/formatDate'
 import { BreadcrumbCacheContext } from './utils/breadcrumbCacheContext'
 import { defaultPlayPerspective, fieldWindowForPlay, fitMarkersToWindow, PLAY_PERSPECTIVES } from './utils/playGeometry'
@@ -64,17 +67,6 @@ const GAME_CARD_VIEWS = [
   { id: 'special-teams-scout', unit: 'Special Teams', tab: 'scout', title: 'Special Teams - Practice Scripts', description: 'Practice scripts for our scout special teams' },
 ]
 const GAME_PLAN_UNITS = ['Offense', 'Defense', 'Special Teams']
-const GAME_PLAN_TABS = [
-  { id: 'installs', label: 'Installs' },
-  { id: 'practiceScripts', label: 'Practice Scripts' },
-  { id: 'scoutingReports', label: 'Scouting Reports' },
-]
-const GAME_PLAN_ITEM_COLUMNS = [
-  { key: 'name', header: 'Name' },
-  { key: 'playCount', header: 'Plays', render: (_, item) => item.gameCardId?.endsWith('-installs') ? item.installPlays?.length ?? 0 : item.playCount ?? 0 },
-  { key: 'year', header: 'Year' },
-  { key: 'updatedAt', header: 'Last Modified', render: formatDate },
-]
 const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
   { key: 'template', header: 'Formation', render: (value) => findPlayTemplate(value)?.label || value || '—' },
@@ -161,8 +153,10 @@ function scoutingReportDefaultName(game, unit) {
   return `${unit || 'Game'} Scouting Report${opponent ? ` for ${opponent}` : ''}`
 }
 
-function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
+function GameCardItemDialog({ card, initialName, practices = [], initialPracticeEventId, onCancel, onCreate }) {
   const [name, setName] = useState(initialName)
+  const [unit, setUnit] = useState(card.unit)
+  const [practiceEventId, setPracticeEventId] = useState(initialPracticeEventId || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -172,7 +166,7 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
     setSaving(true)
     setError(null)
     try {
-      await onCreate(name.trim())
+      await onCreate(name.trim(), unit, practiceEventId)
     } catch (failure) {
       setError(failure)
     } finally {
@@ -185,6 +179,8 @@ function GameCardItemDialog({ card, initialName, onCancel, onCreate }) {
       <h2><Plus size={22} aria-hidden="true" />Add {card.tab === 'installs' ? 'Install' : 'Practice Script'}</h2>
       <DialogCloseButton onClick={onCancel} disabled={saving} />
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label className="dialog-field"><span>Unit</span><select value={unit} onChange={(event) => setUnit(event.target.value)}>{GAME_PLAN_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label>
+      {card.tab === 'scout' && <label className="dialog-field"><span>Practice</span><select required value={practiceEventId} onChange={(event) => setPracticeEventId(event.target.value)}><option value="">Select a linked practice</option>{practices.map((practice) => <option key={practice.id} value={practice.id}>{practice.eventDate} - {practice.name}</option>)}</select></label>}
       <ErrorDialog error={error} message="We couldn't create this item. Please try again." />
       <div className="dialog-actions">
         <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
@@ -449,12 +445,11 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onGamePlanSelectionChange, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
   const gameTab = isGamePlan ? gamePlanTab : gameCard?.tab || 'scout'
-  const selectedGameCard = GAME_CARD_VIEWS.find((card) => card.unit === selectedUnit && card.tab === (gameTab === 'installs' ? 'installs' : 'scout'))
   const [name, setName] = useState(parentRecord.name)
   const [category, setCategory] = useState(parentRecord.category || 'Defense')
   const [year, setYear] = useState(String(parentRecord.year || new Date().getFullYear()))
@@ -477,8 +472,6 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [playbooks, setPlaybooks] = useState([])
   const [playbooksLoading, setPlaybooksLoading] = useState(isGamePlan || installMode)
   const [playbooksError, setPlaybooksError] = useState(null)
-  const [gamePlanScoutPlays, setGamePlanScoutPlays] = useState(null)
-  const [gamePlanScoutPlaysLoading, setGamePlanScoutPlaysLoading] = useState(isGamePlan)
   const [playbookPlays, setPlaybookPlays] = useState({})
   const [loadedPlaybookKey, setLoadedPlaybookKey] = useState('')
   const [playbookPlaysError, setPlaybookPlaysError] = useState(null)
@@ -486,7 +479,6 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [installGroupingsError, setInstallGroupingsError] = useState(null)
   const [selectedPlaybookId, setSelectedPlaybookId] = useState('')
   const [formationFilter, setFormationFilter] = useState('')
-  const [collapsedGamePlanFolders, setCollapsedGamePlanFolders] = useState(() => new Set())
   const [installCategoryFilter, setInstallCategoryFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const [playSearchDraft, setPlaySearchDraft] = useState('')
@@ -497,10 +489,6 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [installError, setInstallError] = useState(null)
   const [installPickerOpen, setInstallPickerOpen] = useState(false)
   const [installPickerGroupingId, setInstallPickerGroupingId] = useState(null)
-  const [gameCardActionBusy, setGameCardActionBusy] = useState(false)
-  const [gameCardToast, setGameCardToast] = useState('')
-  const [gameCardError, setGameCardError] = useState(null)
-  const selectedGameCardItems = playbooks.filter((item) => item.recordStatus !== 'Archived' && item.gamePlanId === parentRecord.id && item.gameCardId === selectedGameCard?.id)
 
   useEffect(() => {
     if (!installMode) return undefined
@@ -534,22 +522,6 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
       })
     return () => { active = false }
   }, [api, installMode, isGamePlan, reloadToken])
-
-  useEffect(() => {
-    if (!isGamePlan) return undefined
-    let active = true
-    api.listScoutPlays(parentRecord.id)
-      .then((result) => {
-        if (active) setGamePlanScoutPlays(result.items)
-      })
-      .catch(() => {
-        if (active) setGamePlanScoutPlays(null)
-      })
-      .finally(() => {
-        if (active) setGamePlanScoutPlaysLoading(false)
-      })
-    return () => { active = false }
-  }, [api, isGamePlan, parentRecord.id, reloadToken])
 
   const unitPlaybooks = playbooks.filter((playbook) => playbook.category === selectedUnit)
   const activePlaybookId = unitPlaybooks.some((playbook) => playbook.id === selectedPlaybookId)
@@ -704,29 +676,6 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
     }
   }
 
-  async function handleGameCardItemAction(action, card, item) {
-    const selectedItems = Array.isArray(item) ? item : [item]
-    if (action === 'open') {
-      onOpenGameCardItem(card, item)
-      return
-    }
-    setGameCardActionBusy(true)
-    setGameCardError(null)
-    try {
-      if (action === 'duplicate') {
-        await onDuplicateGameCardItem(item)
-        setGameCardToast(`Duplicated ${item.name}`)
-      } else {
-        for (const selectedItem of selectedItems) await onDeleteGameCardItem(selectedItem)
-        setGameCardToast(selectedItems.length === 1 ? `Deleted ${selectedItems[0].name}` : `Deleted ${selectedItems.length} items`)
-      }
-    } catch (failure) {
-      setGameCardError(failure)
-    } finally {
-      setGameCardActionBusy(false)
-      window.setTimeout(() => setGameCardToast(''), 4000)
-    }
-  }
   async function handleSettingsSave(event) {
     event.preventDefault()
     if (!draftName.trim() || readOnly || saving || busy) return
@@ -795,8 +744,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
 
   return (
     <main className="plays-drillthrough-view">
-      <ErrorDialog error={gameCardError} message="We couldn't complete the game plan action. Please check the list before trying again." />
-      {isGamePlan && 
+      {isGamePlan && gameCard &&
         <GamePlanBanner 
           game={parentRecord} 
         />
@@ -888,83 +836,14 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           </form>
         </div>
       )}
-      {isGamePlan && !gameCard ? <section className="game-plan-workspace" aria-label="Game plan">
-        <nav className="game-plan-folder-tree" aria-label="Game plan folders">
-          {GAME_PLAN_TABS.map((tab) => <section className="game-plan-folder-group" key={tab.id}>
-            <h3><button
-                type="button"
-                className="game-plan-folder-toggle"
-                aria-expanded={!collapsedGamePlanFolders.has(tab.id)}
-                onClick={() => setCollapsedGamePlanFolders((current) => {
-                  const next = new Set(current)
-                  if (next.has(tab.id)) next.delete(tab.id)
-                  else next.add(tab.id)
-                  return next
-                })}
-              >
-                {collapsedGamePlanFolders.has(tab.id)
-                  ? <Folder className="game-plan-folder-toggle-icon" size={18} aria-hidden="true" />
-                  : <FolderOpen className="game-plan-folder-toggle-icon" size={18} aria-hidden="true" />}
-                {tab.label}
-              </button></h3>
-            {!collapsedGamePlanFolders.has(tab.id) && <ul>
-              {GAME_PLAN_UNITS.map((unit) => {
-                const selected = gameTab === tab.id && selectedUnit === unit
-                const FolderIcon = selected ? FolderOpen : Folder
-                const gameCard = GAME_CARD_VIEWS.find((card) => card.unit === unit && card.tab === (tab.id === 'installs' ? 'installs' : 'scout'))
-                const countLoading = tab.id === 'scoutingReports' ? gamePlanScoutPlaysLoading : playbooksLoading
-                const count = tab.id === 'scoutingReports'
-                  ? gamePlanScoutPlays?.filter((play) => play.recordStatus !== 'Archived' && (play.unit || parentRecord.category || (selectedUnit === unit ? unit : '')) === unit).length ?? null
-                  : playbooks.filter((item) => item.gamePlanId === parentRecord.id && item.gameCardId === gameCard?.id).length
-                return <li key={unit}>
-                  <button type="button" className={selected ? 'is-selected' : undefined} aria-current={selected ? 'page' : undefined} onClick={() => onGamePlanSelectionChange(unit, tab.id)}>
-                    <FolderIcon size={19} aria-hidden="true" />{unit}
-                    <span className={`game-plan-folder-count${count > 0 ? ' has-records' : ''}`} aria-label={countLoading ? `${tab.label} count loading` : count === null ? `${tab.label} count unavailable` : `${count} ${tab.label.toLowerCase()}`} title={countLoading ? `Loading ${tab.label.toLowerCase()} count` : count === null ? 'Count unavailable' : `${count} ${tab.label.toLowerCase()}`}>
-                      {countLoading ? <LoaderCircle className="game-plan-folder-count-spinner" size={13} aria-hidden="true" /> : count ?? '\u2014'}
-                    </span>
-                  </button>
-                </li>
-              })}
-            </ul>}
-          </section>)}
-        </nav>
-        <div className="game-plan-content">
-          <header className="game-plan-content-heading">
-            <h2>{GAME_PLAN_TABS.find((tab) => tab.id === gameTab)?.label}<ChevronRight size={18} aria-hidden="true" />{selectedUnit}</h2>
-          </header>
-          {gameTab !== 'scoutingReports' && <ErrorDialog error={playbooksError} message="We couldn't load the game plan items. Please try again." />}
-          {gameTab === 'scoutingReports' ? <DataGrid
-            key={`game-reports-${parentRecord.id}-${selectedUnit}`}
-            title={`${selectedUnit} Scouting Reports`}
-            columns={GAME_SCOUT_PLAY_COLUMNS}
-            filterRows={(row) => (row.unit || parentRecord.category || selectedUnit) === selectedUnit}
-            statusFilter
-            reloadToken={reloadToken}
-            busy={busy}
-            fetchRows={fetchRows}
-            onNew={onNew ? () => onNew(selectedUnit, 'scoutingReports') : undefined}
-            newLabel="New Scouting Report"
-            onRowDoubleClick={onOpenPlay}
-            rowActions={rowActions}
-          /> : playbooksLoading ? <LoadingIndicator compact className="schedule-muted" label={`Loading ${gameTab === 'installs' ? 'installs' : 'practice scripts'}...`} /> : <DataGrid
-            key={`game-items-${parentRecord.id}-${selectedUnit}-${gameTab}`}
-            title={`${selectedUnit} ${gameTab === 'installs' ? 'Installs' : 'Practice Scripts'}`}
-            columns={GAME_PLAN_ITEM_COLUMNS}
-            items={selectedGameCardItems.map((item) => withoutGridOnlyFields(item))}
-            busy={busy || gameCardActionBusy}
-            onNew={onAddGameCardItem && canAddGameCardItem ? () => onAddGameCardItem(selectedGameCard) : undefined}
-            newLabel={gameTab === 'installs' ? 'New Install' : 'New Practice Script'}
-            onRowDoubleClick={(item) => onOpenGameCardItem(selectedGameCard, item)}
-            rowActions={() => [
-              { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => handleGameCardItemAction('open', selectedGameCard, item) },
-              { key: 'slideshow', label: 'Slideshow', icon: Presentation, onClick: (item) => onSlideshow(selectedGameCard, item) },
-              ...(canDuplicateGameCardItem ? [{ key: 'duplicate', label: 'Duplicate', icon: Copy, onClick: (item) => handleGameCardItemAction('duplicate', selectedGameCard, item) }] : []),
-              ...(canDeleteGameCardItem ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: (item) => handleGameCardItemAction('delete', selectedGameCard, item) }] : []),
-            ]}
-          />}
-          {gameCardToast && <div className="schedule-game-card-toast" role="status">{gameCardToast}</div>}
-        </div>
-      </section> : <>
+      {isGamePlan && !gameCard ? <GamePlanWorkspace
+        api={api} game={parentRecord} reloadToken={reloadToken} readOnly={readOnly} cards={GAME_CARD_VIEWS}
+        canCreate={canAddGameCardItem} canDuplicate={canDuplicateGameCardItem} canDelete={canDeleteGameCardItem}
+        onAdd={onAddGameCardItem} onOpen={onOpenGameCardItem} onSlideshow={onSlideshow}
+        onDuplicate={onDuplicateGameCardItem} onDelete={onDeleteGameCardItem}
+        onNewReport={onNew} onOpenReport={onOpenPlay} reportActions={rowActions}
+        practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} practiceSheetRevisionToken={practiceSheetRevisionToken}
+      /> : <>
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
       {isGamePlan && gameTab === 'installs' ? <section className="schedule-install-page">
         <header><h2>{gameCard?.title || `${selectedUnit} - Installs`}</h2><p>Select plays from your <strong>Playbooks</strong> to install for this game.</p></header>
@@ -1066,7 +945,23 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
             setInstallPickerGroupingId(null)
           }}
         />}
-      </section> : <DataGrid
+      </section> : !isGamePlan && gameCard?.tab === 'scout' ? <PracticeScriptPlayGrid
+        api={api}
+        playbookId={parentRecord.id}
+        title={title}
+        fetchRows={fetchRows}
+        reloadToken={reloadToken}
+        busy={busy}
+        canEdit={!readOnly}
+        onReorder={onReorder}
+        onOpenPlay={onOpenPlay}
+        onCreatePlay={onNew}
+        rowActions={rowActions}
+        menuItems={[
+          ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
+          { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll },
+        ]}
+      /> : <DataGrid
         key={isGamePlan ? `game-${parentRecord.id}-${selectedUnit}` : `collection-${parentRecord.id}`}
         title={isGamePlan ? gameCard?.title || `${selectedUnit} Scout Plays` : title}
         columns={isGamePlan ? GAME_SCOUT_PLAY_COLUMNS : timezoneColumns(PLAY_GRID_COLUMNS, timezone)}
@@ -1123,9 +1018,20 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [accountDialog, setAccountDialog] = useState(null)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [parent, setParent] = useState(null)
+  const [practice, setPractice] = useState(() => {
+    const saved = storedBreadcrumb?.practice
+    if (typeof saved?.id !== 'string') return null
+    if (saved.source === 'schedule' && storedBreadcrumb.view === 'teamSchedule' && !storedBreadcrumb.parent) return saved
+    if (saved.source === 'game' && storedBreadcrumb.parent?.kind === 'gamePlan') return saved
+    return null
+  })
+  const [practiceSheetRevisionToken, setPracticeSheetRevisionToken] = useState(0)
+  const handlePracticeLoaded = useCallback((event) => {
+    setPractice((current) => current?.id === event.id && current.name !== event.name ? { ...current, name: event.name } : current)
+  }, [])
   const [gameCard, setGameCard] = useState(null)
   const [gamePlanUnit, setGamePlanUnit] = useState(storedBreadcrumb?.gamePlanUnit || 'Offense')
-  const [gamePlanTab, setGamePlanTab] = useState(storedBreadcrumb?.gamePlanTab || 'practiceScripts')
+  const [gamePlanTab, setGamePlanTab] = useState(storedBreadcrumb?.gamePlanTab || 'overview')
   const [cardPlaybook, setCardPlaybook] = useState(null)
   const [designer, setDesigner] = useState(null)
   const [slideshow, setSlideshow] = useState(false)
@@ -1134,6 +1040,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     ? gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'
     : parent?.kind === 'gamePlan' ? 'Game' : 'Playbook'
   const [newDialog, setNewDialog] = useState(null)
+  const [practiceScoutRequest, setPracticeScoutRequest] = useState(null)
+  const [practiceScoutGames, setPracticeScoutGames] = useState([])
+  const [selectedPracticeScoutGameId, setSelectedPracticeScoutGameId] = useState('')
   const [groupingDialog, setGroupingDialog] = useState(null)
   const [showNewPlaybookDialog, setShowNewPlaybookDialog] = useState(false)
   const [printPlay, setPrintPlay] = useState(null)
@@ -1168,24 +1077,27 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     return api.createGamePlan(payload)
   }
 
-  async function handleCreateGameCardItem(name) {
-    const card = newDialog.card
+  async function handleCreateGameCardItem(name, unit, practiceEventId) {
+    const card = GAME_CARD_VIEWS.find((item) => item.unit === unit && item.tab === newDialog.card.tab)
     await api.createPlaybook({
       name,
       category: card.unit,
       year: Number(parent.year || new Date().getFullYear()),
       gamePlanId: parent.id,
       gameCardId: card.id,
+      ...(card.tab === 'scout' && { practiceEventId }),
     })
     setPlaybooksReloadToken((token) => token + 1)
     setNewDialog(null)
     onWorkspaceUpdated(await api.workspace())
   }
 
-  async function handleDeleteGameCardItem(item) {
-    await api.deletePlaybook(item.id)
-    setPlaybooksReloadToken((token) => token + 1)
-    onWorkspaceUpdated(await api.workspace())
+  function handleDeleteGameCardItem(item) {
+    setDeleteConfirmation({ message: `Delete "${item.name}"? This cannot be undone.`, onConfirm: async () => {
+      await api.deletePlaybook(item.id)
+      setPlaybooksReloadToken((token) => token + 1)
+      onWorkspaceUpdated(await api.workspace())
+    } })
   }
 
   async function handleDuplicateGameCardItem(item) {
@@ -1195,6 +1107,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       year: item.year,
       gamePlanId: item.gamePlanId,
       gameCardId: item.gameCardId,
+      ...(item.practiceEventId && { practiceEventId: item.practiceEventId }),
       ...(Array.isArray(item.installPlays) && { installPlays: item.installPlays }),
     })
     try {
@@ -1261,6 +1174,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
   function handleOpenGameCardItem(card, item, present = false) {
     requestLeave(() => {
+      setPractice(null)
       setDesigner(null)
       setGamePlanUnit(card.unit)
       setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
@@ -1268,6 +1182,133 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       setCardPlaybook({ ...item, kind: 'playbook' })
       setSlideshow(present)
     }, present ? 'Open slideshow' : 'Open game item')
+  }
+
+  async function handleOpenSchedulePracticeScript(script) {
+    try {
+      const game = script.gamePlanId ? { ...await api.getGamePlan(script.gamePlanId), kind: 'gamePlan' } : null
+      const card = GAME_CARD_VIEWS.find((item) => item.id === script.gameCardId)
+      requestLeave(() => {
+        setPractice(null)
+        setDesigner(null)
+        setSlideshow(false)
+        if (game && card) {
+          setParent(game)
+          setGamePlanUnit(card.unit)
+          setGamePlanTab('practiceScripts')
+          setGameCard(card)
+          setCardPlaybook({ ...script, kind: 'playbook' })
+        } else {
+          setParent({ ...script, kind: 'playbook' })
+          setGameCard(null)
+          setCardPlaybook(null)
+        }
+      }, 'Open Practice Script')
+    } catch (failure) {
+      setStatusError({ ...failure, message: `Unable to open Practice Script: ${failure.message}` })
+    }
+  }
+
+  async function handleCreateSchedulePracticeScript(practiceEventId) {
+    try {
+      const event = await api.getScheduleEvent(practiceEventId)
+      const gamePlanId = event.gamePlanIds?.[0]
+      if (!gamePlanId) throw new Error('Link this Practice to a Game Plan before adding a Practice Script.')
+      const game = { ...await api.getGamePlan(gamePlanId), kind: 'gamePlan' }
+      const card = GAME_CARD_VIEWS.find((item) => item.unit === gamePlanUnit && item.tab === 'scout')
+      requestLeave(() => {
+        setPractice({ id: event.id, name: event.name, source: 'game' })
+        setParent(game)
+        setGameCard(null)
+        setCardPlaybook(null)
+        setDesigner(null)
+        setSlideshow(false)
+        setNewDialog({ target: 'gameCardItem', card, practices: [event], practiceEventId: event.id })
+      }, 'Add Practice Script')
+    } catch (failure) {
+      setStatusError({ ...failure, message: `Unable to add Practice Script: ${failure.message}` })
+    }
+  }
+
+  async function beginPracticeScoutPlay(event, periodId, script, game) {
+    const gamePlanIds = event.gamePlanIds || []
+    if (!gamePlanIds.includes(game.id)) await api.updateScheduleEvent(event.id, { gamePlanIds: [...gamePlanIds, game.id] })
+    setParent({ ...game, kind: 'gamePlan' })
+    setGameCard(null)
+    setCardPlaybook(null)
+    setSlideshow(false)
+    setDesigner(null)
+    setView('teamSchedule')
+    setPractice({ id: event.id, name: event.name, source: 'game' })
+    setNewDialog({
+      target: 'scoutPlay',
+      parentId: game.id,
+      unit: 'Offense',
+      initialName: script.offPlay || script.play || 'New Scout Play',
+      practiceScriptRef: { eventId: event.id, periodId, scriptId: script.id },
+    })
+  }
+
+  async function handleCreatePracticeScoutPlay({ event, periodId, script, gamePlanId }) {
+    try {
+      if (gamePlanId) {
+        const game = parent?.id === gamePlanId ? parent : await api.getGamePlan(gamePlanId)
+        await beginPracticeScoutPlay(event, periodId, script, game)
+        return
+      }
+      const { items } = await api.listGamePlans()
+      const activeGames = items.filter((game) => game.recordStatus !== 'Archived')
+      const linkedIds = new Set(event.gamePlanIds || [])
+      const linkedGames = activeGames.filter((game) => linkedIds.has(game.id))
+      const choices = linkedGames.length ? linkedGames : activeGames
+      if (choices.length === 1) {
+        await beginPracticeScoutPlay(event, periodId, script, choices[0])
+        return
+      }
+      setPracticeScoutGames(choices)
+      setSelectedPracticeScoutGameId('')
+      setPracticeScoutRequest({ event, periodId, script })
+    } catch (failure) {
+      setStatusError({ ...failure, message: `Unable to prepare Scout Play: ${failure.message}` })
+    }
+  }
+
+  async function handleOpenPracticeScoutPlay(script) {
+    try {
+      const game = { ...await api.getGamePlan(script.scoutGamePlanId), kind: 'gamePlan' }
+      const row = await api.getScoutPlay(script.scoutGamePlanId, script.scoutPlayId)
+      setParent(game)
+      setGameCard(null)
+      setCardPlaybook(null)
+      setPractice((current) => current ? { ...current, source: 'game' } : current)
+      setView('teamSchedule')
+      await openDesignerForRow('scoutPlay', game.id, row, game, !writable)
+    } catch (failure) {
+      setStatusError({ ...failure, message: `Unable to open Scout Play: ${failure.message}` })
+    }
+  }
+
+  async function submitPracticeScoutRequest(event) {
+    event.preventDefault()
+    const game = practiceScoutGames.find((item) => item.id === selectedPracticeScoutGameId)
+    if (!game || !practiceScoutRequest) return
+    const request = practiceScoutRequest
+    setPracticeScoutRequest(null)
+    try {
+      await beginPracticeScoutPlay(request.event, request.periodId, request.script, game)
+    } catch (failure) {
+      setStatusError({ ...failure, message: `Unable to prepare Scout Play: ${failure.message}` })
+    }
+  }
+
+  function handleBackToGamePlan() {
+    requestLeave(() => {
+      setDesigner(null)
+      setSlideshow(false)
+      setGameCard(null)
+      setCardPlaybook(null)
+      setGamePlanTab('overview')
+    }, 'Return to Game Plan')
   }
 
   async function handlePrintGrouping(parentId, grouping, collection) {
@@ -1335,8 +1376,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption, selectedPerspective) {
-    const { target, parentId, unit, groupingId } = newDialog
-    setNewDialog(null)
+    const { target, parentId, unit, groupingId, practiceScriptRef, practiceScriptDraft } = newDialog
+    if (!practiceScriptRef) setNewDialog(null)
+    const playName = practiceScriptDraft ? scoutPlayName(practiceScriptDraft) : name
     const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent?.id === parentId ? parent : null
     const collectionCategory = newDialog.category || parent?.category
     const perspective = target === 'scoutPlay' || newDialog.practiceScript
@@ -1352,7 +1394,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     let record =
       target === 'play'
         ? await api.createPlay(parentId, {
-            name,
+          name: playName,
           gameType,
             template: templateId,
             theme,
@@ -1362,6 +1404,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             fieldZone,
             perspective,
             markers: initialMarkers,
+            ...(practiceScriptDraft && {
+              hash: practiceScriptDraft.hash,
+              offFormation: practiceScriptDraft.offFormation,
+              offPlay: practiceScriptDraft.offPlay,
+              defFront: practiceScriptDraft.defFront,
+              defCoverage: practiceScriptDraft.defCoverage,
+              notes: practiceScriptDraft.notes,
+            }),
           })
         : await api.createScoutPlay(parentId, {
             name,
@@ -1374,12 +1424,38 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             fieldZone,
             perspective,
             unit: playUnit,
+            markers: initialMarkers,
           })
     if (target === 'play' && groupingId) {
           await appendPlayToGrouping(parentId, groupingId, record.id)
       record = await api.getPlay(parentId, record.id)
       setPlaysReloadToken((token) => token + 1)
     }
+    if (target === 'play' && practiceScriptDraft) {
+      record = await api.getPlay(parentId, record.id)
+      setPlaysReloadToken((token) => token + 1)
+    }
+    if (target === 'scoutPlay' && practiceScriptRef) {
+      try {
+        const practiceEvent = await api.getScheduleEvent(practiceScriptRef.eventId)
+        const practiceSheet = practiceEvent.practiceSheet || { periods: [] }
+        const periodIndex = practiceSheet.periods.findIndex((period, index) => (period.id || String(index)) === practiceScriptRef.periodId)
+        if (periodIndex < 0) throw new Error('The practice period no longer exists.')
+        const period = practiceSheet.periods[periodIndex]
+        const scriptIndex = (period.scripts || []).findIndex((script) => script.id === practiceScriptRef.scriptId)
+        if (scriptIndex < 0) throw new Error('The play script row no longer exists.')
+        const scripts = [...period.scripts]
+        scripts[scriptIndex] = { ...scripts[scriptIndex], scoutPlayId: record.id, scoutGamePlanId: parentId }
+        const periods = [...practiceSheet.periods]
+        periods[periodIndex] = { ...period, scripts }
+        await api.updateScheduleEvent(practiceScriptRef.eventId, { practiceSheet: { ...practiceSheet, periods } })
+        setPracticeSheetRevisionToken((value) => value + 1)
+      } catch (failure) {
+        await api.deleteScoutPlay(parentId, record.id).catch(() => {})
+        throw failure
+      }
+    }
+    if (practiceScriptRef) setNewDialog(null)
     setDesigner({
       kind: target,
       parentId,
@@ -1483,13 +1559,15 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         const collection = isReport || result.entityType === 'gamePlans'
           ? { ...await api.getGamePlan(isReport ? result.parentId : result.id), kind: 'gamePlan' }
           : { ...await api.getPlaybook(isPlay ? result.parentId : result.id), kind: 'playbook' }
-        const card = collection.kind === 'playbook' && collection.gamePlanId
+        const contextId = result.gamePlanContexts?.find((context) => context.id === parent?.id)?.id || result.gamePlanContexts?.[0]?.id || collection.gamePlanId
+        const card = collection.kind === 'playbook' && contextId
           ? GAME_CARD_VIEWS.find((item) => item.id === collection.gameCardId)
           : null
-        const root = card ? { ...await api.getGamePlan(collection.gamePlanId), kind: 'gamePlan' } : collection
+        const root = card ? { ...await api.getGamePlan(contextId), kind: 'gamePlan' } : collection
         const row = isPlay ? await api.getPlay(collection.id, result.id)
           : isReport ? await api.getScoutPlay(collection.id, result.id) : null
         setAccountDialog(null)
+        setPractice(null)
         setParentSettingsRequestId(null)
         setSlideshow(false)
         setDesigner(null)
@@ -1503,6 +1581,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         } else if (isReport) {
           setGamePlanUnit(row.unit || root.category || 'Offense')
           setGamePlanTab('scoutingReports')
+        } else if (root.kind === 'gamePlan') {
+          setGamePlanTab('overview')
         }
         if (row) await openDesignerForRow(isReport ? 'scoutPlay' : 'play', collection.id, row, collection, card?.tab === 'installs')
       } catch (error) {
@@ -1525,6 +1605,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     const payload = {
       name: `${row.name} (Copy)`,
       gameType: row.gameType || findPlayTemplate(row.template)?.gameType,
+      ...(kind === 'scoutPlay' && { unit: row.unit }),
       template: row.template,
       theme: row.theme,
       category: row.category,
@@ -1607,6 +1688,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     gamePlanUnit,
     gamePlanTab,
     parent: parent ? { kind: parent.kind, id: parent.id } : null,
+    practice,
     gameCardId: gameCard?.id ?? null,
     cardPlaybookId: cardPlaybook?.id ?? null,
     slideshow,
@@ -1659,6 +1741,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onSignOut={onSignOut}
         onAbout={() => setAboutOpen(true)}
         onNavigate={(nextView) => requestLeave(() => {
+          setPractice(null)
           setSlideshow(false)
           if (['settings', 'profile', 'billing', 'team'].includes(nextView)) {
             setDesigner(null)
@@ -1681,7 +1764,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       <nav className="breadcrumb-bar" aria-label="Breadcrumb">
         <ol>
           <li>
-            {parent ? (
+            {parent || practice ? (
               <button
                 type="button"
                 disabled={busy}
@@ -1691,11 +1774,12 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                   setParent(null)
                   setGameCard(null)
                   setCardPlaybook(null)
-                  setView(parent.kind === 'playbook' ? 'playbooks' : 'teamSchedule')
-                }, parent.kind === 'playbook' ? 'Leave playbook' : 'Leave game')}
+                  setPractice(null)
+                  setView(parent?.kind === 'playbook' ? 'playbooks' : 'teamSchedule')
+                }, parent?.kind === 'playbook' ? 'Leave playbook' : 'Return to Team Schedule')}
               >
-                <BreadcrumbLabel icon={parent.kind === 'playbook' ? LibraryBig : CalendarDays}>
-                  {parent.kind === 'playbook' ? 'Playbooks' : 'Team Schedule'}
+                <BreadcrumbLabel icon={parent?.kind === 'playbook' ? LibraryBig : CalendarDays}>
+                  {parent?.kind === 'playbook' ? 'Playbooks' : 'Team Schedule'}
                 </BreadcrumbLabel>
               </button>
             ) : (
@@ -1708,7 +1792,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           </li>
           {loadingPlay && <LoadingIndicator label="Loading play..." />}
           {parent && <li>
-            {parent.kind === 'gamePlan' && gameCard ? (
+            {parent.kind === 'gamePlan' && practice?.source === 'game' ? (
+              <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false); setPractice(null) }, 'Return to Game Plan')}><BreadcrumbLabel icon={CalendarDays}>{gameBreadcrumbLabel(parent)}</BreadcrumbLabel></button>
+            ) : parent.kind === 'gamePlan' && gameCard ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false); setGameCard(null); setCardPlaybook(null) }, 'Return to game cards')}>
                 <BreadcrumbLabel icon={CalendarDays}>{gameBreadcrumbLabel(parent)}</BreadcrumbLabel>
               </button>
@@ -1725,8 +1811,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
                 </BreadcrumbLabel>
               </span>
             )}
-            {!slideshow && ((parent.kind === 'gamePlan' && !gameCard) || (parent.kind === 'playbook' && !parent.gameCardId)) && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
+            {!slideshow && !practice && ((parent.kind === 'gamePlan' && !gameCard) || (parent.kind === 'playbook' && !parent.gameCardId)) && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}
           </li>}
+          {practice && <li>{designer || slideshow
+            ? <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false) }, 'Return to Practice Sheet')}><BreadcrumbLabel icon={ClipboardList}>{practice.name || 'Practice Sheet'}</BreadcrumbLabel></button>
+            : <span aria-current="page"><BreadcrumbLabel icon={ClipboardList}>{practice.name || 'Practice Sheet'}</BreadcrumbLabel></span>}{!designer && !slideshow && !cardPlaybook && <div className="breadcrumb-settings-target" ref={setBreadcrumbSettingsTarget} />}</li>}
           {cardPlaybook && <li>
             {designer || slideshow
               ? <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false) }, 'Return to plays')}><BreadcrumbLabel icon={BookOpen}>{cardPlaybook.name}</BreadcrumbLabel></button>
@@ -1747,11 +1836,11 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       <ErrorDialog error={statusError} message="We couldn't complete that action. Please try again." />
 
       <NewPlayDialog
-        key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : ''}:${defaults.theme}:${defaults.fieldOrientation}`}
+        key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${newDialog?.initialName || ''}:${newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : ''}:${defaults.theme}:${defaults.fieldOrientation}`}
         open={newDialog?.target === 'play' || newDialog?.target === 'scoutPlay'}
         titleLabel={newDialog?.scoutingReport ? 'New Scouting Report' : newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
         titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : PlayDiagramIcon}
-        initialName={newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : undefined}
+        initialName={newDialog?.initialName || (newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : undefined)}
         onCancel={() => setNewDialog(null)}
         onCreate={handleCreatePlay}
         defaultTheme={defaults.theme}
@@ -1760,8 +1849,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         categoryOptions={playCategoriesForCollection(newDialog?.unit || newDialog?.category || parent?.category)}
         showPlayerLabelOptions={newDialog?.target === 'play'}
       />
+      {practiceScoutRequest && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setPracticeScoutRequest(null) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="practice-scout-game-title" onSubmit={submitPracticeScoutRequest}>
+        <header className="schedule-dialog-header"><div><ScanSearch size={20} aria-hidden="true" /><h2 id="practice-scout-game-title">Create Scout Play</h2></div><DialogCloseButton onClick={() => setPracticeScoutRequest(null)} /></header>
+        <div className="schedule-dialog-body"><p>Select the Game Plan that should own this Scout Play.</p><label className="schedule-field"><span>Game Plan</span><select autoFocus required value={selectedPracticeScoutGameId} onChange={(event) => setSelectedPracticeScoutGameId(event.target.value)} disabled={!practiceScoutGames.length}><option value="">{practiceScoutGames.length ? 'Select a Game Plan' : 'No active Game Plans available'}</option>{practiceScoutGames.map((game) => <option key={game.id} value={game.id}>{game.opponent || game.name} · {game.gameDate}</option>)}</select></label>{!practiceScoutGames.length && <p className="gp-empty">Create a Game Plan before adding a Scout Play to this practice.</p>}</div>
+        <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => setPracticeScoutRequest(null)}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={!selectedPracticeScoutGameId}>Continue</button></footer>
+      </form></div>}
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
-      {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
+      {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
       {showNewPlaybookDialog && (
         <NewCollectionDialog
           title="Add New Playbook"
@@ -1780,6 +1874,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
 
+      {!restoring && parent?.kind === 'gamePlan' && (cardPlaybook || designer?.kind === 'scoutPlay') && <GamePlanHeader game={parent} onBack={handleBackToGamePlan} />}
       {!restoring && slideshowCollection && <PlaybookSlideshow key={`${slideshowCollection.kind}-${slideshowCollection.id}`} api={api} collection={slideshowCollection} />}
       {!restoring && designer && (
         <PlayDesigner
@@ -1824,7 +1919,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowType="Play"
           fetchRows={fetchCardPlaybookPlays}
           onReorder={(ids) => api.reorderPlays(cardPlaybook.id, ids)}
-          onNew={writable && gameCard?.tab === 'scout' ? () => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true }) : undefined}
+          onNew={writable && gameCard?.tab === 'scout' ? (practiceScriptDraft) => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true, practiceScriptDraft, initialName: scoutPlayName(practiceScriptDraft) }) : undefined}
           onNewGrouping={writable && gameCard?.tab === 'installs' ? () => setGroupingDialog({ parentId: cardPlaybook.id }) : undefined}
           onEditGrouping={(grouping) => setGroupingDialog({ parentId: cardPlaybook.id, grouping })}
           onDeleteGrouping={workspace.capabilities.delete ? (grouping) => handleDeleteGrouping(cardPlaybook.id, grouping) : undefined}
@@ -1870,14 +1965,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {!restoring && parent?.kind === 'gamePlan' && (
         <BreadcrumbView active={!designer && !cardPlaybook && !slideshow}>
         <PlaysDrillthroughView
-          active={!designer && !cardPlaybook && !slideshow}
+          active={!designer && !cardPlaybook && !slideshow && !practice}
           key={`scoutPlays-${parent.id}`}
           busy={statusSaving}
           parentRecord={parent}
           parentLabel="Game"
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
-          onGamePlanSelectionChange={(unit, tab) => { setGamePlanUnit(unit); setGamePlanTab(tab) }}
           breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           openSettingsOnMount={parentSettingsRequestId === parent.id}
           onSettingsClosed={() => setParentSettingsRequestId(null)}
@@ -1898,7 +1992,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}
           rowActions={playRowActions('scoutPlay', parent.id)}
           reloadToken={scoutPlaysReloadToken + playbooksReloadToken + cacheVersion}
-          onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card) => setNewDialog({ target: 'gameCardItem', card }) : undefined}
+          onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card, practices, practiceEventId) => setNewDialog({ target: 'gameCardItem', card, practices, practiceEventId }) : undefined}
           onOpenGameCardItem={handleOpenGameCardItem}
           onSlideshow={(card, item) => handleOpenGameCardItem(card, item, true)}
           onDuplicateGameCardItem={handleDuplicateGameCardItem}
@@ -1906,6 +2000,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           canAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
           canDuplicateGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
           canDeleteGameCardItem={workspace.capabilities.delete}
+          practiceId={practice?.source === 'game' ? practice.id : null}
+          practiceBreadcrumbSettingsTarget={practice && !designer && !slideshow && !cardPlaybook ? breadcrumbSettingsTarget : null}
+          onOpenPractice={(event) => setPractice({ id: event.id, name: event.name, source: 'game' })}
+          onPracticeLoaded={handlePracticeLoaded}
+          onCreateScoutPlay={handleCreatePracticeScoutPlay}
+          onOpenScoutPlay={handleOpenPracticeScoutPlay}
+          practiceSheetRevisionToken={practiceSheetRevisionToken}
         />
         </BreadcrumbView>
       )}
@@ -1923,8 +2024,19 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             canDelete={workspace.capabilities.delete}
             canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
             onCreateGame={handleCreateScheduleGame}
-            onOpenGame={(game) => { setGameCard(null); setParent({ ...game, kind: 'gamePlan' }) }}
+            onOpenGame={(game) => { setGameCard(null); setGamePlanTab('overview'); setParent({ ...game, kind: 'gamePlan' }) }}
             onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}
+            practiceId={practice?.source === 'schedule' ? practice.id : null}
+            practiceBreadcrumbSettingsTarget={practice && !designer && !slideshow && !cardPlaybook ? breadcrumbSettingsTarget : null}
+            onOpenPractice={(event) => setPractice({ id: event.id, name: event.name, source: 'schedule' })}
+            onClosePractice={() => setPractice(null)}
+            onGuardChange={onGuardChange}
+            onPracticeLoaded={handlePracticeLoaded}
+            onCreateScoutPlay={handleCreatePracticeScoutPlay}
+            onOpenScoutPlay={handleOpenPracticeScoutPlay}
+            onOpenScript={handleOpenSchedulePracticeScript}
+            onCreatePracticeScript={writable && workspace.usage.playbooks < workspace.limits.playbooks ? handleCreateSchedulePracticeScript : undefined}
+            practiceSheetRevisionToken={practiceSheetRevisionToken}
           />
         </>
       )}

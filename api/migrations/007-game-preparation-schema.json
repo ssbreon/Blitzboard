@@ -1,0 +1,19 @@
+{
+  "version": 7,
+  "provider": "azure-cosmos-nosql",
+  "description": "Adds independent coaching workflow status and explicit preparation activity associations. No records are inserted or automatically reassigned.",
+  "fields": {
+    "playbooks": {
+      "workflowStatus": "Draft | In Progress | Ready | Needs Review; applies to installs and practice scripts",
+      "practiceEventId": "Optional scheduleEvents ID for legacy compatibility; required by the UI for new practice scripts"
+    },
+    "scoutPlays": {
+      "workflowStatus": "Draft | In Progress | Ready | Needs Review"
+    },
+    "scheduleEvents": {
+      "gamePlanIds": "Array of unique Game Plan IDs in the same workspace; an activity may prepare for multiple games"
+    }
+  },
+  "legacyCompatibility": "Missing workflowStatus displays as Draft without inferring readiness. Existing scripts without practiceEventId remain visible as Unassigned in their original Game Plan. Practice-owned scripts use event associations instead of legacy gamePlanId for workspace membership.",
+  "lifecycle": "Active/Archived remains independent. Practices owning scripts cannot be deleted, changed to a different event type, or unlinked from their last Game Plan until their scripts are reassigned or deleted."
+}

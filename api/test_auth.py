@@ -547,6 +547,45 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_game_records_ignore_retired_workflow_status(self):
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
+        for path, extra in (("playbooks", {"gamePlanId": game["id"], "gameCardId": "offense-installs"}),
+                            (f"game-plans/{game['id']}/scout-plays", {})):
+            record = response_json(call_api("POST", path, "local-coach", {"name": "Package", **extra, "workflowStatus": "Needs Review"}))
+            self.assertNotIn("workflowStatus", record)
+            record_path = f"{path}/{record['id']}"
+            entity_type = "playbooks" if path == "playbooks" else "scoutPlays"
+            function_app.storage.memory[entity_type][record["id"]]["workflowStatus"] = "Ready"
+            self.assertNotIn("workflowStatus", response_json(call_api("GET", record_path, "local-coach")))
+            updated = call_api("PATCH", record_path, "local-coach", {"workflowStatus": "In Progress", "_etag": record.get("_etag")})
+            self.assertEqual(updated.status_code, 200)
+            self.assertNotIn("workflowStatus", response_json(updated))
+            archived = call_api("PATCH", record_path, "local-coach", {"recordStatus": "Archived", "_etag": response_json(updated).get("_etag")})
+            self.assertEqual(response_json(archived)["recordStatus"], "Archived")
+
+    def test_preparation_links_validate_workspace_and_preserve_scripts(self):
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
+        event_payload = {"name": "Wednesday", "eventType": "Practice", "eventDate": "2026-11-11", "gamePlanIds": [game["id"]]}
+        event = response_json(call_api("POST", "schedule-events", "local-coach", event_payload))
+        script_payload = {"name": "Team", "gameCardId": "offense-scout", "gamePlanId": game["id"], "practiceEventId": event["id"]}
+        script = response_json(call_api("POST", "playbooks", "local-coach", script_payload))
+        self.assertEqual(script["practiceEventId"], event["id"])
+        self.assertEqual(call_api("DELETE", f"schedule-events/{event['id']}", "local-coach").status_code, 409)
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "local-coach", {"eventType": "Other"}).status_code, 400)
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "local-coach", {"gamePlanIds": []}).status_code, 409)
+        self.assertEqual(call_api("DELETE", f"game-plans/{game['id']}", "local-coach").status_code, 409)
+        self.assertEqual(call_api("POST", "playbooks", "local-coach", {**script_payload, "practiceEventId": "missing"}).status_code, 400)
+        self.assertEqual(call_api("POST", "playbooks", "local-coach", {**script_payload, "practiceEventId": [event["id"]]}).status_code, 400)
+        foreign = response_json(call_api("POST", "game-plans", "other-coach", {"name": "Private"}))
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**event_payload, "gamePlanIds": [foreign["id"]]}).status_code, 400)
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**event_payload, "gamePlanIds": [game["id"], game["id"]]}).status_code, 400)
+        other_game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Other"}))
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "local-coach", {"gamePlanIds": [game["id"], other_game["id"]]}).status_code, 200)
+        self.assertEqual(call_api("DELETE", f"game-plans/{game['id']}", "local-coach").status_code, 204)
+        self.assertEqual(response_json(call_api("GET", f"schedule-events/{event['id']}", "local-coach"))["gamePlanIds"], [other_game["id"]])
+        self.assertEqual(call_api("PATCH", f"playbooks/{script['id']}", "local-coach", {"workflowStatus": "Ready"}).status_code, 200)
+        self.assertNotIn("workflowStatus", response_json(call_api("GET", f"playbooks/{script['id']}", "local-coach")))
+
     def test_schedule_range_filters_dates_inclusively_and_preserves_scope(self):
         for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {})):
             for date in ("2025-12-31", "2026-01-01", "2026-02-28", "2026-03-01"):
@@ -697,6 +736,33 @@ class AuthenticationTests(unittest.TestCase):
         request.params = {"q": "no such record"}
         self.assertEqual(response_json(function_app.api(request))["items"], [])
 
+    def test_game_plan_search_includes_linked_practice_and_exact_playbook_references(self):
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
+        other = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Other"}))
+        event = response_json(call_api("POST", "schedule-events", "local-coach", {
+            "name": "Practice", "eventType": "Practice", "eventDate": "2026-11-11", "gamePlanIds": [game["id"], other["id"]]}))
+        book = response_json(call_api("POST", "playbooks", "local-coach", {"name": "Needle book"}))
+        play = response_json(call_api("POST", f"playbooks/{book['id']}/plays", "local-coach", {"name": "Needle selected"}))
+        call_api("POST", f"playbooks/{book['id']}/plays", "local-coach", {"name": "Needle unrelated"})
+        install = response_json(call_api("POST", "playbooks", "local-coach", {
+            "name": "Needle install", "gamePlanId": game["id"], "gameCardId": "offense-installs",
+            "installPlays": [{"playbookId": book["id"], "playId": play["id"]}]}))
+        script = response_json(call_api("POST", "playbooks", "local-coach", {
+            "name": "Needle script", "gamePlanId": other["id"], "gameCardId": "defense-scout", "practiceEventId": event["id"]}))
+        report = response_json(call_api("POST", f"game-plans/{game['id']}/scout-plays", "local-coach", {"name": "Needle report"}))
+        request = FakeRequest("GET", "search", "local-coach")
+        request.params = {"q": "needle", "scope": "gamePlan", "gamePlanId": game["id"]}
+        result = response_json(function_app.api(request))
+        self.assertEqual({row["id"] for row in result["items"]}, {book["id"], play["id"], install["id"], script["id"], report["id"]})
+        shared = next(row for row in result["items"] if row["id"] == script["id"])
+        self.assertEqual({context["id"] for context in shared["gamePlanContexts"]}, {game["id"], other["id"]})
+        request.params["gamePlanId"] = "missing"
+        self.assertEqual(function_app.api(request).status_code, 404)
+        request.params = {"q": "needle", "scope": "playbooks"}
+        self.assertNotIn(report["id"], {row["id"] for row in response_json(function_app.api(request))["items"]})
+        request.params["scope"] = "season"
+        self.assertEqual(function_app.api(request).status_code, 400)
+
     def test_global_search_is_scoped_to_the_selected_workspace(self):
         team = self.team_fixture()
         book = response_json(call_api("POST", "playbooks", "coach-b", {"name": "Team Needle"}, team["id"]))
@@ -802,16 +868,26 @@ class AuthenticationTests(unittest.TestCase):
     def test_schedule_events_are_validated_and_workspace_scoped(self):
         team = self.team_fixture()
         payload = {"name": "Tuesday Practice", "eventType": "Practice", "eventDate": "2026-10-13", "startTime": "16:00"}
-        created = call_api("POST", "schedule-events", "local-coach", payload, team["id"])
+        created = call_api("POST", "schedule-events", "local-coach", {**payload, "dress": "Full Pads"}, team["id"])
         self.assertEqual(created.status_code, 201)
         event = response_json(created)
         self.assertEqual(event["workspaceId"], team["id"])
+        self.assertEqual(event["dress"], "Full Pads")
         self.assertEqual(response_json(call_api("GET", "schedule-events", "local-coach", workspace_id=team["id"]))["items"], [event])
         self.assertEqual(response_json(call_api("GET", "schedule-events", "local-coach"))["items"], [])
         self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "coach-b", {"name": "Team Practice"}, team["id"]).status_code, 200)
+        sheet = {"periods": [{"id": "period-1", "name": "Team", "startTime": "16:00", "duration": "10", "activities": [{"id": "activity-1", "name": "Inside Run", "group": "Offense", "notes": "First down"}]}]}
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "coach-b", {"practiceSheet": sheet}, team["id"]).status_code, 200)
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "local-coach", {"location": "Field"}, team["id"]).status_code, 200)
+        self.assertEqual(response_json(call_api("GET", f"schedule-events/{event['id']}", "local-coach", workspace_id=team["id"]))["practiceSheet"], sheet)
+        self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "local-coach", {"dress": "Half Pads"}, team["id"]).status_code, 200)
+        self.assertEqual(response_json(call_api("GET", f"schedule-events/{event['id']}", "local-coach", workspace_id=team["id"]))["dress"], "Half Pads")
+        self.assertEqual(call_api("GET", f"schedule-events/{event['id']}", "outsider", workspace_id=team["id"]).status_code, 403)
         self.assertEqual(call_api("PATCH", f"schedule-events/{event['id']}", "outsider", {"name": "No access"}, team["id"]).status_code, 403)
         self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "eventDate": "not-a-date"}, team["id"]).status_code, 400)
         self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "eventType": "Game"}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "dress": "Shoulder Pads"}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("POST", "schedule-events", "local-coach", {**payload, "eventType": "Film Review", "dress": "Full Pads"}, team["id"]).status_code, 400)
         self.assertEqual(call_api("DELETE", f"schedule-events/{event['id']}", "local-coach", workspace_id=team["id"]).status_code, 204)
 
     def test_content_limits_load_from_app_settings(self):

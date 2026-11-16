@@ -1,0 +1,10 @@
+{
+  "version": 8,
+  "provider": "azure-cosmos-nosql",
+  "description": "Simplifies Game Plan workflow status to Draft and Ready without changing Active/Archived lifecycle status.",
+  "fields": {
+    "playbooks.workflowStatus": "Draft | Ready; applies to installs and practice scripts",
+    "scoutPlays.workflowStatus": "Draft | Ready"
+  },
+  "legacyCompatibility": "No bulk data rewrite is required. Existing Ready values remain Ready; missing or legacy workflow values such as In Progress and Needs Review are presented as Draft. New API writes accept only Draft or Ready."
+}
