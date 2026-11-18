@@ -448,7 +448,8 @@ def summary(storage, workspace, role):
         subscription["status"] = "expired"
     public = {"id": workspace["id"], "name": workspace["name"], "kind": workspace["kind"], "role": role,
               "alphaEnabled": workspace.get("alphaEnabled") is True,
-              "defaults": workspace.get("defaults", {}), "subscription": subscription,
+              "defaults": workspace.get("defaults", {}),
+              "suggestionLists": workspace.get("suggestionLists", {"location": []}), "subscription": subscription,
               "permissions": sorted(permission.value for permission in permissions),
               "capabilities": {"edit": Permission.PLAY_WRITE in permissions,
                                "delete": Permission.PLAY_DELETE in permissions,
@@ -493,6 +494,20 @@ def validate_preferences(payload):
         except (ZoneInfoNotFoundError, TypeError, ValueError):
             raise AccountError("VALIDATION_ERROR", "Unknown timezone") from None
         allowed["timezone"] = payload["timezone"]
+    return allowed
+
+
+def validate_suggestion_lists(payload):
+    fields = {"location", "period", "offFormation", "offPlay", "defFront", "defCoverage"}
+    if not isinstance(payload, dict) or set(payload) - fields:
+        raise AccountError("VALIDATION_ERROR", "Suggestion lists contain an unsupported field")
+    allowed = {}
+    for field, values in payload.items():
+        if not isinstance(values, list) or len(values) > 100:
+            raise AccountError("VALIDATION_ERROR", f"{field.title()} suggestions must be a list of at most 100 items")
+        if any(not isinstance(value, str) or len(value.strip()) > 120 for value in values):
+            raise AccountError("VALIDATION_ERROR", f"{field.title()} suggestions must be text no longer than 120 characters")
+        allowed[field] = list(dict.fromkeys(value.strip() for value in values if value.strip()))
     return allowed
 
 
@@ -712,6 +727,8 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 workspace["name"] = payload["name"].strip()
             if "defaults" in payload:
                 workspace["defaults"].update(validate_preferences(payload["defaults"]))
+            if "suggestionLists" in payload:
+                workspace.setdefault("suggestionLists", {}).update(validate_suggestion_lists(payload["suggestionLists"]))
             storage.save("workspaces", workspace)
             return summary(storage, workspace, role), 200
     if path == ["workspace", "ownership", "transfer"] and method == "POST":

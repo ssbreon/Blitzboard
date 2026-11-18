@@ -76,7 +76,7 @@ const scheduleGridColumns = [
   { key: 'notes', header: 'Notes', render: (value) => value || '—' },
 ]
 
-export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, canCreateGame, canDelete, onCancel, onSave, onDelete }) {
+export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, canCreateGame, canDelete, locationSuggestions = [], onCancel, onSave, onDelete }) {
   const defaultEventDate = initialEvent?.eventDate || initialEvent?.gameDate || initialDate || dateKey(new Date())
   const isFridayDefault = !initialEvent && parseDate(defaultEventDate).getDay() === 5
   const [eventType, setEventType] = useState(initialEvent?.kind === 'game' ? 'Game' : initialEvent?.eventType || (isFridayDefault && canCreateGame ? 'Game' : 'Practice'))
@@ -150,6 +150,7 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
           <DialogCloseButton onClick={onCancel} disabled={saving} />
         </header>
         <div className="schedule-dialog-body">
+          <datalist id="schedule-location-suggestions">{locationSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
           <label className="schedule-field">
             <span>Event type</span>
             <select value={eventType} onChange={(event) => { setEventType(event.target.value); if (event.target.value !== 'Practice') { setPracticeScriptUnit('No'); setDress('') } }} disabled={!canEdit || saving || Boolean(initialEvent)}>
@@ -164,13 +165,13 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
             </label>
             {isGame && <label className="schedule-field"><span>Game Site</span><select value={gameSite} onChange={(event) => setGameSite(event.target.value)} disabled={!canEdit || saving}><option value="">Select game site</option><option value="Home">Home</option><option value="Away">Away</option><option value="Neutral">Neutral</option></select></label>}
           </div>
-          {isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
+          {isGame && <label className="schedule-field"><span>Location</span><input list="schedule-location-suggestions" value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
           <div className="schedule-field-row">
             <label className="schedule-field"><span>Date</span><input className="date-picker" type="date" value={eventDate} onChange={(event) => setEventDate(event.target.value)} required disabled={!canEdit || saving} /></label>
             <label className="schedule-field"><span>Start</span><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} disabled={!canEdit || saving} /></label>
             {!isGame && <label className="schedule-field"><span>End</span><input type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} disabled={!canEdit || saving} /></label>}
           </div>
-          {!isGame && <label className="schedule-field"><span>Location</span><input value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
+          {!isGame && <label className="schedule-field"><span>Location</span><input list="schedule-location-suggestions" value={location} onChange={(event) => setLocation(event.target.value)} disabled={!canEdit || saving} /></label>}
           {eventType === 'Practice' && <label className="schedule-field"><span>Dress</span><select value={dress} onChange={(event) => setDress(event.target.value)} disabled={!canEdit || saving}><option value="">Select dress</option>{PRACTICE_DRESSES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}
           {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
           </label>}
@@ -339,7 +340,7 @@ export function YearCalendar({ date, eventsByDate, onSelectMonth }) {
   </div>
 }
 
-export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, practiceSheetRevisionToken }) {
+export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, locationSuggestions = [], periodSuggestions = [], practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, practiceSheetRevisionToken }) {
   const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState(savedScheduleView)
@@ -562,8 +563,8 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }
 
   if (practiceId) return <main className="team-schedule">
-    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
-    {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} periodSuggestions={periodSuggestions} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
+    {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} locationSuggestions={locationSuggestions} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
     {eventToDelete && <DeleteConfirmationDialog message={`Are you sure you want to delete "${eventToDelete.name}"? This cannot be undone.`} onCancel={() => setEventToDelete(null)} onConfirm={async () => { await removeEvent(eventToDelete); setEventToDelete(null); onClosePractice() }} />}
   </main>
 
@@ -638,7 +639,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           rowActions={(event) => [{ label: 'Open', icon: FolderOpen, onClick: () => openEvent(event) }]}
         />}
       </section>}
-      {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
+      {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} initialDate={dialog.date} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} locationSuggestions={locationSuggestions} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
       {eventContextMenu && <ScheduleEventContextMenu
         event={eventContextMenu.event}
         position={eventContextMenu}

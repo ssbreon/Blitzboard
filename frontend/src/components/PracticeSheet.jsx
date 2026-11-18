@@ -35,7 +35,7 @@ export function practicePeriodGroupBreakdown(period = {}) {
   return period.groupBreakdown === 'Yes' ? 'Yes' : 'No'
 }
 
-export function PracticeSheet({ api, eventId, canEdit, breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, scripts, onCreatePracticeScript, onOpenScript }) {
+export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, scripts, onCreatePracticeScript, onOpenScript }) {
   const [event, setEvent] = useState(null)
   const [sheet, setSheet] = useState({ periods: [] })
   const [dirty, setDirty] = useState(false)
@@ -232,6 +232,7 @@ export function PracticeSheet({ api, eventId, canEdit, breadcrumbSettingsTarget,
       }}
     />}
     <div className="practice-sheet-content">
+      <datalist id="practice-period-suggestions">{periodSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
       <div className="practice-sheet-section-heading"><div className="practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="schedule-primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
         <button type="button" className="hamburger-button" aria-label="Practice Plan options" aria-haspopup="true" aria-expanded={menuOpen} title="Practice Plan options" onClick={() => setMenuOpen((open) => !open)}><Menu size={19} aria-hidden="true" /></button>
         {menuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown practice-plan-dropdown" role="menu" aria-label="Practice Plan options"><div className="data-grid-menu-panes">
@@ -264,7 +265,7 @@ export function PracticeSheet({ api, eventId, canEdit, breadcrumbSettingsTarget,
           <button type="button" className="practice-period-drag-handle" aria-label={`Drag period ${periodIndex + 1}`} title="Drag to reorder period" draggable={canEdit && !busy} disabled={!canEdit || busy} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', periodId); setDraggingPeriodId(periodId); setPeriodDropTarget(null) }} onDragEnd={finishPeriodDrag}><GripVertical size={17} aria-hidden="true" /></button>
           <label><span>Start</span><input aria-label={`Period ${periodIndex + 1} start`} type="time" required value={period.startTime || ''} disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { startTime: input.target.value })} /><span className="practice-print-value">{period.startTime || '-'}</span></label>
           <label><span>Minutes</span><input aria-label={`Period ${periodIndex + 1} minutes`} type="number" min="1" step="1" required value={period.duration ?? ''} disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { duration: input.target.value })} /><span className="practice-print-value">{period.duration || '-'}</span></label>
-          <label><span>Period</span><input aria-label={`Period ${periodIndex + 1} name`} value={period.name || ''} placeholder="Period name" disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { name: input.target.value })} /><span className="practice-print-value">{period.name || '-'}</span></label>
+          <label><span>Period</span><input aria-label={`Period ${periodIndex + 1} name`} list="practice-period-suggestions" value={period.name || ''} placeholder="Period name" disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { name: input.target.value })} /><span className="practice-print-value">{period.name || '-'}</span></label>
           <div className="practice-period-script-control">
             <label className="practice-period-script-select"><span>Practice Script</span><select aria-label={`Practice Script for period ${periodIndex + 1}`} value={period.practiceScriptId || ''} disabled={!canEdit || busy || !availableScripts.length} onChange={(input) => changePeriod(periodIndex, { practiceScriptId: input.target.value })}><option value=""></option>{period.practiceScriptId && !availableScripts.some((script) => script.id === period.practiceScriptId) && <option value={period.practiceScriptId}>Unavailable script</option>}{availableScripts.map((script) => <option key={script.id} value={script.id}>{script.name}</option>)}</select><span className="practice-print-value">{selectedScript?.name || '—'}</span></label>
             {selectedScript && onOpenScript && <button type="button" className="practice-script-launcher" title="Open Practice Script" aria-label={`Open Practice Script ${selectedScript.name}`} onClick={() => onOpenScript(selectedScript)}><BookOpen size={17} aria-hidden="true" /></button>}

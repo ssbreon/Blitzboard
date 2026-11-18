@@ -56,6 +56,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     const { CategoryBadge, getCategoryBadgeStyle } = await server.ssrLoadModule('/src/components/CategoryBadge.jsx')
     const { GamePlanHeader, GamePlanUnitFilter, GamePlanWorkspace } = await server.ssrLoadModule('/src/components/GamePlanWorkspace.jsx')
     const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows, practiceSheetTimeLabel, practiceSheetDateLabel, defaultPracticePeriodStart } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
+    const { PracticeScriptPlayGrid } = await server.ssrLoadModule('/src/components/PracticeScriptPlayGrid.jsx')
     const { DataGrid } = await server.ssrLoadModule('/src/components/DataGrid.jsx')
     assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
     assert.ok(renderToStaticMarkup(createElement(CategoryBadge, { value: 'Game - Away' })).includes('>Game - Away</span>'))
@@ -67,6 +68,16 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.equal(defaultPracticePeriodStart('15:40'), '15:40')
     assert.equal(defaultPracticePeriodStart('15:40:00'), '15:40')
     assert.equal(defaultPracticePeriodStart(''), '15:30')
+    const scoutPlayGrid = renderToStaticMarkup(createElement(PracticeScriptPlayGrid, {
+      api: {}, playbookId: 'script', title: 'Scout Plays', fetchRows: () => Promise.resolve([]), reloadToken: null,
+      canEdit: true, suggestionLists: {
+        offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'],
+      },
+    }))
+    for (const [field, value] of Object.entries({ offFormation: 'Trips Right', offPlay: '24 Zone', defFront: 'Even Front', defCoverage: 'Cover 3' })) {
+      assert.ok(scoutPlayGrid.includes(`id="scout-${field}-suggestions"`))
+      assert.ok(scoutPlayGrid.includes(`<option value="${value}"></option>`))
+    }
     assert.equal(summarizePracticeActivities([{ group: 'QB', name: 'Team Period', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }, { group: 'QB', name: 'Dropback' }]), 'Team: Dynamic\nQB: Team Period (Smith), Dropback')
     assert.equal(summarizePracticeActivities([]), '—')
     assert.deepEqual(groupPracticeActivities([{ group: 'QB', name: 'Dropback', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }]), [
@@ -130,6 +141,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(gamePlanHeader.includes('Back to Game Plan'))
     const createPracticeDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
       api: {}, initialDate: '2026-11-10', canEdit: true, canCreateGame: false, canDelete: false,
+      locationSuggestions: ['Marcal Paper Field', 'Kish Bank Field'],
       onCancel: () => {}, onSave: () => {},
     }))
     assert.ok(createPracticeDialog.includes('Related Game'))
@@ -137,6 +149,9 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(createPracticeDialog.includes('Offense (Scout Defense)'))
     assert.ok(createPracticeDialog.includes('Defense (Scout Offense)'))
     assert.ok(createPracticeDialog.includes('Special Teams'))
+    assert.ok(createPracticeDialog.includes('list="schedule-location-suggestions"'))
+    assert.ok(createPracticeDialog.includes('<option value="Marcal Paper Field"></option>'))
+    assert.ok(createPracticeDialog.includes('<option value="Kish Bank Field"></option>'))
     assert.ok(createPracticeDialog.includes('Dress'))
     assert.ok(createPracticeDialog.includes('Full Pads'))
     assert.ok(createPracticeDialog.includes('Half Pads'))

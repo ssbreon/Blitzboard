@@ -1241,6 +1241,32 @@ class AuthenticationTests(unittest.TestCase):
                 self.assertEqual(call_api(method, path, "coach-b", payload, team["id"]).status_code, 403)
         self.assertEqual(call_api("GET", "workspace/members", "coach-b", workspace_id=team["id"]).status_code, 200)
 
+    def test_workspace_location_suggestions_are_validated_and_workspace_scoped(self):
+        team = self.team_fixture()
+        payload = {"suggestionLists": {
+            "location": [" Marcal Paper Field ", "Kish Bank Field", "Marcal Paper Field"],
+            "period": [" Warmups ", "Team Period"],
+            "offFormation": [" Trips Right "],
+            "offPlay": [" 24 Zone "],
+            "defFront": ["Even Front"],
+            "defCoverage": ["Cover 3"],
+        }}
+        saved = call_api("PATCH", "workspace", "local-coach", payload, team["id"])
+        self.assertEqual(saved.status_code, 200)
+        expected = ["Marcal Paper Field", "Kish Bank Field"]
+        self.assertEqual(response_json(saved)["suggestionLists"]["location"], expected)
+        self.assertEqual(response_json(saved)["suggestionLists"]["period"], ["Warmups", "Team Period"])
+        self.assertEqual(response_json(saved)["suggestionLists"]["offFormation"], ["Trips Right"])
+        self.assertEqual(response_json(saved)["suggestionLists"]["offPlay"], ["24 Zone"])
+        self.assertEqual(response_json(saved)["suggestionLists"]["defFront"], ["Even Front"])
+        self.assertEqual(response_json(saved)["suggestionLists"]["defCoverage"], ["Cover 3"])
+        self.assertEqual(function_app.storage.get("workspaces", team["id"])["suggestionLists"]["location"], expected)
+        self.assertEqual(response_json(call_api("GET", "workspace", "coach-b", workspace_id=team["id"]))["suggestionLists"]["location"], expected)
+        self.assertEqual(response_json(call_api("GET", "workspace", "coach-b", workspace_id=team["id"]))["suggestionLists"]["period"], ["Warmups", "Team Period"])
+        self.assertEqual(call_api("PATCH", "workspace", "coach-b", payload, team["id"]).status_code, 403)
+        self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"suggestionLists": {"unknown": ["Value"]}}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"suggestionLists": {"location": ["x" * 121]}}, team["id"]).status_code, 400)
+
     def test_admin_membership_and_invitation_roles_fail_closed(self):
         team = self.team_fixture("admin")
         for root in ("playbooks", "game-plans", "schedule-events", "search", "exports", "workspace/members"):

@@ -8,16 +8,22 @@ import { scoutPlayName } from '../utils/gamePlanWorkspace'
 import './PracticeScriptPlayGrid.css'
 
 const SCRIPT_FIELDS = [
-  { key: 'hash', label: 'HASH' },
-  { key: 'offFormation', label: 'OFF FORMATION', legacy: 'formation' },
-  { key: 'offPlay', label: 'OFF PLAY', legacy: 'name' },
-  { key: 'defFront', label: 'DEF FRONT', legacy: 'front' },
-  { key: 'defCoverage', label: 'DEF COVERAGE', legacy: 'cov' },
-  { key: 'notes', label: 'NOTES' },
+  { key: 'hash', label: 'Hash' },
+  { key: 'offFormation', label: 'OFF Formation', legacy: 'formation' },
+  { key: 'offPlay', label: 'OFF Play', legacy: 'name' },
+  { key: 'defFront', label: 'DEF Front', legacy: 'front' },
+  { key: 'defCoverage', label: 'DEF Coverage', legacy: 'cov' },
+  { key: 'notes', label: 'Notes' },
 ]
+const SUGGESTION_LIST_FIELDS = {
+  offFormation: 'offFormation',
+  offPlay: 'offPlay',
+  defFront: 'defFront',
+  defCoverage: 'defCoverage',
+}
 const HASHES = ['L', 'R', 'M']
 const readField = (row, key) => row[key] ?? (SCRIPT_FIELDS.find((field) => field.key === key)?.legacy ? row[SCRIPT_FIELDS.find((field) => field.key === key).legacy] : '') ?? ''
-export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
+export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, suggestionLists = {}, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
   const [rows, setRows] = useState([])
   const [loadedToken, setLoadedToken] = useState(null)
   const [error, setError] = useState(null)
@@ -119,10 +125,10 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
         if (key === 'hash') return <select aria-label={`${label} for ${row.id}`} value={fieldValue || 'M'} disabled={disabled} onChange={(event) => change(event.target.value)} onBlur={saveOnBlur}>{HASHES.map((hash) => <option key={hash} value={hash}>{hash}</option>)}</select>
         return key === 'notes'
           ? <textarea aria-label={`${label} for ${row.id}`} rows="2" value={fieldValue} disabled={disabled} onChange={(event) => change(event.target.value)} onBlur={saveOnBlur} />
-          : <input aria-label={`${label} for ${row.id}`} value={fieldValue} disabled={disabled} onChange={(event) => change(event.target.value)} onBlur={saveOnBlur} />
+          : <input aria-label={`${label} for ${row.id}`} {...(SUGGESTION_LIST_FIELDS[key] ? { list: `scout-${key}-suggestions` } : {})} value={fieldValue} disabled={disabled} onChange={(event) => change(event.target.value)} onBlur={saveOnBlur} />
       },
     })),
-    { key: 'thumbnail', header: 'PLAY THUMBNAIL', render: (_, row) => row.isPracticeScriptDraft
+    { key: 'thumbnail', header: 'Play Thumbnail', render: (_, row) => row.isPracticeScriptDraft
       ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row, row.groupingId)}><PencilRuler size={16} aria-hidden="true" />Design Play</button>
       : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} thumbnail /></button> },
   ]
@@ -145,6 +151,9 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
 
   return <section className="practice-script-play-grid" aria-label={`${title} plays`}>
     <ErrorDialog error={error} message="We couldn't load this practice script. Please retry." />
+    {Object.values(SUGGESTION_LIST_FIELDS).map((field) => <datalist id={`scout-${field}-suggestions`} key={field}>
+      {(suggestionLists[field] || []).map((value) => <option key={value} value={value} />)}
+    </datalist>)}
     <DataGrid
       title={title}
       className="editable-data-grid"

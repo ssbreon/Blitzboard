@@ -13,6 +13,15 @@ import { PLAY_THEMES } from '../utils/themes'
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
 const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
+const SETTINGS_TABS = [{ id: 'preferences', label: 'Preferences' }, { id: 'suggestions', label: 'Suggestion Lists' }]
+const SUGGESTION_FIELDS = [
+  { id: 'location', label: 'Location' },
+  { id: 'period', label: 'Period' },
+  { id: 'offFormation', label: 'OFF Formation' },
+  { id: 'offPlay', label: 'OFF Play' },
+  { id: 'defFront', label: 'DEF Front' },
+  { id: 'defCoverage', label: 'DEF Coverage' },
+]
 const TEAM_TABS = [{ id: 'workspace', label: 'Workspace' }, { id: 'staff', label: 'Staff' }, { id: 'invitations', label: 'Invitations' }]
 const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
 const PLAN_LABELS = { free: 'Free', individual: 'Individual', team: 'Team' }
@@ -32,7 +41,11 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [deliveryMode, setDeliveryMode] = useState(null)
   const [billing, setBilling] = useState(null)
   const [billingTab, setBillingTab] = useState('membership')
+  const [settingsTab, setSettingsTab] = useState('preferences')
+  const [suggestionField, setSuggestionField] = useState('location')
   const [teamTab, setTeamTab] = useState('workspace')
+  const [suggestionTexts, setSuggestionTexts] = useState(() => Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, (workspace.suggestionLists?.[id] || []).join('\n')])))
+  const [savedSuggestionTexts, setSavedSuggestionTexts] = useState(suggestionTexts)
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [hasStoredLogo, setHasStoredLogo] = useState(false)
@@ -43,10 +56,13 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState('')
-  const dirty = JSON.stringify(form) !== JSON.stringify(savedForm) || (view === 'team' && Boolean(logoFile || logoRemoved))
+  const formDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
+  const suggestionDirty = view === 'settings' && JSON.stringify(suggestionTexts) !== JSON.stringify(savedSuggestionTexts)
+  const dirty = formDirty || suggestionDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
   const teamEditable = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.settings'))
+  const canManageSuggestions = Boolean(workspace.permissions?.includes('workspace.settings'))
   const canInvite = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.invite'))
   const canRemove = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.remove'))
   const canTransfer = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.transfer_ownership'))
@@ -110,8 +126,22 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
         const updated = await api.updateProfile(form)
         onUserUpdated({ ...user, ...updated })
       } else if (view === 'settings') {
-        const preferences = await api.updatePreferences(form)
-        onUserUpdated({ ...user, preferences })
+        if (formDirty) {
+          const preferences = await api.updatePreferences(form)
+          onUserUpdated({ ...user, preferences })
+          setSavedForm(form)
+        }
+        if (suggestionDirty) {
+          const suggestionLists = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [
+            id,
+            [...new Set((suggestionTexts[id] || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean))],
+          ]))
+          const updated = await api.updateWorkspace({ suggestionLists })
+          onWorkspaceUpdated(updated)
+          const normalizedTexts = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, suggestionLists[id].join('\n')]))
+          setSuggestionTexts(normalizedTexts)
+          setSavedSuggestionTexts(normalizedTexts)
+        }
       } else if (view === 'team') {
         const { name, ...defaults } = form
         onWorkspaceUpdated(await api.updateWorkspace({ name, defaults }))
@@ -183,6 +213,17 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       : event.key === 'End' ? BILLING_TABS.length - 1
         : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + BILLING_TABS.length) % BILLING_TABS.length
     setBillingTab(BILLING_TABS[nextIndex].id)
+    event.currentTarget.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
+  }
+
+  function handleSettingsTabKeyDown(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const currentIndex = SETTINGS_TABS.findIndex((tab) => tab.id === settingsTab)
+    const nextIndex = event.key === 'Home' ? 0
+      : event.key === 'End' ? SETTINGS_TABS.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + SETTINGS_TABS.length) % SETTINGS_TABS.length
+    setSettingsTab(SETTINGS_TABS[nextIndex].id)
     event.currentTarget.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
   }
 
@@ -293,21 +334,50 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     <ErrorDialog error={error} message="We couldn't complete the account request. Please try again." />
     {notice && <p className="account-notice" role="status">{notice}</p>}
 
-    {['profile', 'settings'].includes(view) && <form className="account-form" onSubmit={save}>
-      <fieldset disabled={saving}>
-        {view === 'profile' && <>
-          <label className="dialog-field"><span>Display name</span><input required maxLength={120} value={form.name} onChange={(event) => change('name', event.target.value)} /></label>
-          <label className="dialog-field"><span>Coaching title</span><input maxLength={120} value={form.coachingTitle} onChange={(event) => change('coachingTitle', event.target.value)} /></label>
-          <label className="dialog-field"><span>Email</span><input value={user.email || ''} placeholder="Not configured" readOnly /></label>
-          <label className="dialog-field"><span>Email verification</span><input value={user.email ? (user.emailVerified ? 'Verified' : 'Not verified') : 'Unavailable'} readOnly /></label>
-        </>}
-        {view === 'settings' && preferences}
-      </fieldset>
-      <div className="account-form-actions">
-        <button type="button" className="dialog-cancel" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-        <button type="submit" className="dialog-create" disabled={saving}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
-      </div>
-    </form>}
+    {['profile', 'settings'].includes(view) && <>
+      {view === 'settings' && <div className="account-billing-tabs" role="tablist" aria-label="Settings sections" onKeyDown={handleSettingsTabKeyDown}>
+        {SETTINGS_TABS.map((tab) => <button
+          key={tab.id}
+          id={`account-settings-tab-${tab.id}`}
+          type="button"
+          role="tab"
+          aria-selected={settingsTab === tab.id}
+          aria-controls={`account-settings-panel-${tab.id}`}
+          tabIndex={settingsTab === tab.id ? 0 : -1}
+          onClick={() => setSettingsTab(tab.id)}
+        >{tab.label}</button>)}
+      </div>}
+      <form className="account-form" onSubmit={save}>
+        <fieldset disabled={saving}>
+          {view === 'profile' && <>
+            <label className="dialog-field"><span>Display name</span><input required maxLength={120} value={form.name} onChange={(event) => change('name', event.target.value)} /></label>
+            <label className="dialog-field"><span>Coaching title</span><input maxLength={120} value={form.coachingTitle} onChange={(event) => change('coachingTitle', event.target.value)} /></label>
+            <label className="dialog-field"><span>Email</span><input value={user.email || ''} placeholder="Not configured" readOnly /></label>
+            <label className="dialog-field"><span>Email verification</span><input value={user.email ? (user.emailVerified ? 'Verified' : 'Not verified') : 'Unavailable'} readOnly /></label>
+          </>}
+          {view === 'settings' && <>
+            <div id="account-settings-panel-preferences" role="tabpanel" aria-labelledby="account-settings-tab-preferences" hidden={settingsTab !== 'preferences'}>
+              {preferences}
+            </div>
+            <div id="account-settings-panel-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-suggestions" hidden={settingsTab !== 'suggestions'}>
+              <label className="dialog-field"><span>Field</span>
+                <select value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>{SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select>
+              </label>
+              <label className="dialog-field"><span>Suggestions</span>
+                <textarea rows="8" value={suggestionTexts[suggestionField] || ''} onChange={(event) => {
+                  setSuggestionTexts((current) => ({ ...current, [suggestionField]: event.target.value }))
+                  setNotice('')
+                }} disabled={!canManageSuggestions} />
+              </label>
+            </div>
+          </>}
+        </fieldset>
+        <div className="account-form-actions">
+          <button type="button" className="dialog-cancel" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
+          <button type="submit" className="dialog-create" disabled={saving || (view === 'settings' && settingsTab === 'suggestions' && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
+        </div>
+      </form>
+    </>}
 
     {view === 'team' && <div className="account-billing-tabs" role="tablist" aria-label="Team sections" onKeyDown={handleTeamTabKeyDown}>
       {TEAM_TABS.filter((tab) => tab.id !== 'invitations' || canInvite).map((tab) => <button

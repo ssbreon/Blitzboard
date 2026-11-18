@@ -462,7 +462,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {} }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -831,9 +831,10 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
                     </select>
                   </label>
                 </div>
+                <datalist id="game-settings-location-suggestions">{locationSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
                 <label className="dialog-field">
                   <span>Location</span>
-                  <input type="text" value={draftLocation} onChange={(event) => setDraftLocation(event.target.value)} />
+                  <input type="text" list="game-settings-location-suggestions" value={draftLocation} onChange={(event) => setDraftLocation(event.target.value)} />
                 </label>
                 <div className="dialog-field-row">
                   <label className="dialog-field">
@@ -992,6 +993,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         api={api}
         playbookId={parentRecord.id}
         title={title}
+        suggestionLists={suggestionLists}
         fetchRows={fetchRows}
         reloadToken={reloadToken}
         busy={busy}
@@ -1950,6 +1952,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentRecord={cardPlaybook}
           parentLabel={gameCard?.tab === 'installs' ? 'Install' : 'Practice Script'}
           gameCard={gameCard}
+          suggestionLists={workspace.suggestionLists || {}}
           breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           openSettingsOnMount={parentSettingsRequestId === cardPlaybook.id}
           onSettingsClosed={() => setParentSettingsRequestId(null)}
@@ -2015,6 +2018,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           busy={statusSaving}
           parentRecord={parent}
           parentLabel="Game"
+          locationSuggestions={workspace.suggestionLists?.location || []}
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
           showAffiliateRecommendations={workspace.subscription.kind === 'free'}
@@ -2070,6 +2074,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             canEdit={writable}
             canDelete={workspace.capabilities.delete}
             canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
+            locationSuggestions={workspace.suggestionLists?.location || []}
+            periodSuggestions={workspace.suggestionLists?.period || []}
             onCreateGame={handleCreateScheduleGame}
             onOpenGame={(game) => { setGameCard(null); setGamePlanTab('overview'); setParent({ ...game, kind: 'gamePlan' }) }}
             onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}

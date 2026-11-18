@@ -57,6 +57,18 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(granted.includes('account-invite-form'))
     assert.ok(!granted.includes('<fieldset disabled=""'))
     assert.ok(!granted.includes('value="admin"'))
+    const settings = renderToStaticMarkup(createElement(AccountViews, {
+      view: 'settings', user: { userId: 'owner', preferences: { timezone: 'UTC' } }, api: {},
+      workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, subscription: { kind: 'team' } },
+    }))
+    assert.ok(settings.includes('Suggestion Lists'))
+    assert.ok(settings.includes('<option value="location" selected="">Location</option>'))
+    assert.ok(settings.includes('<option value="period">Period</option>'))
+    assert.ok(settings.includes('<option value="offFormation">OFF Formation</option>'))
+    assert.ok(settings.includes('<option value="offPlay">OFF Play</option>'))
+    assert.ok(settings.includes('<option value="defFront">DEF Front</option>'))
+    assert.ok(settings.includes('<option value="defCoverage">DEF Coverage</option>'))
+    assert.ok(settings.includes('Marcal Paper Field\nKish Bank Field'))
     const renderProfile = (emailVerified) => renderToStaticMarkup(createElement(AccountViews, {
       view: 'profile', user: { userId: 'coach', name: 'Coach', email: 'coach@example.com', emailVerified, preferences: {} },
       api: {}, workspace: { name: 'Individual', kind: 'individual', role: 'owner', permissions: [], defaults: {}, subscription: {} },
