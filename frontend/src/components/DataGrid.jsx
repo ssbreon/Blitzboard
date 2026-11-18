@@ -540,7 +540,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                           {row.name}
                         </span>
                       </td>
-                      <td className="data-grid-grouping-description-cell" colSpan={Math.max(1, columns.length + (hasRowIcons ? 1 : 0) - 2)}>{row.description}</td>
+                      <td className="data-grid-grouping-description-cell" colSpan={Math.max(1, columns.length - 1)}>{row.description}</td>
                       </>
                     ) : <>
                       {RowIconForRow && (

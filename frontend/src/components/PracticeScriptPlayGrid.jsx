@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PencilRuler, Trash2 } from 'lucide-react'
+import { PencilRuler, Plus, Trash2 } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -17,7 +17,7 @@ const SCRIPT_FIELDS = [
 ]
 const HASHES = ['L', 'R', 'M']
 const readField = (row, key) => row[key] ?? (SCRIPT_FIELDS.find((field) => field.key === key)?.legacy ? row[SCRIPT_FIELDS.find((field) => field.key === key).legacy] : '') ?? ''
-export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, onReorder, onOpenPlay, onCreatePlay, rowActions, menuItems = [] }) {
+export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
   const [rows, setRows] = useState([])
   const [loadedToken, setLoadedToken] = useState(null)
   const [error, setError] = useState(null)
@@ -34,18 +34,27 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
     return () => { active = false }
   }, [fetchRows, reloadToken])
 
-  function addDraft() {
-    setRows((current) => [...current, {
+  function addDraft(groupingId) {
+    const draft = {
       id: `draft-${crypto.randomUUID()}`,
       isPracticeScriptDraft: true,
-      page: current.length + 1,
+      ...(groupingId && { groupingId }),
       hash: 'M',
       offFormation: '',
       offPlay: '',
       defFront: '',
       defCoverage: '',
       notes: '',
-    }])
+    }
+    setRows((current) => {
+      const next = [...current]
+      if (groupingId) {
+        const groupingIndex = next.findIndex((row) => row.id === groupingId)
+        const nextGroupingIndex = next.findIndex((row, index) => index > groupingIndex && row.rowType === 'grouping')
+        next.splice(nextGroupingIndex < 0 ? next.length : nextGroupingIndex, 0, draft)
+      } else next.push(draft)
+      return next.map((row, index) => ({ ...row, page: index + 1 }))
+    })
   }
 
   function updateDraft(rowId, key, value) {
@@ -114,13 +123,17 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       },
     })),
     { key: 'thumbnail', header: 'PLAY THUMBNAIL', render: (_, row) => row.isPracticeScriptDraft
-      ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row)}><PencilRuler size={16} aria-hidden="true" />Design Play</button>
+      ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row, row.groupingId)}><PencilRuler size={16} aria-hidden="true" />Design Play</button>
       : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} thumbnail /></button> },
   ]
 
   function getRowActions(row) {
+    if (row.rowType === 'grouping') return [
+      ...(canEdit ? [{ key: 'add-scout-play', label: 'Add Scout Play', icon: Plus, onClick: () => addDraft(row.id) }] : []),
+      ...(rowActions?.(row) || []).filter((action) => action.key !== 'add-play'),
+    ]
     if (row.isPracticeScriptDraft) return [
-      { key: 'create-play', label: 'Design Play', icon: PencilRuler, onClick: () => onCreatePlay?.(row) },
+      { key: 'create-play', label: 'Design Play', icon: PencilRuler, onClick: () => onCreatePlay?.(row, row.groupingId) },
       { key: 'remove-draft', label: 'Remove Draft', icon: Trash2, destructive: true, onClick: () => setRows((current) => current.filter((item) => item.id !== row.id)) },
     ]
     return (rowActions?.(row) || []).map((action) => action.key === 'open'
@@ -141,8 +154,10 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       pageLabel="#"
       hidePager
       busy={busy}
-      onNew={canEdit ? addDraft : undefined}
+      onNew={canEdit ? () => addDraft() : undefined}
       newLabel="New Scout Play"
+      onSecondaryNew={canEdit ? onNewGrouping : undefined}
+      secondaryNewLabel="New Scout Grouping"
       onReorder={canEdit ? reorder : undefined}
       onRowDoubleClick={(row) => { if (!row.isPracticeScriptDraft) void openSavedPlay(row) }}
       rowActions={getRowActions}

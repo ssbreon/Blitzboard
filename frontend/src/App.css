@@ -2079,6 +2079,25 @@ html.is-drilling-through * {
       border-color: var(--accent-border);
     }
   }
+
+  textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text-h);
+    font: inherit;
+    font-size: 16px;
+    resize: vertical;
+
+    &:focus {
+      outline: none;
+      border-color: var(--accent-border);
+    }
+  }
 }
 
 .date-picker {

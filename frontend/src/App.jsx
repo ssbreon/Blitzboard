@@ -190,7 +190,7 @@ function GameCardItemDialog({ card, initialName, practices = [], initialPractice
   </div>
 }
 
-function GroupingDialog({ grouping, onCancel, onSave }) {
+function GroupingDialog({ grouping, scoutGrouping = false, onCancel, onSave }) {
   const [name, setName] = useState(grouping?.name || '')
   const [description, setDescription] = useState(grouping?.description || '')
   const [saving, setSaving] = useState(false)
@@ -212,7 +212,7 @@ function GroupingDialog({ grouping, onCancel, onSave }) {
 
   return <div className="dialog-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onCancel() }}>
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
-      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Grouping' : 'New Grouping'}</h2>
+      <h2>{grouping ? <Folder className="data-grid-grouping-icon" size={22} aria-hidden="true" /> : <FolderPlus size={22} aria-hidden="true" />}{grouping ? 'Edit Grouping' : scoutGrouping ? 'New Scout Grouping' : 'New Grouping'}</h2>
       <DialogCloseButton onClick={onCancel} disabled={saving} />
       <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
       <label className="dialog-field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
@@ -956,6 +956,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         onReorder={onReorder}
         onOpenPlay={onOpenPlay}
         onCreatePlay={onNew}
+        onNewGrouping={onNewGrouping}
         rowActions={rowActions}
         menuItems={[
           ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
@@ -1065,6 +1066,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const fetchScoutPlays = useCallback(({ namePrefix }) => viewApi.listScoutPlays(parentId, undefined, namePrefix, true).then((result) => result.items), [viewApi, parentId])
   const cardPlaybookId = cardPlaybook?.id
   const fetchCardPlaybookPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(viewApi, cardPlaybookId, (await viewApi.listPlays(cardPlaybookId, undefined, namePrefix, true, true)).items), [viewApi, cardPlaybookId])
+  const fetchCardPlaybookRows = useCallback(({ namePrefix }) => viewApi.listPlaybookRows(cardPlaybookId, namePrefix).then((result) => result.items), [viewApi, cardPlaybookId])
 
   async function handleCreatePlaybook(payload) {
     await api.createPlaybook(payload)
@@ -1854,7 +1856,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         <div className="schedule-dialog-body"><p>Select the Game Plan that should own this Scout Play.</p><label className="schedule-field"><span>Game Plan</span><select autoFocus required value={selectedPracticeScoutGameId} onChange={(event) => setSelectedPracticeScoutGameId(event.target.value)} disabled={!practiceScoutGames.length}><option value="">{practiceScoutGames.length ? 'Select a Game Plan' : 'No active Game Plans available'}</option>{practiceScoutGames.map((game) => <option key={game.id} value={game.id}>{game.opponent || game.name} · {game.gameDate}</option>)}</select></label>{!practiceScoutGames.length && <p className="gp-empty">Create a Game Plan before adding a Scout Play to this practice.</p>}</div>
         <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => setPracticeScoutRequest(null)}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={!selectedPracticeScoutGameId}>Continue</button></footer>
       </form></div>}
-      {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
+      {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} scoutGrouping={groupingDialog.scoutGrouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
       {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
       {showNewPlaybookDialog && (
         <NewCollectionDialog
@@ -1917,10 +1919,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           title="Plays"
           rowIcon={PlayDiagramIcon}
           rowType="Play"
-          fetchRows={fetchCardPlaybookPlays}
+          fetchRows={gameCard?.tab === 'scout' ? fetchCardPlaybookRows : fetchCardPlaybookPlays}
           onReorder={(ids) => api.reorderPlays(cardPlaybook.id, ids)}
-          onNew={writable && gameCard?.tab === 'scout' ? (practiceScriptDraft) => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true, practiceScriptDraft, initialName: scoutPlayName(practiceScriptDraft) }) : undefined}
-          onNewGrouping={writable && gameCard?.tab === 'installs' ? () => setGroupingDialog({ parentId: cardPlaybook.id }) : undefined}
+          onNew={writable && gameCard?.tab === 'scout' ? (practiceScriptDraft, groupingId) => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true, practiceScriptDraft, groupingId, initialName: scoutPlayName(practiceScriptDraft) }) : undefined}
+          onNewGrouping={writable && ['installs', 'scout'].includes(gameCard?.tab) ? () => setGroupingDialog({ parentId: cardPlaybook.id, scoutGrouping: gameCard?.tab === 'scout' }) : undefined}
           onEditGrouping={(grouping) => setGroupingDialog({ parentId: cardPlaybook.id, grouping })}
           onDeleteGrouping={workspace.capabilities.delete ? (grouping) => handleDeleteGrouping(cardPlaybook.id, grouping) : undefined}
           newLabel="New Scout Play"

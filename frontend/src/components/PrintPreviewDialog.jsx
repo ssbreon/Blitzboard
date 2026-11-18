@@ -86,7 +86,7 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
   const [orientation, setOrientation] = useState('landscape')
   const [showTitle, setShowTitle] = useState(true)
   const [titlePage, setTitlePage] = useState(Boolean(collection))
-  const [perPage, setPerPage] = useState(collection ? 2 : 1)
+  const [perPage, setPerPage] = useState(1)
   const [includeGroupings, setIncludeGroupings] = useState(true)
   const [includeAssignments, setIncludeAssignments] = useState(true)
   const [scale, setScale] = useState(1)
