@@ -5651,6 +5651,7 @@ html.is-drilling-through * {
 .schedule-event {
   box-sizing: border-box;
   display: flex;
+  container-type: inline-size;
   flex-direction: row;
   align-items: stretch;
   width: 100%;
@@ -5773,6 +5774,14 @@ html.is-drilling-through * {
   font-weight: 650;
 }
 
+.schedule-event-other .schedule-event-label {
+  font-weight: 650;
+}
+
+.schedule-event-other .schedule-event-time {
+  font-weight: 650;
+}
+
 .schedule-event-name {
   display: block;
   min-width: 0;
@@ -5836,6 +5845,41 @@ html.is-drilling-through * {
   font-size: 12px;
 }
 
+@container (max-width: 180px) {
+  .schedule-event-content {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .schedule-event-details {
+    width: 100%;
+    flex: none;
+    overflow: visible;
+  }
+
+  .schedule-event-label {
+    flex: none;
+  }
+
+  .schedule-event-name {
+    flex: 1;
+    width: auto;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .schedule-event-notes,
+  .schedule-event-location {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+}
+
 @media (max-height: 700px) {
   .schedule-day > header {
     min-height: 24px;
@@ -5847,26 +5891,6 @@ html.is-drilling-through * {
     padding: 1px 4px 2px;
   }
 
-  .schedule-day:has(.schedule-day-events > .schedule-event:nth-child(2)) .schedule-event-content {
-    align-items: center;
-    flex-direction: row;
-    justify-content: space-between;
-    gap: 4px;
-    min-height: 18px;
-    padding: 1px 4px;
-    font-size: 13px;
-    line-height: 1.15;
-  }
-
-  .schedule-day:has(.schedule-day-events > .schedule-event:nth-child(2)) .schedule-event-name {
-    flex: 1;
-    width: auto;
-  }
-
-  .schedule-day:has(.schedule-day-events > .schedule-event:nth-child(2)) .schedule-event-time {
-    padding-left: 0;
-    white-space: nowrap;
-  }
 }
 
 .schedule-loading {
@@ -7499,16 +7523,68 @@ html.is-drilling-through * {
   .team-schedule .schedule-print-title {
     display: block !important;
     visibility: visible !important;
-    margin: 0 0 12px;
+    margin: 0 0 4px;
     color: #000;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
+    line-height: 1.1;
   }
 
   .team-schedule .schedule-toolbar,
   .team-schedule .schedule-day-add,
   .team-schedule .schedule-event-drag-handle {
     display: none !important;
+  }
+
+  .team-schedule .schedule-event-game {
+    border: 1px solid var(--navy);
+    background: #fff;
+    color: var(--navy);
+  }
+
+  .team-schedule .schedule-event:not(.schedule-event-game) {
+    border-color: var(--navy);
+    color: var(--navy);
+  }
+
+  .team-schedule .schedule-event {
+    min-height: 22px;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .team-schedule .schedule-event-content {
+    min-height: 20px;
+    gap: 0;
+    padding: 1px 4px;
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .team-schedule .schedule-event-label > svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .team-schedule .schedule-football {
+    width: 12px;
+    font-size: 12px;
+  }
+
+  .team-schedule .schedule-event-time {
+    font-size: 10px;
+  }
+
+  .team-schedule .schedule-event-notes,
+  .team-schedule .schedule-event-location {
+    padding-left: 16px;
+    font-size: 10px;
+    line-height: 1.05;
+  }
+
+  .team-schedule .schedule-day-events {
+    gap: 1px;
+    padding: 1px 3px 3px;
   }
 
   .team-schedule .schedule-calendar,
@@ -7522,15 +7598,66 @@ html.is-drilling-through * {
     background: white;
   }
 
+  .team-schedule .schedule-calendar {
+    border: 1px solid var(--navy);
+  }
+
+  .team-schedule .schedule-weekdays {
+    border: 0;
+    border-bottom: 1px solid var(--navy);
+  }
+
   .team-schedule .schedule-weekdays,
   .team-schedule .schedule-days {
     min-width: 0;
   }
 
+  .team-schedule .schedule-weekdays > div {
+    padding: 4px 6px;
+    border-right-color: var(--navy);
+  }
+
+  .team-schedule .schedule-weekdays > div:last-child {
+    border-right: 0;
+  }
+
   .team-schedule .schedule-days {
     grid-template-rows: none !important;
-    grid-auto-rows: minmax(78px, auto);
+    grid-auto-rows: minmax(70px, auto);
     flex: none;
+  }
+
+  .team-schedule .schedule-day {
+    border-right-color: var(--navy);
+    border-bottom-color: var(--navy);
+  }
+
+  .team-schedule .schedule-day:nth-child(7n) {
+    border-right: 0;
+  }
+
+  .team-schedule .schedule-day:nth-last-child(-n + 7) {
+    border-bottom: 0;
+  }
+
+  .team-schedule .schedule-day > header {
+    min-height: 24px;
+    padding: 2px 5px;
+    font-size: 12px;
+  }
+
+  .team-schedule .schedule-day.today {
+    background: white;
+    box-shadow: none;
+  }
+
+  .team-schedule .schedule-day.today > header > span {
+    display: inline;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
   }
 
   .team-schedule .schedule-days::before {
