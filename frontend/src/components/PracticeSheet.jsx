@@ -12,13 +12,16 @@ const CREATE_PRACTICE_SCRIPT_OPTION = '__create_new_practice_script__'
 export const ACTIVITY_GROUPS = ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE']
 const newPeriod = (startTime = '', duration = '', name = '') => ({ id: crypto.randomUUID(), name, startTime, duration, groupBreakdown: 'No', activities: [newActivity()] })
 const parsePracticeClockTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(value || '')
+// Format a 24-hour clock value for display in the practice sheet.
 export function practiceSheetTimeLabel(value) {
   const match = parsePracticeClockTime(value)
   return match ? new Date(2000, 0, 1, Number(match[1]), Number(match[2])).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : value || ''
 }
+// Format the event date for the practice sheet header.
 export function practiceSheetDateLabel(value) {
   return value ? new Date(`${value}T00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'Date not set'
 }
+// Use the event start time or the standard afternoon practice start.
 export function defaultPracticePeriodStart(value) {
   const match = parsePracticeClockTime(value)
   return match ? `${match[1]}:${match[2]}` : '15:30'
@@ -31,10 +34,12 @@ export const PRACTICE_PLAN_GRID_COLUMNS = [
   { key: 'practiceScript', header: 'Practice Script', render: (value) => value || '—' },
 ]
 
+// Normalize a period's group breakdown to the supported Yes or No values.
 export function practicePeriodGroupBreakdown(period = {}) {
   return period.groupBreakdown === 'Yes' ? 'Yes' : 'No'
 }
 
+// Render the practice plan and manage its editing, loading, and save lifecycle.
 export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, scripts, onCreatePracticeScript, onOpenScript }) {
   const [event, setEvent] = useState(null)
   const [sheet, setSheet] = useState({ periods: [] })
@@ -51,6 +56,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   const [periodDropTarget, setPeriodDropTarget] = useState(null)
 
   useEffect(() => {
+    // Ignore a response if this event load is superseded or the sheet unmounts.
     let active = true
     api.getScheduleEvent(eventId).then((result) => {
       if (!active) return
@@ -59,6 +65,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
       const practiceSheet = result.practiceSheet || { periods: [] }
       const hasEmptyGroups = practiceSheet.periods?.some((period) => period.activities?.some((activity) => !activity.group))
       const hasMissingGroupBreakdown = practiceSheet.periods?.some((period) => period.groupBreakdown !== 'Yes' && period.groupBreakdown !== 'No')
+      // Normalize legacy fields on load and mark editable sheets dirty so the defaults can be saved.
       setSheet(hasEmptyGroups || hasMissingGroupBreakdown ? {
         ...practiceSheet,
         periods: practiceSheet.periods.map((period) => ({
@@ -74,6 +81,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }, [api, eventId, revision, onEventLoaded])
 
   useEffect(() => {
+    // Prefer scripts supplied by the parent; fetch only when this sheet owns the lookup.
     if (scripts !== undefined || !event) return undefined
     let active = true
     api.listPlaybooks()
@@ -91,6 +99,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
 
   useEffect(() => {
     function warnBeforeUnload(event) {
+      // Keep browser close or reload from silently discarding an edited sheet.
       if (dirty) { event.preventDefault(); event.returnValue = '' }
     }
     window.addEventListener('beforeunload', warnBeforeUnload)
@@ -98,6 +107,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }, [dirty])
 
   useEffect(() => {
+    // Let the parent coordinate navigation guards with this sheet's dirty and saving state.
     onGuardChange?.({ dirty, saving: busy, canSave: false })
     return () => onGuardChange?.(null)
   }, [dirty, busy, onGuardChange])
@@ -110,6 +120,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     function handleEscape(event) {
       if (event.key === 'Escape') {
         setMenuOpen(false)
+        // Return keyboard focus to the control that opened the menu.
         menuRef.current?.querySelector('button')?.focus()
       }
     }
@@ -122,17 +133,20 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }, [menuOpen])
 
   function changePeriods(update) {
+    // Centralize period edits so every change also marks the sheet as unsaved.
     setSheet((current) => ({ ...current, periods: update(current.periods || []) }))
     setDirty(true)
   }
 
   function changePeriod(index, patch) {
     if (patch.practiceScriptId === CREATE_PRACTICE_SCRIPT_OPTION) {
+      // Creating a script is a separate workflow, not a value to save on this period.
       onCreatePracticeScript?.(eventId)
       return
     }
     changePeriods((periods) => {
       const next = periods.map((period, current) => current === index ? { ...period, ...patch } : period)
+      // A timing edit shifts only later periods; the edited period keeps its chosen start time.
       return Object.hasOwn(patch, 'startTime') || Object.hasOwn(patch, 'duration')
         ? cascadePracticePeriodStarts(next, index + 1)
         : next
@@ -160,11 +174,13 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
 
   function dropPeriod(event, targetIndex) {
     event.preventDefault()
+    // Native drag data survives the pointer interaction; state is the fallback for browsers without it.
     const sourceId = event.dataTransfer.getData('text/plain') || draggingPeriodId
     const sourceIndex = periods.findIndex((period, index) => (period.id || String(index)) === sourceId)
     if (sourceIndex >= 0) {
       const rect = event.currentTarget.getBoundingClientRect()
       const insertionIndex = targetIndex + (event.clientY > rect.top + rect.height / 2 ? 1 : 0)
+      // Removing an earlier source shifts the insertion point back by one.
       const destination = sourceIndex < insertionIndex ? insertionIndex - 1 : insertionIndex
       changePeriods((current) => reorderPracticePeriods(current, sourceIndex, destination))
     }
@@ -178,6 +194,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }
 
   async function save() {
+    // Reject incomplete timings before sending the whole sheet to the API.
     if ((sheet.periods || []).some((period) => !period.startTime || !practicePeriodEndTime(period.startTime, period.duration))) {
       setError(new Error('Every practice period needs a valid Start time and a Minutes value greater than zero.'))
       return false
@@ -196,6 +213,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }
 
   function leave(action) {
+    // Refresh and event editing both replace the current view, so guard them when edits are pending.
     if (!dirty || window.confirm('Discard unsaved practice sheet changes?')) action()
   }
 
@@ -247,6 +265,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
         const selectedScript = availableScripts.find((script) => script.id === period.practiceScriptId)
         const periodContentId = `practice-period-content-${periodIndex}`
         const groupBreakdown = practicePeriodGroupBreakdown(period)
+        // Activity details are shown only when this period has a group breakdown.
         const periodCollapsed = groupBreakdown !== 'Yes'
         const activityRows = (period.activities || []).map((activity, activityIndex) => ({
           ...activity,
@@ -278,6 +297,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
           <div className="data-grid-toolbar practice-activities-grid-toolbar"><div className="data-grid-toolbar-actions"><button type="button" className="toolbar-new-button" disabled={!canEdit || busy} onClick={() => changePeriod(periodIndex, { activities: [...(period.activities || []), newActivity()] })}><Plus className="toolbar-icon" aria-hidden="true" />Add Activity</button></div></div>
           <DataGrid title={`Period ${periodIndex + 1} Activities`} className="editable-data-grid" columns={activityColumns} items={activityRows} showPage pageLabel="Order" hidePager hideToolbar onReorder={canEdit ? (ids) => {
             const rowsById = new Map(activityRows.map((row) => [row.id, row]))
+            // Rebuild from displayed row order while retaining IDs for legacy activities without one.
             changePeriod(periodIndex, { activities: ids.map((id) => {
               const row = rowsById.get(id)
               const activity = period.activities[row.activityIndex]
@@ -292,32 +312,39 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   </section>
 }
 
+// Return the end time of a period, or an empty string when its timing is invalid.
 export function practicePeriodEndTime(startTime, duration) {
   const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(startTime || '')
   const minutes = Number(duration)
   if (!match || !Number.isInteger(minutes) || minutes < 1) return ''
+  // Modulo keeps periods that cross midnight within the 24-hour clock.
   const total = (Number(match[1]) * 60 + Number(match[2]) + minutes) % 1440
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
+// Recalculate each period's start time from its predecessor, beginning at fromIndex.
 export function cascadePracticePeriodStarts(periods, fromIndex = 1) {
   const next = periods.map((period) => ({ ...period }))
+  // Keep the first period as the schedule anchor; derive each following start from its predecessor.
   for (let index = Math.max(1, fromIndex); index < next.length; index += 1) {
     next[index].startTime = practicePeriodEndTime(next[index - 1].startTime, next[index - 1].duration)
   }
   return next
 }
 
+// Move a period, preserve the schedule's first start time, and recalculate later starts.
 export function reorderPracticePeriods(periods, fromIndex, toIndex) {
   if (fromIndex < 0 || fromIndex >= periods.length || toIndex < 0 || toIndex >= periods.length || fromIndex === toIndex) return periods
   const firstStartTime = periods[0]?.startTime || ''
   const reordered = [...periods]
   const [period] = reordered.splice(fromIndex, 1)
   reordered.splice(toIndex, 0, period)
+  // Moving periods changes their sequence, so preserve the schedule anchor and recalculate later starts.
   if (reordered.length) reordered[0] = { ...reordered[0], startTime: firstStartTime }
   return cascadePracticePeriodStarts(reordered)
 }
 
+// Group activities by unit and order supported groups before custom groups.
 export function groupPracticeActivities(activities = []) {
   const grouped = new Map()
   activities.forEach((activity) => {
@@ -337,12 +364,14 @@ export function groupPracticeActivities(activities = []) {
     .map(([group, items]) => ({ group, activities: items }))
 }
 
+// Convert grouped activities into a compact, printable text summary.
 export function summarizePracticeActivities(activities = []) {
   return groupPracticeActivities(activities)
     .map(({ group, activities: items }) => `${group}: ${items.map(({ name, coach }) => `${name}${coach ? ` (${coach})` : ''}`).join(', ')}`)
     .join('\n') || '—'
 }
 
+// Map practice periods and linked scripts into rows for the plan grid.
 export function practicePlanGridRows(periods = [], scripts = []) {
   return periods.map((period, periodIndex) => ({
     id: period.id || String(periodIndex),

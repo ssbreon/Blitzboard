@@ -22,7 +22,9 @@ const SUGGESTION_LIST_FIELDS = {
   defCoverage: 'defCoverage',
 }
 const HASHES = ['L', 'R', 'M']
+// Read a script field, falling back to its legacy property name when needed.
 const readField = (row, key) => row[key] ?? (SCRIPT_FIELDS.find((field) => field.key === key)?.legacy ? row[SCRIPT_FIELDS.find((field) => field.key === key).legacy] : '') ?? ''
+// Load, edit, reorder, and render scout plays in a practice-script grid.
 export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, suggestionLists = {}, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
   const [rows, setRows] = useState([])
   const [loadedToken, setLoadedToken] = useState(null)
@@ -40,6 +42,7 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
     return () => { active = false }
   }, [fetchRows, reloadToken])
 
+  // Insert an unsaved scout-play row, optionally within a grouping.
   function addDraft(groupingId) {
     const draft = {
       id: `draft-${crypto.randomUUID()}`,
@@ -57,26 +60,31 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       if (groupingId) {
         const groupingIndex = next.findIndex((row) => row.id === groupingId)
         const nextGroupingIndex = next.findIndex((row, index) => index > groupingIndex && row.rowType === 'grouping')
+        // Keep the new play contiguous with its group, before the next group header.
         next.splice(nextGroupingIndex < 0 ? next.length : nextGroupingIndex, 0, draft)
       } else next.push(draft)
       return next.map((row, index) => ({ ...row, page: index + 1 }))
     })
   }
 
+  // Update a field directly on an unsaved draft row.
   function updateDraft(rowId, key, value) {
     setRows((current) => current.map((row) => row.id === rowId ? { ...row, [key]: value } : row))
   }
 
+  // Stage a saved play's field change until it can be persisted.
   function updateSavedDraft(rowId, key, value) {
     setDrafts((current) => ({ ...current, [rowId]: { ...current[rowId], [key]: value } }))
   }
 
+  // Persist staged field changes for a saved play.
   async function saveSavedDraft(row) {
     const changes = drafts[row.id]
     if (!canEdit || !changes || !Object.keys(changes).length) return row
     setSavingRows((current) => ({ ...current, [row.id]: true }))
     setError(null)
     try {
+      // Use the current ETag so the update respects the API's optimistic concurrency check.
       const currentRecord = await api.getPlay(playbookId, row.id)
       const merged = { ...row, ...changes }
       const scriptFields = Object.fromEntries(SCRIPT_FIELDS.map(({ key }) => [key, readField(merged, key) || (key === 'hash' ? 'M' : '')]))
@@ -96,15 +104,18 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
     }
   }
 
+  // Save pending edits before opening the selected play.
   async function openSavedPlay(row) {
     const saved = await saveSavedDraft(row)
     if (saved) onOpenPlay?.(saved)
   }
 
+  // Reorder rows locally and persist the order of saved plays.
   async function reorder(ids) {
     const previous = rows
     const next = ids.map((id) => rows.find((row) => row.id === id)).filter(Boolean).map((row, index) => ({ ...row, page: index + 1 }))
     setRows(next)
+    // Draft rows have no server record yet, so only saved IDs can be persisted.
     const savedIds = next.filter((row) => !row.isPracticeScriptDraft).map((row) => row.id)
     if (!savedIds.length) return
     try { await onReorder(savedIds) }
@@ -119,6 +130,7 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
         const fieldValue = drafts[row.id]?.[key] ?? readField(row, key)
         const draft = row.isPracticeScriptDraft
         if (!draft && !canEdit) return fieldValue || '—'
+        // Route each edit to its draft or saved-row state handler.
         const change = (newValue) => draft ? updateDraft(row.id, key, newValue) : updateSavedDraft(row.id, key, newValue)
         const saveOnBlur = draft ? undefined : () => { void saveSavedDraft(row) }
         const disabled = busy || savingRows[row.id]
@@ -133,6 +145,7 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} thumbnail /></button> },
   ]
 
+  // Build actions appropriate to grouping, draft, and saved-play rows.
   function getRowActions(row) {
     if (row.rowType === 'grouping') return [
       ...(canEdit ? [{ key: 'add-scout-play', label: 'Add Scout Play', icon: Plus, onClick: () => addDraft(row.id) }] : []),

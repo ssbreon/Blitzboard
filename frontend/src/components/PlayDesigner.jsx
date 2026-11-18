@@ -72,6 +72,7 @@ const TOOL_ICONS = {
 }
 
 const PLAYER_COLORS = ['#ffffff', '#1d4ed8', '#b91c1c', '#15803d', '#ef9a00', '#7c3aed', '#374151']
+// Render the rectangle-shaped player icon at the requested size.
 const RectanglePlayerIcon = ({ size = 16, ...props }) => (
   <svg
     width={size}
@@ -120,10 +121,12 @@ const ZONE_HANDLES = [
   { id: 'w', left: 0, top: 50 },
 ]
 
+// Convert a game-type identifier into a readable label.
 function gameTypeLabel(gameType) {
   return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
 }
 
+// Resolve an adjustment's design fields against its base-play defaults.
 function adjustmentDesign(slide, fallback) {
   return {
     markers: Array.isArray(slide.markers) ? slide.markers : fallback.markers,
@@ -141,6 +144,7 @@ function adjustmentDesign(slide, fallback) {
   }
 }
 
+// Render and manage the interactive play-designing workspace.
 export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, onNameApplied, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
   const drawingMaskId = useId()
   const assignmentsId = `${drawingMaskId}-assignments`
@@ -257,6 +261,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   useEffect(() => {
     const el = fieldRef.current
     if (!el) return
+    // Keep pixel-sized drawing caps and alignment calculations in sync with the responsive field.
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
       if (width > 0 && height > 0) setFieldPxSize({ width, height })
@@ -271,6 +276,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   useEffect(() => {
     if (record.kind !== 'play') return undefined
+    // Ignore slide results if this record changes or the designer unmounts before they arrive.
     let cancelled = false
     api.listSlides(record.parentId, record.id)
       .then((result) => {
@@ -295,6 +301,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }, [record.kind, record.parentId, record.id, api])
 
   useEffect(() => {
+    // Close both menus when a pointer press lands outside their shared container.
     function handleClickOutside(event) {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setMenuOpen(false)
@@ -335,6 +342,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     theme,
     showAssignments,
   }
+  // Compare nested design data here; the active name or slide title is checked separately below.
   const designIsDirty = Object.keys(currentDesign).some(
     (key) => JSON.stringify(currentDesign[key]) !== JSON.stringify(savedActiveDesign[key]),
   )
@@ -346,10 +354,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     isDirty && drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
   const canRedoDrawing = redoHistory.length > 0
 
+  // Snapshot the active design and its current name or adjustment title.
   function captureCurrentDraft() {
     return { ...currentDesign, name, title: activeSlideTitle }
   }
 
+  // Apply a design and clear transient selection, tool, and history state.
   function restoreDesign(design) {
     setMarkers(design.markers)
     setDrawings(normalizeDrawings(design.drawings))
@@ -376,6 +386,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setRedoHistory([])
   }
 
+  // Preserve the outgoing draft and load the selected base play or adjustment.
   function activateSlide(slideId) {
     if (slideId === activeSlideId) return
     if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
@@ -401,6 +412,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Switch to an adjustment and animate markers from the base design to it.
   function runAdjustment(slide) {
     const baseDesign = activeSlideId
       ? slideDraftsRef.current.base || savedBaseDesign
@@ -411,6 +423,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     activateSlide(slide.id)
 
     if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
+    // Only shared markers have a starting position from which they can animate.
     const baseMarkers = new Map((baseDesign.markers || []).map((marker) => [marker.id, marker]))
     const players = Object.fromEntries(
       adjustment.markers.flatMap((marker) => {
@@ -430,6 +443,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     const duration = 2400
     let startedAt
     setPlayerAnimation({ players, progress: 0 })
+    // Advance marker positions until the adjustment animation completes.
     const animate = (timestamp) => {
       if (startedAt === undefined) startedAt = timestamp
       const progress = Math.min((timestamp - startedAt) / duration, 1)
@@ -444,6 +458,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     animationFrameRef.current = requestAnimationFrame(animate)
   }
 
+  // Persist the active base-play or adjustment design.
   async function handleSave() {
     if (readOnly || savingRef.current) return false
     savingRef.current = true
@@ -464,6 +479,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         theme,
         showAssignments,
       }
+      // Adjustment slides and the base play use separate endpoints and title fields.
       if (activeSlideId) {
         const title = activeSlideTitle.trim() || activeSlide?.title || 'Adjustment'
         const updated = await api.updateSlide(record.parentId, record.id, activeSlideId, { ...designPayload, title })
@@ -505,6 +521,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Compare a cached draft with the saved base or adjustment baseline.
   function draftIsDirty(slideId, draft) {
     const savedSlide = slides.find((slide) => slide.id === slideId)
     const baseline = slideId === 'base' ? savedBaseDesign : adjustmentDesign(savedSlide || {}, savedBaseDesign)
@@ -512,10 +529,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       || (slideId === 'base' ? draft.name !== savedName : draft.title !== (savedSlide?.title || 'Adjustment'))
   }
 
+  // Check whether unsaved edits or open settings should block navigation.
   function navigationIsDirty() {
     return !readOnly && (isDirty || settingsOpen || Object.entries(slideDraftsRef.current).some(([slideId, draft]) => draftIsDirty(slideId, draft)))
   }
 
+  // Save every changed base and adjustment draft, processing the base first.
   async function saveNavigationDrafts() {
     if (readOnly || settingsOpen || savingRef.current) return false
     savingRef.current = true
@@ -554,6 +573,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   })
 
   useEffect(() => {
+    // Warn the browser before leaving while any design draft remains unsaved.
     function beforeUnload(event) {
       if (navigationIsDirty()) { event.preventDefault(); event.returnValue = '' }
     }
@@ -561,6 +581,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     return () => window.removeEventListener('beforeunload', beforeUnload)
   })
 
+  // Discard the active draft and restore its last saved design.
   function handleCancel() {
     delete slideDraftsRef.current[activeSlideId || 'base']
     if (activeSlideId && activeSlide) {
@@ -575,6 +596,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setError(null)
   }
 
+  // Create an adjustment from the current design and retain the current draft.
   async function handleAddAdjustment() {
     if (readOnly || record.kind !== 'play' || slides.length >= MAX_ADJUSTMENT_SLIDES || slidesLoading || slidesLoadError) return
     setSaving(true)
@@ -613,6 +635,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Delete an adjustment and restore the base draft if it was active.
   async function handleDeleteAdjustment(slide) {
     if (readOnly || !canDelete) return
     setRemovingSlideId(slide.id)
@@ -627,6 +650,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       })
       delete slideDraftsRef.current[slide.id]
       if (activeSlideId === slide.id) {
+        // The deleted slide is no longer a valid destination, so restore the preserved base draft.
         const baseDraft = slideDraftsRef.current.base
         setActiveSlideId(null)
         setActiveSlideTitle('')
@@ -643,6 +667,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Remove the latest existing drawing and save it with its dependents for redo.
   function undoLastDrawing() {
     const history = [...drawHistory]
     while (history.length > 0) {
@@ -664,6 +689,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setDrawHistory(history)
   }
 
+  // Restore drawings removed by the most recent undo operation.
   function redoLastDrawing() {
     const history = [...redoHistory]
     const action = history.pop()
@@ -681,6 +707,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setRedoHistory(history)
   }
 
+  // Initialize the settings form from the current design before opening it.
   function openSettings() {
     setDraftName(name)
     setDraftGameType(gameType)
@@ -690,6 +717,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSettingsOpen(true)
   }
 
+  // Replace the field setup with a template and clear existing overlays.
   function applyTemplate(nextTemplateId, nextCategory = category) {
     if (nextTemplateId === templateId) return
     const template = findPlayTemplate(nextTemplateId) || DEFAULT_PLAY_TEMPLATE
@@ -709,6 +737,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setRedoHistory([])
   }
 
+  // Validate and apply the pending name, game type, category, and template.
   function handleSettingsSave(event) {
     event.preventDefault()
     if (!draftName.trim() || !settingsTemplateIds.has(draftTemplateId)) return
@@ -723,12 +752,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSettingsOpen(false)
   }
 
+  // Activate an adjustment and initialize its rename form.
   function openAdjustmentRename(slide) {
     activateSlide(slide.id)
     setAdjustmentTitleDraft(slideDraftTitles[slide.id] ?? slideDraftsRef.current[slide.id]?.title ?? slide.title ?? 'Adjustment')
     setEditingSlideId(slide.id)
   }
 
+  // Apply the trimmed adjustment title to the active draft.
   function handleAdjustmentRename(event) {
     event.preventDefault()
     const title = adjustmentTitleDraft.trim()
@@ -738,6 +769,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setEditingSlideId(null)
   }
 
+  // Mirror all field elements across an axis and update vertical perspective.
   function flipPlay(axis) {
     setMarkers((current) =>
       current.map((marker) => (axis === 'horizontal' ? { ...marker, x: 100 - marker.x } : { ...marker, y: 100 - marker.y })),
@@ -745,6 +777,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setDrawings((current) => {
       const next = {}
       for (const [type, list] of Object.entries(current)) {
+        // Origins are absolute field positions; route points are relative offsets.
         next[type] = list.map((drawing) => ({
           ...drawing,
           ...(drawing.origin && {
@@ -780,6 +813,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Rebuild the current play from its selected template.
   function restartPlay() {
     const template = findPlayTemplate(templateId) || DEFAULT_PLAY_TEMPLATE
     setMarkers(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindow))
@@ -798,12 +832,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setRedoHistory([])
   }
 
+  // Reset the active adjustment to the current base-play design.
   function restartAdjustment() {
     if (!activeSlideId || !activeSlide) return
     restoreDesign(slideDraftsRef.current.base || savedBaseDesign)
     setMenuOpen(false)
   }
 
+  // Convert pointer coordinates into clamped percentages of the field.
   function positionFromEvent(event) {
     const rect = event.currentTarget.getBoundingClientRect()
     return {
@@ -812,6 +848,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Activate a placement tool and clear incompatible selection state.
   function startPlacementTool(tool) {
     setActiveTool(tool)
     setActiveChain(null)
@@ -824,6 +861,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSelectedZoneId(null)
   }
 
+  // Add and focus a new text annotation at the given field position.
   function addTextAnnotation(position) {
     const id = crypto.randomUUID()
     setTextAnnotations((current) => [...current, { id, text: '', x: position.x, y: position.y }])
@@ -833,6 +871,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setActiveTool('select')
   }
 
+  // Add a centered default zone within the field and select it.
   function addZone(position) {
     const id = crypto.randomUUID()
     const width = 20
@@ -851,6 +890,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Select a zone and capture the starting geometry for a move or resize.
   function handleZonePointerDown(event, zone, handle = null) {
     if (activeTool !== 'select' || event.button !== 0) return
     event.stopPropagation()
@@ -873,10 +913,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     })
   }
 
+  // Apply visual-property changes to the matching zone.
   function updateZoneAppearance(id, updates) {
     setZones((current) => current.map((zone) => (zone.id === id ? { ...zone, ...updates } : zone)))
   }
 
+  // Select an annotation and preserve the pointer offset for smooth dragging.
   function handleTextPointerDown(event, id) {
     event.stopPropagation()
     const annotation = textAnnotations.find((item) => item.id === id)
@@ -893,6 +935,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setDragTextId(id)
   }
 
+  // Update annotation styling while omitting properties reset to their defaults.
   function updateTextAppearance(id, updates) {
     setTextAnnotations((current) =>
       current.map((annotation) => {
@@ -906,10 +949,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     )
   }
 
+  // Resolve a drawing's anchor from the current drawings and player markers.
   function drawingAnchor(drawing) {
     return resolveDrawingAnchor(drawing, drawings, markers)
   }
 
+  // Select an assignment marker and clear other selection modes.
   function selectAssignmentMarker(id) {
     setMultiSelectedIds([])
     setSelectedId(id)
@@ -918,6 +963,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSelectedZoneId(null)
   }
 
+  // Toggle marker selection or begin dragging one marker or a selected group.
   function handleMarkerPointerDown(event, id) {
     if (activeTool !== 'select' || event.button !== 0) return
     event.preventDefault()
@@ -958,6 +1004,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setDragId(id)
   }
 
+  // Start an anchored path when an eligible drawing tool is active.
   function handleMarkerClick(event, id) {
     event.stopPropagation()
     if (!PATH_ANCHOR_TOOLS.has(activeTool) || activeChain) return
@@ -966,6 +1013,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Apply marker appearance changes while omitting default-valued properties.
   function updateMarkerAppearance(id, updates) {
     setMarkers((current) =>
       current.map((marker) => {
@@ -978,6 +1026,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     )
   }
 
+  // Update a drawing's appearance and remove its default color override.
   function updateDrawingAppearance(type, id, updates) {
     setDrawings((current) => ({
       ...current,
@@ -990,6 +1039,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }))
   }
 
+  // Select a drawing and focus the field for keyboard interaction.
   function handleDrawingClick(event, type, id) {
     if (activeTool !== 'select') return
     event.stopPropagation()
@@ -1001,6 +1051,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setSelectedZoneId(null)
   }
 
+  // Begin dragging a drawing, selected points, or a free-line segment.
   function handleDrawingPointerDown(event, type, drawing, indices = null) {
     if (activeTool !== 'select' || event.button !== 0) return
     event.preventDefault()
@@ -1010,6 +1061,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     if (!rect || !anchor) return
     const isFreeLine = type === 'line' && !drawing.motionId && !drawing.blockId && !drawing.anchorId
     const movableIndices = isFreeLine ? indices : indices?.filter((index) => index !== 0)
+    // Point handles on anchored paths cannot move the anchor; a free line can move its origin.
     if (movableIndices?.length === 0) return
     event.currentTarget.setPointerCapture(event.pointerId)
     fieldRef.current.focus({ preventScroll: true })
@@ -1028,6 +1080,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     })
   }
 
+  // Select a block cap or use it as the anchor for a new path.
   function handleBlockCapClick(event, drawing) {
     if (!BLOCK_ANCHOR_TOOLS.has(activeTool) || activeChain) {
       handleDrawingClick(event, 'block', drawing.id)
@@ -1039,6 +1092,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Select a motion cap or start a new path from its endpoint.
   function handleMotionCapClick(event, drawing) {
     if (activeChain) {
       event.stopPropagation()
@@ -1054,6 +1108,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Deselect, place an object, or extend the active drawing path.
   function handleFieldClick(event) {
     if (suppressFieldClickRef.current) {
       suppressFieldClickRef.current = false
@@ -1098,6 +1153,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setActiveChain((current) => current && { ...current, points: [...current.points, offset] })
   }
 
+  // Commit the active path and update drawing undo history.
   function finishDrawingPath(trimLastPoint = false) {
     if (activeTool === 'select' || !activeChain) return
     const points = trimLastPoint && activeChain.points.length > 0
@@ -1124,17 +1180,20 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  // Finish the current path without adding the cursor-preview point.
   function handleFieldDoubleClick(event) {
     event.preventDefault()
     finishDrawingPath(true)
   }
 
+  // Begin a marquee selection when the field is in select mode.
   function handleFieldPointerDown(event) {
     if (activeTool !== 'select' || event.button !== 0) return
     const point = positionFromEvent(event)
     setMarquee({ start: point, end: point, additive: event.shiftKey })
   }
 
+  // Find the closest horizontal and vertical spacing guides for a marker.
   function markerAlignmentGuides(markerId, x, y) {
     const field = fieldRef.current
     const fieldRect = field?.getBoundingClientRect()
@@ -1149,6 +1208,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     const draggedCenter = { x: (x / 100) * fieldRect.width, y: (y / 100) * fieldRect.height }
     const nearest = new Map()
     const tolerance = 1
+    // Retain only the nearest positive spacing gap for each aligned side.
+    // Convert pixel-space guide points back to field percentages.
     const toPercent = (point) => ({ x: (point.x / fieldRect.width) * 100, y: (point.y / fieldRect.height) * 100 })
 
     for (const marker of markers) {
@@ -1192,6 +1253,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     return Array.from(nearest, ([side, { points }]) => ({ side, points }))
   }
 
+  // Update the active path, marquee, marker, zone, or text drag.
   function handleFieldPointerMove(event) {
     if (pathDrag) {
       const point = positionFromEvent(event)
@@ -1283,6 +1345,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
   }
 
+  // Finalize marquee selection and clear all active drag state.
   function handleFieldPointerUp() {
     if (marquee) {
       if (marquee.active) {
@@ -1314,6 +1377,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setPathDrag(null)
   }
 
+  // Handle Escape cancellation and deletion of the selected field object.
   function handleKeyDown(event) {
     if (event.key === 'Escape' && multiSelectedIds.length > 0) {
       setMultiSelectedIds([])
@@ -1348,18 +1412,22 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       setSelectedZoneId(null)
     }
   }
+  // Calculate the rendered T-bar cap geometry for the current field size.
   function tbarCap(points) {
     return tbarCapPoints(points, fieldPxSize)
   }
 
+  // Calculate the rendered arrowhead geometry for the current field size.
   function arrowCap(points) {
     return arrowCapPoints(points, fieldPxSize)
   }
 
+  // Resolve the drawing tool's color from the active theme.
   function toolColor(tool) {
     return resolveToolColor(tool, activeTheme)
   }
 
+  // Resolve the drawing tool's dash pattern from its theme and style.
   function toolDash(tool, drawing) {
     return resolveToolDash(tool, activeTheme, drawing)
   }
@@ -1380,15 +1448,18 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const isEmpty = markers.length === 0 && allDrawings.length === 0 && textAnnotations.length === 0 && zones.length === 0
   const assignmentsAvailable = Boolean(assignmentTeam(record.parentCategory))
 
+  // Toggle the player-assignment panel.
   function navigateAssignments() {
     setAssignmentsOpen((current) => !current)
   }
 
+  // Track the panel's docked state and keep it open after undocking.
   function handleAssignmentsUndockedChange(undocked) {
     setAssignmentsUndocked(undocked)
     setAssignmentsOpen(true)
   }
 
+  // Render the toolbar button for a drawing or selection tool.
   function toolButton(tool) {
     return (
       <button
@@ -1413,6 +1484,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     )
   }
 
+  // Render one radio-option column in the field layout menu.
   function layoutColumn(title, options, selectedValue, onSelect) {
     return (
       <div className="play-layout-column" role="group" aria-label={title} key={title}>
@@ -2128,6 +2200,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 onKeyDown={(event) => event.stopPropagation()}
                 onBlur={(event) => {
                   const focusRemainsWithinAnnotation = event.currentTarget.parentElement?.contains(event.relatedTarget)
+                  // Remove empty notes on blur; otherwise deselect only after focus leaves the annotation.
                   if (!annotation.text.trim()) {
                     setTextAnnotations((current) => current.filter((item) => item.id !== annotation.id))
                     setSelectedTextId((current) => (current === annotation.id ? null : current))
@@ -2391,6 +2464,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         {markers.map((marker) => {
           const animation = playerAnimation?.players[marker.id]
           const progress = playerAnimation?.progress || 0
+          // Smoothstep eases the marker motion at both ends of the animation.
           const easedProgress = progress * progress * (3 - 2 * progress)
           const displayMarker = animation
             ? {
