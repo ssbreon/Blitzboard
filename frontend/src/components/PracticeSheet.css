@@ -4,7 +4,7 @@
 .practice-sheet-header-meta-overlay { display: inline-flex; max-width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px; background: rgba(4, 13, 26, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .practice-sheet-header h1 { margin: 3px 0 8px; font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; letter-spacing: 0; color: #fff; }
 .practice-sheet-eyebrow { margin: 0; color: #e5edf5; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-.practice-sheet-meta { display: flex; width: fit-content; max-width: 100%; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; color: #e5edf5; font-size: 14px; }
+.practice-sheet-meta { display: flex; width: fit-content; max-width: 100%; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0; color: #e5edf5; font-size: 14px; }
 .practice-sheet-dress-row { display: flex; width: fit-content; max-width: 100%; align-items: baseline; gap: 20px; min-width: 0; }
 .practice-sheet-dress { display: flex; flex: none; align-items: baseline; gap: 8px; margin: 0; color: #e5edf5; font-size: 14px; }
 .practice-sheet-dress strong { color: #fff; }

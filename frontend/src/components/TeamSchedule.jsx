@@ -90,14 +90,15 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
   const [dress, setDress] = useState(initialEvent?.dress || '')
   const [practiceScriptUnit, setPracticeScriptUnit] = useState('No')
   const [relatedGames, setRelatedGames] = useState([])
-  const [relatedGameId, setRelatedGameId] = useState('')
-  const [loadingRelatedGames, setLoadingRelatedGames] = useState(!initialEvent && eventType !== 'Game')
+  const [relatedGameId, setRelatedGameId] = useState(initialEvent?.gamePlanIds?.[0] || '')
+  const [loadingRelatedGames, setLoadingRelatedGames] = useState(eventType !== 'Game')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const isGame = eventType === 'Game'
+  const showRelatedGame = !isGame
 
   useEffect(() => {
-    if (initialEvent || isGame) {
+    if (!showRelatedGame) {
       setRelatedGames([])
       setRelatedGameId('')
       setLoadingRelatedGames(false)
@@ -105,19 +106,22 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
     }
     let active = true
     setRelatedGames([])
-    setRelatedGameId('')
+    if (!initialEvent) setRelatedGameId('')
     setLoadingRelatedGames(true)
-    api.listGamePlans(undefined, undefined, false, practiceGamePlanRange(eventDate))
+    api.listGamePlans(undefined, undefined, false, initialEvent ? undefined : practiceGamePlanRange(eventDate))
       .then((result) => {
         if (!active) return
-        const games = practiceGamePlans(eventDate, result.items)
+        const linkedGameIds = initialEvent?.gamePlanIds || []
+        const eligibleGames = practiceGamePlans(eventDate, result.items)
+        const linkedGames = result.items.filter((game) => linkedGameIds.includes(game.id))
+        const games = [...new Map([...eligibleGames, ...linkedGames].map((game) => [game.id, game])).values()]
         setRelatedGames(games)
-        setRelatedGameId(defaultRelatedGameId(games))
+        setRelatedGameId(initialEvent ? linkedGameIds[0] || '' : defaultRelatedGameId(games))
       })
       .catch((failure) => { if (active) setError(failure) })
       .finally(() => { if (active) setLoadingRelatedGames(false) })
     return () => { active = false }
-  }, [api, eventDate, initialEvent, isGame])
+  }, [api, eventDate, initialEvent, showRelatedGame])
 
   async function submit(event) {
     event.preventDefault()
@@ -125,7 +129,12 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
     setSaving(true)
     setError(null)
     try {
-      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }), ...(eventType === 'Practice' && { dress }), ...(!isGame && !initialEvent && relatedGameId && { relatedGameId }), ...(eventType === 'Practice' && !initialEvent && { practiceScriptUnit }) })
+      const currentGamePlanIds = initialEvent?.gamePlanIds || []
+      const currentRelatedGameId = currentGamePlanIds[0]
+      const gamePlanIds = relatedGameId
+        ? [relatedGameId, ...currentGamePlanIds.filter((id) => id !== currentRelatedGameId && id !== relatedGameId)]
+        : currentGamePlanIds.filter((id) => id !== currentRelatedGameId)
+      await onSave({ eventType, name: name.trim(), eventDate, startTime, endTime, location: location.trim(), gameSite, ...(!isGame && { notes: notes.trim() }), ...(eventType === 'Practice' && { dress }), ...(showRelatedGame && { gamePlanIds }), ...(eventType === 'Practice' && !initialEvent && { practiceScriptUnit }) })
     } catch (failure) {
       setError(failure)
     } finally {
@@ -165,15 +174,16 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
           {eventType === 'Practice' && <label className="schedule-field"><span>Dress</span><select value={dress} onChange={(event) => setDress(event.target.value)} disabled={!canEdit || saving}><option value="">Select dress</option>{PRACTICE_DRESSES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}
           {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
           </label>}
-          {!isGame && !initialEvent && <div className={`schedule-field-row${eventType === 'Practice' ? ' schedule-practice-options' : ''}`}>
+          {showRelatedGame && <div className={`schedule-field-row${eventType === 'Practice' && !initialEvent ? ' schedule-practice-options' : ''}`}>
             <label className="schedule-field">
               <span>Related Game</span>
               <select value={relatedGameId} onChange={(event) => setRelatedGameId(event.target.value)} disabled={!canEdit || saving || loadingRelatedGames}>
                 <option value="">{loadingRelatedGames ? 'Loading games...' : 'No related game'}</option>
+                {relatedGameId && !relatedGames.some((game) => game.id === relatedGameId) && <option value={relatedGameId}>Current linked game</option>}
                 {relatedGames.map((game) => <option key={game.id} value={game.id}>{parseDate(game.gameDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {gameOpponent(game) || 'Game'}</option>)}
               </select>
             </label>
-            {eventType === 'Practice' && <label className="schedule-field">
+            {eventType === 'Practice' && !initialEvent && <label className="schedule-field">
               <span>Generate Practice Script?</span>
               <select value={practiceScriptUnit} onChange={(event) => setPracticeScriptUnit(event.target.value)} disabled={!canEdit || saving}>
                 <option value="No">No</option>
@@ -469,7 +479,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
       if (dialog.event?.kind === 'game') await api.updateGamePlan(dialog.event.id, payload)
       else await onCreateGame(payload)
     } else {
-      const payload = { name: values.name, eventType: values.eventType, eventDate: values.eventDate, startTime: values.startTime, endTime: values.endTime, location: values.location, notes: values.notes, ...(values.eventType === 'Practice' && { dress: values.dress }), ...(values.relatedGameId && { gamePlanIds: [values.relatedGameId] }) }
+      const payload = { name: values.name, eventType: values.eventType, eventDate: values.eventDate, startTime: values.startTime, endTime: values.endTime, location: values.location, notes: values.notes, ...(values.eventType === 'Practice' && { dress: values.dress }), ...(values.gamePlanIds && { gamePlanIds: values.gamePlanIds }) }
       if (dialog.event?.kind === 'event') {
         await api.updateScheduleEvent(dialog.event.id, payload)
         if (dialog.event.id === practiceId) setPracticeRevision((value) => value + 1)

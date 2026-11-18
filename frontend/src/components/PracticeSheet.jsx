@@ -11,6 +11,18 @@ const newActivity = () => ({ id: crypto.randomUUID(), name: '', group: 'Team', c
 const CREATE_PRACTICE_SCRIPT_OPTION = '__create_new_practice_script__'
 export const ACTIVITY_GROUPS = ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE']
 const newPeriod = (startTime = '', duration = '', name = '') => ({ id: crypto.randomUUID(), name, startTime, duration, groupBreakdown: 'No', activities: [newActivity()] })
+const parsePracticeClockTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(value || '')
+export function practiceSheetTimeLabel(value) {
+  const match = parsePracticeClockTime(value)
+  return match ? new Date(2000, 0, 1, Number(match[1]), Number(match[2])).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : value || ''
+}
+export function practiceSheetDateLabel(value) {
+  return value ? new Date(`${value}T00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : 'Date not set'
+}
+export function defaultPracticePeriodStart(value) {
+  const match = parsePracticeClockTime(value)
+  return match ? `${match[1]}:${match[2]}` : '15:30'
+}
 export const PRACTICE_PLAN_GRID_COLUMNS = [
   { key: 'start', header: 'Start' },
   { key: 'minutes', header: 'Minutes' },
@@ -206,7 +218,7 @@ export function PracticeSheet({ api, eventId, canEdit, breadcrumbSettingsTarget,
   return <section className="practice-sheet" aria-label="Practice sheet" aria-busy={busy}>
     {canEdit && breadcrumbSettingsTarget && createPortal(<button type="button" className="breadcrumb-settings breadcrumb-settings-icon-only" onClick={() => leave(() => onEditEvent(event))} disabled={busy} title="Edit Event" aria-label="Edit Event"><Pencil size={18} aria-hidden="true" /></button>, breadcrumbSettingsTarget)}
     <header className="practice-sheet-header">
-      <div className="practice-sheet-header-details"><p className="practice-sheet-eyebrow">Practice Sheet</p><h1>{event.name}</h1><div className="practice-sheet-header-meta-overlay"><p className="practice-sheet-meta"><CalendarDays size={16} />{event.eventDate}{event.startTime && ` · ${event.startTime}`}{event.endTime && ` - ${event.endTime}`}{event.location && ` · ${event.location}`}</p>{(event.dress || event.notes) && <div className="practice-sheet-dress-row">{event.dress && <p className="practice-sheet-dress"><strong>Dress</strong><span>{event.dress}</span></p>}{event.notes && <p className="practice-sheet-event-notes" title={event.notes}><strong>Notes</strong><span>{event.notes}</span></p>}</div>}</div></div>
+      <div className="practice-sheet-header-details"><p className="practice-sheet-eyebrow">Practice Sheet</p><h1>{event.name}</h1><div className="practice-sheet-header-meta-overlay"><p className="practice-sheet-meta"><CalendarDays size={16} /><span>{practiceSheetDateLabel(event.eventDate)}</span>{(event.startTime || event.endTime) && <span>{event.startTime && practiceSheetTimeLabel(event.startTime)}{event.startTime && event.endTime && ' - '}{!event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}{event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}</span>}{event.location && <span>at {event.location}</span>}</p>{(event.dress || event.notes) && <div className="practice-sheet-dress-row">{event.dress && <p className="practice-sheet-dress"><strong>Dress</strong><span>{event.dress}</span></p>}{event.notes && <p className="practice-sheet-event-notes" title={event.notes}><strong>Notes</strong><span>{event.notes}</span></p>}</div>}</div></div>
       <div className="practice-sheet-actions">{canEdit && <button type="button" className="schedule-primary-button" onClick={save} disabled={!dirty || busy}><Save size={16} />{busy ? 'Saving...' : 'Save Sheet'}</button>}</div>
     </header>
     <ErrorDialog error={error} message="We couldn't save the practice sheet. Your changes are still here." />
@@ -220,7 +232,7 @@ export function PracticeSheet({ api, eventId, canEdit, breadcrumbSettingsTarget,
       }}
     />}
     <div className="practice-sheet-content">
-      <div className="practice-sheet-section-heading"><div className="practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="schedule-primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod('15:30', '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
+      <div className="practice-sheet-section-heading"><div className="practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="schedule-primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
         <button type="button" className="hamburger-button" aria-label="Practice Plan options" aria-haspopup="true" aria-expanded={menuOpen} title="Practice Plan options" onClick={() => setMenuOpen((open) => !open)}><Menu size={19} aria-hidden="true" /></button>
         {menuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown practice-plan-dropdown" role="menu" aria-label="Practice Plan options"><div className="data-grid-menu-panes">
           <div className="data-grid-status-filter" role="group" aria-label="Practice Plan view"><div className="account-menu-section-label">View</div>{[{ id: 'planning', label: 'Planning View', icon: ClipboardList }, { id: 'grid', label: 'Grid View', icon: Table2 }].map(({ id, label, icon: Icon }) => <button key={id} type="button" role="menuitemradio" aria-checked={practicePlanView === id} onClick={() => { setPracticePlanView(id); setMenuOpen(false) }}><Icon size={16} className="data-grid-option-icon" aria-hidden="true" /><span>{label}</span><Check size={16} className="data-grid-status-check" aria-hidden="true" /></button>)}</div>

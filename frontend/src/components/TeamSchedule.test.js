@@ -55,13 +55,18 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     const { MonthCalendar, YearCalendar, ScheduleEventDialog } = await server.ssrLoadModule('/src/components/TeamSchedule.jsx')
     const { CategoryBadge, getCategoryBadgeStyle } = await server.ssrLoadModule('/src/components/CategoryBadge.jsx')
     const { GamePlanHeader, GamePlanUnitFilter, GamePlanWorkspace } = await server.ssrLoadModule('/src/components/GamePlanWorkspace.jsx')
-    const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
+    const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows, practiceSheetTimeLabel, practiceSheetDateLabel, defaultPracticePeriodStart } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
     const { DataGrid } = await server.ssrLoadModule('/src/components/DataGrid.jsx')
     assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
     assert.ok(renderToStaticMarkup(createElement(CategoryBadge, { value: 'Game - Away' })).includes('>Game - Away</span>'))
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL', offPlay: 'GAMECOCKS LEFT', defFront: '4-2-5', defCoverage: 'C2' }), 'ACE HAIL GAMECOCKS LEFT vs 4-2-5 C2')
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL' }), 'ACE HAIL')
     assert.deepEqual(ACTIVITY_GROUPS, ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE'])
+    assert.equal(practiceSheetDateLabel('2026-11-18'), new Date('2026-11-18T00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))
+    assert.equal(practiceSheetTimeLabel('15:40'), new Date(2000, 0, 1, 15, 40).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+    assert.equal(defaultPracticePeriodStart('15:40'), '15:40')
+    assert.equal(defaultPracticePeriodStart('15:40:00'), '15:40')
+    assert.equal(defaultPracticePeriodStart(''), '15:30')
     assert.equal(summarizePracticeActivities([{ group: 'QB', name: 'Team Period', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }, { group: 'QB', name: 'Dropback' }]), 'Team: Dynamic\nQB: Team Period (Smith), Dropback')
     assert.equal(summarizePracticeActivities([]), '—')
     assert.deepEqual(groupPracticeActivities([{ group: 'QB', name: 'Dropback', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }]), [
@@ -138,11 +143,20 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(createPracticeDialog.includes('Uppers'))
     assert.ok(createPracticeDialog.includes('Helmets'))
     const editPracticeDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
-      initialEvent: { id: 'practice-id', kind: 'event', eventType: 'Practice', name: 'Practice', eventDate: '2026-11-10', dress: 'Half Pads' },
+      initialEvent: { id: 'practice-id', kind: 'event', eventType: 'Practice', name: 'Practice', eventDate: '2026-11-10', dress: 'Half Pads', gamePlanIds: ['game-id'] },
       canEdit: true, canCreateGame: false, canDelete: false, onCancel: () => {}, onSave: () => {},
     }))
     assert.ok(!editPracticeDialog.includes('Generate Practice Script?'))
+    assert.ok(editPracticeDialog.includes('Related Game'))
+    assert.ok(editPracticeDialog.includes('<option value="game-id" selected="">Current linked game</option>'))
     assert.ok(editPracticeDialog.includes('<option value="Half Pads" selected="">Half Pads</option>'))
+    const editOtherDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
+      initialEvent: { id: 'other-id', kind: 'event', eventType: 'Other', name: 'Team Activity', eventDate: '2026-11-10', gamePlanIds: ['game-id'] },
+      canEdit: true, canCreateGame: false, canDelete: false, onCancel: () => {}, onSave: () => {},
+    }))
+    assert.ok(editOtherDialog.includes('Related Game'))
+    assert.ok(editOtherDialog.includes('<option value="game-id" selected="">Current linked game</option>'))
+    assert.ok(!editOtherDialog.includes('Generate Practice Script?'))
     assert.deepEqual(duplicateScheduleEventPayload({
       id: 'event-1', name: 'Film Review', eventType: 'Film Review', eventDate: '2026-11-12',
       startTime: '15:30', endTime: '16:00', location: 'Film Room', notes: 'Third down', gamePlanIds: ['game-1'],
