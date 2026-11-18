@@ -3,6 +3,7 @@ import logging
 import os
 import secrets
 import hashlib
+import re
 import threading
 from functools import wraps
 from contextlib import contextmanager
@@ -61,6 +62,31 @@ def with_record_status(entity_type, record):
 def validate_record_status(entity_type, payload):
     if entity_type in STATUS_TYPES and "recordStatus" in payload and payload["recordStatus"] not in ("Active", "Archived"):
         raise accounts.AccountError("VALIDATION_ERROR", "recordStatus must be Active or Archived")
+
+
+def validate_game_plan_result(result, game_date):
+    if not isinstance(result, str):
+        raise accounts.AccountError("VALIDATION_ERROR", "Result must be a string")
+    try:
+        parsed_date = datetime.strptime(game_date or "", "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        raise accounts.AccountError("VALIDATION_ERROR", "A valid Game Date is required for a Result") from None
+    if parsed_date.isoformat() != game_date:
+        raise accounts.AccountError("VALIDATION_ERROR", "A valid Game Date is required for a Result")
+    if parsed_date >= datetime.now(timezone.utc).date():
+        raise accounts.AccountError("VALIDATION_ERROR", "Result can only be updated after the game date")
+    if not result:
+        return
+    match = re.fullmatch(r"([WLT]) (\d{2})-(\d{2})", result)
+    if not match:
+        raise accounts.AccountError("VALIDATION_ERROR", "Result must use the format W 37-12")
+    high_score, low_score = int(match[2]), int(match[3])
+    if high_score < low_score:
+        raise accounts.AccountError("VALIDATION_ERROR", "The higher score must be first")
+    if match[1] == "T" and high_score != low_score:
+        raise accounts.AccountError("VALIDATION_ERROR", "Tie scores must match")
+    if match[1] != "T" and high_score == low_score:
+        raise accounts.AccountError("VALIDATION_ERROR", "Use T when scores are tied")
 
 
 def schedule_range(req):
@@ -519,6 +545,8 @@ def validate_preparation_links(entity_type, record):
 
 def create_record(entity_type, payload, owner_id, parent_id=None):
     validate_record_status(entity_type, payload)
+    if entity_type == "gamePlans" and "result" in payload:
+        validate_game_plan_result(payload["result"], payload.get("gameDate"))
     validate_preparation_links(entity_type, payload)
     payload = {key: value for key, value in payload.items() if key not in {"_etag", "_rid", "_self", "_ts", "_attachments"}}
     if entity_type in {"playbooks", "scoutPlays"}:
@@ -546,6 +574,8 @@ def update_record(entity_type, item_id, payload):
     record = storage.get(entity_type, item_id)
     if record is None:
         return None
+    if entity_type == "gamePlans" and "result" in payload:
+        validate_game_plan_result(payload["result"], payload.get("gameDate", record.get("gameDate")))
     validate_preparation_links(entity_type, {**record, **payload})
     if entity_type in {"plays", "scoutPlays"}:
         expected_etag = payload.get("_etag")
@@ -603,26 +633,36 @@ def api(req: func.HttpRequest) -> func.HttpResponse:
     if search_request and (not isinstance(search_term, (str, type(None))) or len(search_term or "") > SEARCH_MAX_LENGTH):
         return response({"error": {"code": "VALIDATION_ERROR", "message": f"Search text must be at most {SEARCH_MAX_LENGTH} characters"}}, 400)
     try:
-        with storage.guard("user:" + user["userId"]):
-            if search_request:
+        accounts.ensure_user(storage, user)
+        accounts.bootstrap_configured_alpha_owner(storage, user)
+        if search_request:
+            with storage.guard("user:" + user["userId"]):
                 limited = check_search_rate(user["userId"])
                 if limited is not None:
                     return limited
-            accounts.ensure_user(storage, user)
-        accounts.bootstrap_configured_alpha_owner(storage, user)
         global_route = path[0] in {"me", "workspaces", "invitations"}
         if global_route:
+            if req.method == "GET":
+                return dispatch(req, user, None, None)
             with storage.guard("user:" + user["userId"]):
                 return dispatch(req, user, None, None)
         workspace, role = accounts.select_workspace(storage, user, req.headers.get("X-Workspace-Id"))
         token = request_workspace.set(workspace)
         try:
-            with storage.guard(workspace["id"]):
-                workspace, role = accounts.select_workspace(storage, user, req.headers.get("X-Workspace-Id"))
-                request_workspace.set(workspace)
-                if path[0] in {"playbooks", "game-plans", "schedule-events", "search", "exports", "workspace"}:
-                    accounts.enter_workspace(storage, workspace)
-                return dispatch(req, user, workspace, role)
+            enter_workspace_routes = {"playbooks", "game-plans", "schedule-events", "search", "exports", "workspace"}
+            needs_trial_start = (
+                path[0] in enter_workspace_routes
+                and workspace.get("subscription", {}).get("status") == "trialing"
+                and not workspace.get("subscription", {}).get("trialStartedAt")
+            )
+            if req.method != "GET" or needs_trial_start:
+                with storage.guard(workspace["id"]):
+                    workspace, role = accounts.select_workspace(storage, user, req.headers.get("X-Workspace-Id"))
+                    request_workspace.set(workspace)
+                    if path[0] in enter_workspace_routes:
+                        accounts.enter_workspace(storage, workspace)
+                    return dispatch(req, user, workspace, role)
+            return dispatch(req, user, workspace, role)
         finally:
             request_workspace.reset(token)
     except accounts.AccountError as error:
@@ -813,7 +853,7 @@ def dispatch(req, user, workspace, role):
         if method == "GET":
             bounds = schedule_range(req)
             if req.params.get("scheduleSummary") == "true":
-                fields = ("id", "name", "opponent", "gameDate", "startTime", "gameSite", "location", "recordStatus", "workspaceId", "ownerId")
+                fields = ("id", "name", "opponent", "gameDate", "startTime", "gameSite", "location", "result", "recordStatus", "workspaceId", "ownerId")
                 return response({"items": storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, fields=fields, **bounds)})
             records = storage.list("gamePlans", category=req.params.get("category"), name_prefix=req.params.get("namePrefix"), owner_id=owner_id, **bounds)
             items = [with_owner_name(with_child_count(record, "scoutPlays", owner_id)) for record in records]

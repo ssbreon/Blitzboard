@@ -547,6 +547,14 @@ class AuthenticationTests(unittest.TestCase):
     def setUp(self):
         function_app.storage = function_app.Storage()
 
+    def test_regular_workspace_get_does_not_require_distributed_lock(self):
+        response_json(call_api("GET", "me", "local-coach"))
+        with patch.object(function_app.storage, "guard", side_effect=function_app.accounts.AccountError(
+            "WORKSPACE_BUSY", "Another workspace operation is in progress; retry shortly", 409
+        )):
+            result = call_api("GET", "playbooks", "local-coach")
+        self.assertEqual(result.status_code, 200)
+
     def test_game_records_ignore_retired_workflow_status(self):
         game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
         for path, extra in (("playbooks", {"gamePlanId": game["id"], "gameCardId": "offense-installs"}),
@@ -562,6 +570,30 @@ class AuthenticationTests(unittest.TestCase):
             self.assertNotIn("workflowStatus", response_json(updated))
             archived = call_api("PATCH", record_path, "local-coach", {"recordStatus": "Archived", "_etag": response_json(updated).get("_etag")})
             self.assertEqual(response_json(archived)["recordStatus"], "Archived")
+
+    def test_game_plan_results_require_valid_scores_and_a_past_game_date(self):
+        today = function_app.datetime.now(function_app.timezone.utc).date()
+        past_date = (today - timedelta(days=1)).isoformat()
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons", "gameDate": past_date}))
+        path = f"game-plans/{game['id']}"
+
+        for result in ("w 37-12", "W 12-37", "T 14-13", "W 17-17", "X 37-12", "W 100-12"):
+            with self.subTest(result=result):
+                response = call_api("PATCH", path, "local-coach", {"result": result})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response_json(response)["error"]["code"], "VALIDATION_ERROR")
+
+        for result in ("W 37-12", "L 36-22", "T 14-14"):
+            with self.subTest(valid_result=result):
+                response = call_api("PATCH", path, "local-coach", {"result": result})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response_json(response)["result"], result)
+
+        for game_date in (today.isoformat(), (today + timedelta(days=1)).isoformat()):
+            dated_game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Future", "gameDate": game_date}))
+            response = call_api("PATCH", f"game-plans/{dated_game['id']}", "local-coach", {"result": "W 37-12"})
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response_json(response)["error"]["code"], "VALIDATION_ERROR")
 
     def test_preparation_links_validate_workspace_and_preserve_scripts(self):
         game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
@@ -610,7 +642,7 @@ class AuthenticationTests(unittest.TestCase):
                 self.assertEqual(response_json(result)["error"]["code"], "VALIDATION_ERROR")
 
     def test_schedule_summary_omits_expanded_data_and_child_queries(self):
-        for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {"opponent": "Falcons"})):
+        for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {"opponent": "Falcons", "result": "W 37-12"})):
             call_api("POST", path, "local-coach", {"name": "Summary", date_field: "2026-01-15", "startTime": "16:30", "location": "Main Stadium", "notes": "Large notes", "installPlaybookIds": ["book"], **extra})
             request = FakeRequest("GET", path, "local-coach")
             request.params = {"start": "2026-01-01", "end": "2026-12-31", "scheduleSummary": "true"}
@@ -622,6 +654,7 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(record["startTime"], "16:30")
             if path == "game-plans":
                 self.assertEqual(record["location"], "Main Stadium")
+                self.assertEqual(record["result"], "W 37-12")
             self.assertNotIn("notes", record)
             self.assertNotIn("installPlaybookIds", record)
             self.assertIn("ownerId", record)

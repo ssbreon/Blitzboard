@@ -116,11 +116,12 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(!workspaceMarkup.includes('>Install</button>'))
     assert.ok(!workspaceMarkup.includes('82%'))
     const gamePlanHeader = renderToStaticMarkup(createElement(GamePlanHeader, {
-      game: { opponent: 'Falcons', gameDate: '2026-11-13', gameSite: 'Away', location: 'Stadium' },
+      game: { opponent: 'Falcons', gameDate: '2020-11-13', gameSite: 'Away', location: 'Stadium', result: 'W 37-12' },
       onBack: () => {},
     }))
     assert.ok(gamePlanHeader.includes('gp-header'))
     assert.ok(gamePlanHeader.includes('@ Falcons'))
+    assert.ok(gamePlanHeader.includes('W 37-12'))
     assert.ok(gamePlanHeader.includes('Back to Game Plan'))
     const createPracticeDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
       api: {}, initialDate: '2026-11-10', canEdit: true, canCreateGame: false, canDelete: false,
@@ -206,7 +207,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
       { id: 'practice', kind: 'event', eventType: 'Practice', name: 'Practice <test>', startTime: '16:30', notes: 'Bring indoor shoes' },
       { id: 'film-review', kind: 'event', eventType: 'Film Review', name: 'Film Review', notes: 'Review red-zone coverage' },
       { id: 'other', kind: 'event', eventType: 'Other', name: 'Team Activity', notes: 'Bring equipment' },
-      { id: 'game', kind: 'game', eventType: 'Game', opponent: 'Northern York', name: 'Game vs. Northern York', startTime: '19:00', location: 'North Gym' },
+      { id: 'game', kind: 'game', eventType: 'Game', opponent: 'Northern York', name: 'Game vs. Northern York', startTime: '19:00', location: 'North Gym', result: 'W 37-12' },
     ]]])
     const month = renderToStaticMarkup(createElement(MonthCalendar, { month: january, eventsByDate, showHeading: true, highlightCurrent: true, canEdit: true }))
     assert.ok(month.includes('schedule-centered-month'))
@@ -217,6 +218,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(month.includes('class="schedule-event-notes" title="Bring equipment">Bring equipment</span>'))
     assert.ok(month.includes('vs. Northern York'))
     assert.ok(month.includes('class="schedule-event-location" title="North Gym">North Gym</span>'))
+    assert.ok(month.includes('class="schedule-game-result is-win">W 37-12</span>'))
     assert.ok(month.includes('Drag Northern York'))
     assert.ok(month.includes('Add event 2026-01-15'))
     const year = renderToStaticMarkup(createElement(YearCalendar, { date: january, eventsByDate }))

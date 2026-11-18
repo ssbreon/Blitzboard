@@ -55,6 +55,7 @@ const gameEventLabel = (event) => {
   if (!opponent) return 'Game'
   return `${event.gameSite === 'Away' ? '@' : 'vs.'} ${opponent}`
 }
+const gameResultClass = (result) => `schedule-game-result${result?.startsWith('W ') ? ' is-win' : result?.startsWith('L ') ? ' is-loss' : result?.startsWith('T ') ? ' is-tie' : ''}`
 const calendarTime = (event) => {
   const value = eventTime(event)
   const match = /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(value)
@@ -69,6 +70,7 @@ const scheduleGridColumns = [
   { key: 'eventDate', header: 'Date', render: (value) => value ? parseDate(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
   { key: 'startTime', header: 'Time', render: (value) => value ? calendarTime({ startTime: value }) : '—' },
   { key: 'name', header: 'Event', render: (value, event) => event.kind === 'game' ? gameEventLabel(event) : value },
+  { key: 'result', header: 'Result', render: (value, event) => event.kind === 'game' && value ? <span className={gameResultClass(value)}>{value}</span> : '—' },
   { key: 'eventType', header: 'Type', render: (value, event) => renderCategoryBadge(event.kind === 'game' && event.gameSite ? `${value} - ${event.gameSite}` : value) },
   { key: 'location', header: 'Location', render: (value) => value || '—' },
   { key: 'notes', header: 'Notes', render: (value) => value || '—' },
@@ -163,22 +165,24 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
           {eventType === 'Practice' && <label className="schedule-field"><span>Dress</span><select value={dress} onChange={(event) => setDress(event.target.value)} disabled={!canEdit || saving}><option value="">Select dress</option>{PRACTICE_DRESSES.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>}
           {!isGame && <label className="schedule-field"><span>Notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows="3" disabled={!canEdit || saving} />
           </label>}
-          {!isGame && !initialEvent && <label className="schedule-field">
-            <span>Related Game</span>
-            <select value={relatedGameId} onChange={(event) => setRelatedGameId(event.target.value)} disabled={!canEdit || saving || loadingRelatedGames}>
-              <option value="">{loadingRelatedGames ? 'Loading games...' : 'No related game'}</option>
-              {relatedGames.map((game) => <option key={game.id} value={game.id}>{parseDate(game.gameDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {gameOpponent(game) || 'Game'}</option>)}
-            </select>
-          </label>}
-          {!initialEvent && eventType === 'Practice' && <label className="schedule-field">
-            <span>Generate Practice Script?</span>
-            <select value={practiceScriptUnit} onChange={(event) => setPracticeScriptUnit(event.target.value)} disabled={!canEdit || saving}>
-              <option value="No">No</option>
-              <option value="Offense">Offense (Scout Defense)</option>
-              <option value="Defense">Defense (Scout Offense)</option>
-              <option value="Special Teams">Special Teams</option>
-            </select>
-          </label>}
+          {!isGame && !initialEvent && <div className={`schedule-field-row${eventType === 'Practice' ? ' schedule-practice-options' : ''}`}>
+            <label className="schedule-field">
+              <span>Related Game</span>
+              <select value={relatedGameId} onChange={(event) => setRelatedGameId(event.target.value)} disabled={!canEdit || saving || loadingRelatedGames}>
+                <option value="">{loadingRelatedGames ? 'Loading games...' : 'No related game'}</option>
+                {relatedGames.map((game) => <option key={game.id} value={game.id}>{parseDate(game.gameDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - {gameOpponent(game) || 'Game'}</option>)}
+              </select>
+            </label>
+            {eventType === 'Practice' && <label className="schedule-field">
+              <span>Generate Practice Script?</span>
+              <select value={practiceScriptUnit} onChange={(event) => setPracticeScriptUnit(event.target.value)} disabled={!canEdit || saving}>
+                <option value="No">No</option>
+                <option value="Offense">Offense (Scout Defense)</option>
+                <option value="Defense">Defense (Scout Offense)</option>
+                <option value="Special Teams">Special Teams</option>
+              </select>
+            </label>}
+          </div>}
           <ErrorDialog error={error} message="We couldn't save this event. Your changes are still here so you can try again." />
         </div>
         <footer className="schedule-dialog-actions">
@@ -199,7 +203,7 @@ function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onCont
   const isMoving = movingEventKey === eventKey
   return <div className={eventClass} onContextMenu={(contextEvent) => onContextMenu(contextEvent, event)}>
     <button type="button" className="schedule-event-content" onClick={() => onOpenEvent(event)} title={`${calendarTime(event)} ${event.name}`}>
-      {event.kind === 'game' ? <>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-details"><span className="schedule-event-label"><span className="schedule-football" aria-hidden="true">🏈</span><span className="schedule-event-name">{gameEventLabel(event)}</span></span>{event.location?.trim() && <span className="schedule-event-location" title={event.location}>{event.location}</span>}</span></> : <>{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}{showNotes ? <span className="schedule-event-details"><span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>{event.notes?.trim() && <span className="schedule-event-notes" title={event.notes}>{event.notes}</span>}</span> : <span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>}</>}
+      {event.kind === 'game' ? <>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-details"><span className="schedule-event-label"><span className="schedule-football" aria-hidden="true">🏈</span><span className="schedule-event-name">{gameEventLabel(event)}</span></span>{event.location?.trim() && <span className="schedule-event-location" title={event.location}>{event.location}</span>}{event.result && <span className={gameResultClass(event.result)}>{event.result}</span>}</span></> : <>{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}{showNotes ? <span className="schedule-event-details"><span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>{event.notes?.trim() && <span className="schedule-event-notes" title={event.notes}>{event.notes}</span>}</span> : <span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>}</>}
     </button>
     {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
       dragEvent.dataTransfer.effectAllowed = 'move'

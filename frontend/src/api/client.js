@@ -145,7 +145,7 @@ const scheduleQuery = (range, query = '') => {
 async function sendRequest(path, options = {}, workspaceId) {
   const { headers = {}, ...fetchOptions } = options
   const method = fetchOptions.method || 'GET'
-  const retryDelays = [100, 250]
+  const retryDelays = [100, 250, 500, 1000, 2000, 4000]
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(`${baseUrl}/api${path}`, {
       ...fetchOptions,
@@ -154,7 +154,8 @@ async function sendRequest(path, options = {}, workspaceId) {
     if (!response.ok) {
       const detail = await response.json().catch(() => ({}))
       if (method === 'GET' && detail.error?.code === 'WORKSPACE_BUSY' && attempt < retryDelays.length) {
-        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt]))
+        const jitter = Math.floor(Math.random() * 100)
+        await new Promise((resolve) => setTimeout(resolve, retryDelays[attempt] + jitter))
         continue
       }
       const error = new Error(detail.error?.message || `Request failed with ${response.status}`)

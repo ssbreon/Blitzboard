@@ -1,13 +1,19 @@
 .practice-sheet { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; color: var(--text-h); background: whitesmoke; text-align: left; }
-.practice-sheet-header { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: flex-end; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--form-border); background-image: linear-gradient(rgba(10, 25, 47, .42), rgba(10, 25, 47, .42)), linear-gradient(#0A192F, #0A192F), url('/football_practice.png'); background-blend-mode: multiply, color, normal; background-position: center; background-size: cover; color: #fff; }
+.practice-sheet-header { box-sizing: border-box; display: grid; flex: 0 0 auto; min-height: 160px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--form-border); background-image: linear-gradient(rgba(10, 25, 47, .42), rgba(10, 25, 47, .42)), linear-gradient(#0A192F, #0A192F), url('/football_practice.png'); background-blend-mode: multiply, color, normal; background-position: center; background-size: cover; color: #fff; }
+.practice-sheet-header-details { min-width: 0; }
+.practice-sheet-header-meta-overlay { display: inline-flex; max-width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px; background: rgba(4, 13, 26, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .practice-sheet-header h1 { margin: 3px 0 8px; font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; letter-spacing: 0; color: #fff; }
 .practice-sheet-eyebrow { margin: 0; color: #e5edf5; font-size: 12px; font-weight: 700; text-transform: uppercase; }
-.practice-sheet-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; color: #e5edf5; font-size: 14px; }
-.practice-sheet-dress { display: flex; align-items: baseline; gap: 8px; margin: 8px 0 0; color: #e5edf5; font-size: 14px; }
+.practice-sheet-meta { display: flex; width: fit-content; max-width: 100%; align-items: center; flex-wrap: wrap; gap: 6px; margin: 0; color: #e5edf5; font-size: 14px; }
+.practice-sheet-dress-row { display: flex; width: fit-content; max-width: 100%; align-items: baseline; gap: 20px; min-width: 0; }
+.practice-sheet-dress { display: flex; flex: none; align-items: baseline; gap: 8px; margin: 0; color: #e5edf5; font-size: 14px; }
 .practice-sheet-dress strong { color: #fff; }
 .practice-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 700px) { .practice-sheet-header { grid-template-columns: minmax(0, 1fr); } .practice-sheet-actions { justify-self: end; } }
 .practice-sheet-content { flex: 1; min-width: 0; min-height: 0; width: 100%; padding: 6px; overflow: auto; box-sizing: border-box; }
-.practice-sheet-event-notes { margin: 0 0 20px; color: var(--text); white-space: pre-wrap; }
+.practice-sheet-event-notes { display: flex; flex: 0 1 auto; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; color: #e5edf5; font-size: 14px; white-space: nowrap; }
+.practice-sheet-event-notes strong { flex: none; color: #fff; }
+.practice-sheet-event-notes span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .practice-sheet-section-heading { display: flex; justify-content: flex-start; align-items: center; gap: 12px; margin-bottom: 14px; }
 .practice-sheet-section-heading h2 { display: inline; margin: 0 12px 0 0; font-size: 20px; }
 .practice-sheet-section-heading span, .practice-sheet-empty { color: var(--text); font-size: 13px; }

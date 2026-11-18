@@ -2136,6 +2136,34 @@ html.is-drilling-through * {
   }
 }
 
+.dialog-field input.game-result-input.is-win {
+  border-color: #176b39;
+  background: #f0fdf4;
+  color: #176b39;
+}
+
+.dialog-field input.game-result-input.is-loss {
+  border-color: #b42318;
+  background: #fef2f2;
+  color: #b42318;
+}
+
+.dialog-field input.game-result-input.is-tie {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.dialog-field .game-result-help {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.dialog-field .game-result-help.is-error {
+  color: #b42318;
+}
+
 .dialog-checkbox {
   flex-direction: row;
   align-items: center;
@@ -5845,6 +5873,20 @@ html.is-drilling-through * {
   font-size: 12px;
 }
 
+.schedule-game-result {
+  display: block;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.schedule-game-result.is-win { color: #176b39; }
+.schedule-game-result.is-loss { color: #b42318; }
+.schedule-game-result.is-tie { color: #1d4ed8; }
+.schedule-event-game .schedule-game-result { min-width: 0; overflow: hidden; padding-left: 18px; font-size: 11px; line-height: 1.2; text-overflow: ellipsis; }
+.schedule-event-game .schedule-game-result.is-win { color: #86efac; }
+.schedule-event-game .schedule-game-result.is-loss { color: #fca5a5; }
+.schedule-event-game .schedule-game-result.is-tie { color: #93c5fd; }
+
 @container (max-width: 180px) {
   .schedule-event-content {
     align-items: flex-start;
@@ -6012,6 +6054,12 @@ html.is-drilling-through * {
   gap: 10px;
 }
 
+.schedule-field-row.schedule-practice-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .schedule-dialog-actions {
   justify-content: flex-end;
   padding: 12px 18px;
@@ -6025,6 +6073,12 @@ html.is-drilling-through * {
 .schedule-error {
   color: #b42318;
   font-size: 13px;
+}
+
+@media (max-width: 440px) {
+  .schedule-field-row.schedule-practice-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .schedule-game-dialog {

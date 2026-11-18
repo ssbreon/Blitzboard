@@ -194,10 +194,32 @@ def new_subscription(kind, fixture=False):
 def ensure_user(storage, identity):
     user_id = identity["userId"]
     profile = storage.get("profiles", user_id)
+    initialized = False
+    if profile is not None:
+        email_needs_update = not profile.get("email") and bool(identity.get("email"))
+        verified_email = bool(profile.get("email")) and identity.get("emailVerified") is True and identity.get("email", "").casefold() == profile["email"]
+        initialized = not email_needs_update and profile.get("emailVerified") is verified_email
+    if initialized and os.getenv("AUTH_MODE", "").lower() != "entra":
+        workspace_id = personal_id(user_id)
+        initialized = storage.get("workspaces", workspace_id) is not None and storage.get("memberships", membership_id(user_id, workspace_id)) is not None
+        fixture = is_mock() and user_id == os.getenv("DEV_USER_ID", "local-coach")
+        demo_plan = {"local-demo-free": "free", "local-demo-individual": "individual", "local-demo-team": "team"}.get(user_id) if is_mock() and os.getenv("AUTH_MODE") == "development" else None
+        if initialized and (fixture or demo_plan == "team"):
+            team_id = "local-team-" + hashlib.sha256(user_id.encode()).hexdigest()[:24]
+            initialized = storage.get("workspaces", team_id) is not None and storage.get("memberships", membership_id(user_id, team_id)) is not None
+    if initialized:
+        return profile
+    with storage.guard("user:" + user_id):
+        return _ensure_user_records(storage, identity)
+
+
+def _ensure_user_records(storage, identity):
+    user_id = identity["userId"]
+    profile = storage.get("profiles", user_id)
     if profile is None:
         profile = storage.save("profiles", {
             "id": user_id, "name": identity["name"], "email": identity.get("email", ""),
-            "emailVerified": identity.get("emailVerified") is True,
+            "emailVerified": bool(identity.get("email")) and identity.get("emailVerified") is True,
             "coachingTitle": "", "preferences": dict(DEFAULT_PREFERENCES),
         })
     else:

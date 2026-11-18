@@ -103,6 +103,23 @@ function gameBreadcrumbLabel(game) {
   return `Game vs. ${opponent}${date ? ` - ${date}` : ''}`
 }
 
+function localDateKey() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function gameResultValidationError(value) {
+  if (!value) return ''
+  const match = /^([WLT]) (\d{2})-(\d{2})$/.exec(value)
+  if (!match) return 'Use the format W 37-12.'
+  const highScore = Number(match[2])
+  const lowScore = Number(match[3])
+  if (highScore < lowScore) return 'Enter the higher score first.'
+  if (match[1] === 'T' && highScore !== lowScore) return 'Tie scores must match.'
+  if (match[1] !== 'T' && highScore === lowScore) return 'Use T when scores are tied.'
+  return ''
+}
+
 const ROOT_VIEWS = ['playbooks', 'teamSchedule']
 
 function readStoredBreadcrumb(key) {
@@ -445,7 +462,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -469,6 +486,9 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
   const [draftStartTime, setDraftStartTime] = useState(startTime)
   const [draftGameSite, setDraftGameSite] = useState(gameSite)
   const [draftLocation, setDraftLocation] = useState(location)
+  const [draftResult, setDraftResult] = useState(typeof parentRecord.result === 'string' ? parentRecord.result : '')
+  const canEditResult = isGamePlan && Boolean(draftGameDate) && draftGameDate < localDateKey()
+  const resultValidationError = gameResultValidationError(draftResult.trim())
   const [playbooks, setPlaybooks] = useState([])
   const [playbooksLoading, setPlaybooksLoading] = useState(isGamePlan || installMode)
   const [playbooksError, setPlaybooksError] = useState(null)
@@ -678,7 +698,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
 
   async function handleSettingsSave(event) {
     event.preventDefault()
-    if (!draftName.trim() || readOnly || saving || busy) return
+    if (!draftName.trim() || readOnly || saving || busy || (canEditResult && resultValidationError)) return
     setSaving(true)
     setError(null)
     try {
@@ -689,6 +709,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         payload.startTime = draftStartTime
         if (draftGameSite) payload.gameSite = draftGameSite
         payload.location = draftLocation.trim()
+        if (canEditResult) payload.result = draftResult.trim()
       } else {
         payload.category = draftCategory
       }
@@ -702,6 +723,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         setStartTime(updated.startTime ?? draftStartTime)
         setGameSite(updated.gameSite ?? gameSite)
         setLocation(updated.location ?? draftLocation.trim())
+        if (canEditResult) setDraftResult(updated.result ?? draftResult.trim())
       }
       onParentUpdated(updated)
       closeSettings()
@@ -734,6 +756,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
     setDraftStartTime(startTime)
     setDraftGameSite(gameSite)
     setDraftLocation(location)
+    setDraftResult(typeof parentRecord.result === 'string' ? parentRecord.result : '')
     setSettingsOpen(true)
   }
 
@@ -822,6 +845,23 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
                     <input type="time" value={draftStartTime} onChange={(event) => setDraftStartTime(event.target.value)} />
                   </label>
                 </div>
+                <label className="dialog-field">
+                  <span>Result</span>
+                  <input
+                    className={`game-result-input${draftResult.startsWith('W ') ? ' is-win' : draftResult.startsWith('L ') ? ' is-loss' : draftResult.startsWith('T ') ? ' is-tie' : ''}`}
+                    type="text"
+                    value={draftResult}
+                    onChange={(event) => setDraftResult(event.target.value.toUpperCase())}
+                    placeholder={canEditResult ? 'W 37-12' : 'Available after game date'}
+                    maxLength={7}
+                    disabled={!canEditResult || readOnly || saving || busy}
+                    aria-describedby="game-result-help"
+                    aria-invalid={Boolean(canEditResult && resultValidationError)}
+                  />
+                  <span id="game-result-help" className={`game-result-help${canEditResult && resultValidationError ? ' is-error' : ''}`}>
+                    {!canEditResult ? 'Editable the day after the game.' : resultValidationError || 'Higher score first; tie scores must match.'}
+                  </span>
+                </label>
               </>
             )}
             <ErrorDialog error={error} message="We couldn't save your settings. Your changes are still here so you can try again." />
@@ -829,21 +869,24 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
               <button type="button" className="dialog-cancel" disabled={saving} onClick={closeSettings}>
                 Cancel
               </button>
-              <button type="submit" className="dialog-create" disabled={readOnly || saving || busy || !draftName.trim()}><Save size={16} aria-hidden="true" />
+              <button type="submit" className="dialog-create" disabled={readOnly || saving || busy || !draftName.trim() || (canEditResult && resultValidationError)}><Save size={16} aria-hidden="true" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </form>
         </div>
       )}
-      {isGamePlan && !gameCard ? <GamePlanWorkspace
+      {isGamePlan && !gameCard ? <>
+        {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={onAffiliateUpgrade} />}
+        <GamePlanWorkspace
         api={api} game={parentRecord} reloadToken={reloadToken} readOnly={readOnly} cards={GAME_CARD_VIEWS}
         canCreate={canAddGameCardItem} canDuplicate={canDuplicateGameCardItem} canDelete={canDeleteGameCardItem}
         onAdd={onAddGameCardItem} onOpen={onOpenGameCardItem} onSlideshow={onSlideshow}
         onDuplicate={onDuplicateGameCardItem} onDelete={onDeleteGameCardItem}
         onNewReport={onNew} onOpenReport={onOpenPlay} reportActions={rowActions}
         practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} practiceSheetRevisionToken={practiceSheetRevisionToken}
-      /> : <>
+        />
+      </> : <>
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
       {isGamePlan && gameTab === 'installs' ? <section className="schedule-install-page">
         <header><h2>{gameCard?.title || `${selectedUnit} - Installs`}</h2><p>Select plays from your <strong>Playbooks</strong> to install for this game.</p></header>
@@ -1974,6 +2017,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentLabel="Game"
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
+          showAffiliateRecommendations={workspace.subscription.kind === 'free'}
+          onAffiliateUpgrade={() => setAccountDialog('billing')}
           breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           openSettingsOnMount={parentSettingsRequestId === parent.id}
           onSettingsClosed={() => setParentSettingsRequestId(null)}

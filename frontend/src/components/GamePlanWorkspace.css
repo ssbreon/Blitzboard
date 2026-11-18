@@ -1,10 +1,15 @@
 .gp-workspace { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; padding: 0 0; color: var(--text-h); text-align: left; letter-spacing: 0; background-color: var(--form-bg); }
 .gp-workspace-overview { overflow: hidden; }
 .gp-workspace button, .gp-workspace select { font: inherit; }
-.gp-header { display: flex; justify-content: space-between; gap: 24px; align-items: center; padding: 26px 24px; border-bottom: 1px solid var(--form-border); background: linear-gradient(rgba(0, 0, 0, .32), rgba(0, 0, 0, .32)), url('/friday_night_lights_banner_v2.png') center / cover; color: #fff; }
-.gp-header h1 { font-size: 30px; line-height: 1.2; margin: 5px 0 12px; overflow-wrap: anywhere; letter-spacing: 0; color: #fff; }
+.gp-header { box-sizing: border-box; display: flex; min-height: 160px; justify-content: space-between; gap: 20px; align-items: center; padding: 22px 24px; border-bottom: 1px solid var(--form-border); background: linear-gradient(rgba(0, 0, 0, .32), rgba(0, 0, 0, .32)), url('/friday_night_lights_banner_v2.png') center / cover; color: #fff; }
+.gp-header-info-overlay { display: inline-flex; max-width: 100%; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px; background: rgba(4, 13, 26, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.gp-header h1 { font-size: 26px; line-height: 1.2; margin: 3px 0 8px; overflow-wrap: anywhere; letter-spacing: 0; color: #fff; }
 .gp-header .gp-eyebrow, .gp-header .gp-game-details { color: #e5edf5; }
 .gp-header .gp-countdown { color: #fff; }
+.gp-header .gp-result { font-weight: 700; }
+.gp-header .gp-result-w { color: #86efac; }
+.gp-header .gp-result-l { color: #fca5a5; }
+.gp-header .gp-result-t { color: #93c5fd; }
 .gp-header .schedule-primary-button:focus-visible { outline-color: #fff; }
 .gp-back-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 36px; padding: 8px 11px; border: 1px solid rgba(255, 255, 255, .75); border-radius: 4px; background: rgba(0, 0, 0, .35); color: #fff; font-size: 13px !important; font-weight: 650; cursor: pointer; }
 .gp-back-button:hover { background: rgba(0, 0, 0, .55); }
@@ -53,7 +58,6 @@
   .gp-overview-sidebar { overflow: visible; border-left: 0; border-top: 4px solid var(--navy-light); padding: 16px; }
   .gp-summary-toolbar-content { align-items: flex-start; }
   .gp-summary-section { min-height: 320px; }
-  .gp-header { align-items: start; flex-direction: column; gap: 16px; padding: 20px 16px; }
-  .gp-header h1 { font-size: 26px; }
+  .gp-header { align-items: start; flex-direction: column; gap: 16px; padding: 18px 16px; }
   .gp-header-right { justify-items: start; width: 100%; gap: 12px; }
 }
