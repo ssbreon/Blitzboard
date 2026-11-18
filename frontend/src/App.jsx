@@ -71,7 +71,7 @@ const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
   { key: 'template', header: 'Formation', render: (value) => findPlayTemplate(value)?.label || value || '—' },
   { key: 'category', header: 'Category' },
-  { key: 'preview', header: 'Plays', render: (_, play) => <div className="schedule-grid-play-preview" role="img" aria-label={`${play.name} play diagram`}><PlayFieldView play={play} /></div> },
+  { key: 'preview', header: 'Plays', render: (_, play) => <div className="schedule-grid-play-preview" role="img" aria-label={`${play.name} play diagram`}><PlayFieldView play={play} thumbnail /></div> },
 ]
 
 async function withAdjustmentTitles(api, playbookId, rows) {
@@ -884,7 +884,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
                   { key: 'tags', header: 'Tags', render: (_, play) => playTags(play).join(', ') || '—' },
                   { key: 'install', header: 'Add to Install', render: (_, play) => {
                     const selected = selectedInstallPlays.some((item) => item.playbookId === activePlaybookId && item.playId === play.id)
-                    return <button type="button" className={`schedule-install-add${selected ? ' is-selected' : ''}`} aria-label={`${selected ? 'Remove' : 'Add'} ${play.name} ${selected ? 'from' : 'to'} install`} aria-pressed={selected} onDoubleClick={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); toggleInstallPlay(play) }}><span className="schedule-install-add-preview"><PlayFieldView play={play} /></span><span className="schedule-install-add-state">{selected ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}</span></button>
+                    return <button type="button" className={`schedule-install-add${selected ? ' is-selected' : ''}`} aria-label={`${selected ? 'Remove' : 'Add'} ${play.name} ${selected ? 'from' : 'to'} install`} aria-pressed={selected} onDoubleClick={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); toggleInstallPlay(play) }}><span className="schedule-install-add-preview"><PlayFieldView play={play} thumbnail /></span><span className="schedule-install-add-state">{selected ? <Check size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}</span></button>
                   } },
                 ]}
                 items={filteredInstallPlays.map((play) => withoutGridOnlyFields(play, true))}

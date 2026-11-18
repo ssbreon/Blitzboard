@@ -4,7 +4,7 @@
 .practice-script-play-grid .data-grid-table { min-width: 1320px; }
 .practice-script-play-grid .data-grid-table td { min-width: 110px; }
 .practice-script-play-grid .data-grid-table td:nth-child(3), .practice-script-play-grid .data-grid-table td:nth-child(4), .practice-script-play-grid .data-grid-table td:nth-child(6) { min-width: 190px; }
-.practice-script-play-grid .practice-script-play-thumbnail { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 120px; height: 68px; overflow: hidden; padding: 3px; border: 1px solid var(--form-border); border-radius: 3px; background: var(--left-pane-bg); cursor: pointer; }
-.practice-script-play-thumbnail .play-field-view { --field-width: calc(60px * var(--field-aspect-ratio)); flex: none; box-sizing: border-box; width: var(--field-width); height: auto; min-height: 0; aspect-ratio: var(--field-aspect-ratio); margin-inline: auto; pointer-events: none; }
-.practice-script-create-play { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 120px; min-height: 38px; border: 1px solid var(--form-border); border-radius: 3px; background: var(--secondary-button); color: var(--navy-light); font: inherit; font-size: 12px; cursor: pointer; }
-.practice-script-create-play:hover { border-color: var(--navy-light); }
+.practice-script-play-grid .practice-script-play-thumbnail { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: fit-content; min-width: 120px; height: 126px; overflow: visible; padding: 0; border: 1px solid var(--form-border); border-radius: 3px; background: var(--left-pane-bg); cursor: pointer; }
+.practice-script-play-thumbnail .play-field-view { flex: none; min-height: 0; margin-inline: auto; pointer-events: none; }
+.practice-script-create-play { display: flex; align-items: center; justify-content: center; gap: 5px; width: fit-content; min-width: 120px; min-height: 38px; margin-inline: auto; border: 1px solid var(--primary-button); border-radius: 3px; background: var(--primary-button); color: #fff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.practice-script-create-play:hover { border-color: var(--accent-border); filter: brightness(.97); }

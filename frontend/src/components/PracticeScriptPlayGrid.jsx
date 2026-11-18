@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { PencilRuler, Trash2 } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -114,13 +114,13 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       },
     })),
     { key: 'thumbnail', header: 'PLAY THUMBNAIL', render: (_, row) => row.isPracticeScriptDraft
-      ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row)}><Plus size={16} aria-hidden="true" />Create a Play</button>
-      : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} /></button> },
+      ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row)}><PencilRuler size={16} aria-hidden="true" />Design Play</button>
+      : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} thumbnail /></button> },
   ]
 
   function getRowActions(row) {
     if (row.isPracticeScriptDraft) return [
-      { key: 'create-play', label: 'Create a Play', icon: Plus, onClick: () => onCreatePlay?.(row) },
+      { key: 'create-play', label: 'Design Play', icon: PencilRuler, onClick: () => onCreatePlay?.(row) },
       { key: 'remove-draft', label: 'Remove Draft', icon: Trash2, destructive: true, onClick: () => setRows((current) => current.filter((item) => item.id !== row.id)) },
     ]
     return (rowActions?.(row) || []).map((action) => action.key === 'open'

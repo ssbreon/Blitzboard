@@ -40,8 +40,14 @@ export function playEntryCount(record) {
 }
 
 export function scoutPlayName(row) {
-  return [row.offFormation, row.offPlay, row.defFront, row.defCoverage]
+  const offense = [row.offFormation, row.offPlay]
     .map((value) => value?.trim())
     .filter(Boolean)
-    .join(' ') || 'New Scout Play'
+  const defense = [row.defFront, row.defCoverage]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+  const nameParts = [...offense]
+  if (offense.length && defense.length) nameParts.push('vs')
+  nameParts.push(...defense)
+  return nameParts.join(' ') || 'New Scout Play'
 }

@@ -596,6 +596,11 @@ html.is-drilling-through * {
   aspect-ratio: var(--field-aspect-ratio);
 }
 
+.play-field-view.play-thumbnail-field {
+  --field-width: calc(120px * var(--field-aspect-ratio));
+  height: 120px;
+}
+
 .play-designer-slides {
   position: sticky;
   top: 0;
@@ -4436,6 +4441,10 @@ html.is-drilling-through * {
   }
 }
 
+.data-grid-table td:has(.play-thumbnail-field) {
+  width: 1%;
+}
+
 .data-grid-empty {
   text-align: center;
   background-color: gray;
@@ -6631,12 +6640,10 @@ html.is-drilling-through * {
 .schedule-grid-play-preview {
   display: flex;
   justify-content: flex-end;
-  width: 100%;
-  min-width: 150px;
+  width: fit-content;
 }
 
 .schedule-grid-play-preview .play-field-view {
-  --field-width: calc(94px * var(--field-aspect-ratio));
   flex: none;
   min-height: 0;
   margin-inline: 0;
@@ -6706,7 +6713,7 @@ html.is-drilling-through * {
 
 .schedule-install-page .data-grid-compact .data-grid-table th:last-child,
 .schedule-install-page .data-grid-compact .data-grid-table td:last-child {
-  width: 160px;
+  width: 1%;
   text-align: center;
 }
 
@@ -6715,8 +6722,7 @@ html.is-drilling-through * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 138px;
-  max-width: 100%;
+  width: fit-content;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 3px;
@@ -6729,7 +6735,12 @@ html.is-drilling-through * {
   border-color: #0758bd;
 }
 
-.schedule-install-add-preview,
+.schedule-install-add-preview {
+  display: block;
+  width: fit-content;
+  height: 120px;
+}
+
 .schedule-selected-install-preview {
   display: block;
   width: 100%;
@@ -6738,7 +6749,13 @@ html.is-drilling-through * {
   container-type: size;
 }
 
-.schedule-install-add-preview .play-field-view,
+.schedule-install-add-preview .play-field-view {
+  min-height: 0;
+  margin-inline: auto;
+  border: 0;
+  border-radius: 2px;
+}
+
 .schedule-selected-install-preview .play-field-view {
   --field-width: min(100cqw, 100cqh * var(--field-aspect-ratio));
   min-height: 0;
@@ -6821,10 +6838,6 @@ html.is-drilling-through * {
   align-items: center;
   justify-content: center;
   gap: 5px;
-}
-
-.schedule-selected-install-preview {
-  width: 100%;
 }
 
 .schedule-selected-installs > .schedule-primary-button {

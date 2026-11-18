@@ -33,10 +33,11 @@ import {
 } from '../utils/playGeometry'
 
 /** Read-only rendering of a play's field, markers, drawings and text. Used for print output. */
-export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
+export function PlayFieldView({ play, className = '', drawingSizeScale = 1, thumbnail = false }) {
   const drawingMaskId = useId()
   const fieldRef = useRef(null)
   const [fieldPxSize, setFieldPxSize] = useState({ width: 100, height: 100, markerRadius: 14 })
+  const renderDrawingSizeScale = drawingSizeScale * (thumbnail ? 0.6 : 1)
 
   useEffect(() => {
     const el = fieldRef.current
@@ -57,11 +58,12 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
   const zones = normalizeZones(play.zones)
   const theme = getTheme(play.theme)
   const themeClass = theme.fieldClass ? ` ${theme.fieldClass}` : ''
-  const noFieldDecoration = !play.fieldDecoration || play.fieldDecoration === 'None'
+  const fieldDecoration = thumbnail ? 'None' : play.fieldDecoration
+  const noFieldDecoration = !fieldDecoration || fieldDecoration === 'None'
   const fieldDecorationClass = noFieldDecoration ? ' no-field-decoration' : ''
   const perspective = play.perspective || DEFAULT_PLAY_PERSPECTIVE
-  const showHashMarks = Boolean(play.fieldDecoration) && play.fieldDecoration !== 'None'
-  const showYardNumbers = play.fieldDecoration === 'Hash Marks and Numbers'
+  const showHashMarks = Boolean(fieldDecoration) && fieldDecoration !== 'None'
+  const showYardNumbers = fieldDecoration === 'Hash Marks and Numbers'
   const xPositions = hashMarkXPositions(play.fieldOrientation)
   const fieldWindow = fieldWindowForPlay(play, perspective)
   const yPositions = hashMarkYPositionsForWindow(fieldWindow, perspective)
@@ -75,8 +77,8 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
   return (
     <div
       ref={fieldRef}
-      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass} zone-windowed ${className}`.trim()}
-      style={{ '--drawing-size-scale': drawingSizeScale, ...windowStyle }}
+      className={`play-designer-field play-field-view${themeClass}${fieldDecorationClass}${thumbnail ? ' play-thumbnail-field' : ''} zone-windowed ${className}`.trim()}
+      style={{ '--drawing-size-scale': renderDrawingSizeScale, ...windowStyle }}
     >
       <span className="play-designer-los-line" style={{ top: `${losPercent}%` }} aria-hidden="true" />
       {endZoneBands.map((band) => (
@@ -159,9 +161,9 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
             ? fixedSizeEllipse(points[0], fieldPxSize, fieldPxSize.markerRadius)
             : null
           const maskId = `${drawingMaskId}-${drawing.id}`
-          const cap = tool.endCap === 'tbar' ? tbarCapPoints(points, fieldPxSize, drawingSizeScale) : null
-          const arrow = tool.arrow ? arrowCapPoints(points, fieldPxSize, drawingSizeScale) : null
-          const motionCap = tool.id === 'motion' ? fixedSizeEllipse(points.at(-1), fieldPxSize, 3.5) : null
+          const cap = tool.endCap === 'tbar' ? tbarCapPoints(points, fieldPxSize, renderDrawingSizeScale) : null
+          const arrow = tool.arrow ? arrowCapPoints(points, fieldPxSize, renderDrawingSizeScale) : null
+          const motionCap = tool.id === 'motion' ? fixedSizeEllipse(points.at(-1), fieldPxSize, 3.5 * renderDrawingSizeScale) : null
           return (
             <g key={drawing.id} mask={playerStart ? `url(#${maskId})` : undefined}>
               {playerStart && (
@@ -191,12 +193,12 @@ export function PlayFieldView({ play, className = '', drawingSizeScale = 1 }) {
                   x2={cap.x2}
                   y2={cap.y2}
                   stroke={color}
-                  strokeWidth={TBAR_THICKNESS_PX * drawingSizeScale}
+                  strokeWidth={TBAR_THICKNESS_PX * renderDrawingSizeScale}
                   vectorEffect="non-scaling-stroke"
                 />
               )}
               {arrow && <polygon points={arrow} fill={color} />}
-              {motionCap && <ellipse {...motionCap} fill={color} stroke="#fff" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />}
+              {motionCap && <ellipse {...motionCap} fill={color} stroke="#fff" strokeWidth={1.5 * renderDrawingSizeScale} vectorEffect="non-scaling-stroke" />}
             </g>
           )
         })}
