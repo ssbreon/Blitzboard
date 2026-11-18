@@ -53,9 +53,12 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
   const server = await createServer({ root: fileURLToPath(new URL('../../', import.meta.url)), define: { 'import.meta.env.DEV': true, 'import.meta.env.VITE_AUTH_MODE': JSON.stringify('development'), 'import.meta.env.VITE_DEV_AUTH_SECRET': JSON.stringify('test-secret') }, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
   try {
     const { MonthCalendar, YearCalendar, ScheduleEventDialog } = await server.ssrLoadModule('/src/components/TeamSchedule.jsx')
+    const { CategoryBadge, getCategoryBadgeStyle } = await server.ssrLoadModule('/src/components/CategoryBadge.jsx')
     const { GamePlanHeader, GamePlanUnitFilter, GamePlanWorkspace } = await server.ssrLoadModule('/src/components/GamePlanWorkspace.jsx')
     const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
     const { DataGrid } = await server.ssrLoadModule('/src/components/DataGrid.jsx')
+    assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
+    assert.ok(renderToStaticMarkup(createElement(CategoryBadge, { value: 'Game - Away' })).includes('>Game - Away</span>'))
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL', offPlay: 'GAMECOCKS LEFT', defFront: '4-2-5', defCoverage: 'C2' }), 'ACE HAIL GAMECOCKS LEFT vs 4-2-5 C2')
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL' }), 'ACE HAIL')
     assert.deepEqual(ACTIVITY_GROUPS, ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE'])
@@ -200,13 +203,20 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.equal(shiftScheduleDate(january, 'week', 1).getDate(), 7)
     assert.equal(buildCalendarDays(new Date(2026, 1, 1), 'month').length, 28)
     const eventsByDate = new Map([['2026-01-15', [
-      { id: 'practice', kind: 'event', eventType: 'Practice', name: 'Practice <test>', startTime: '16:30' },
-      { id: 'game', kind: 'game', eventType: 'Game', opponent: 'Northern York', name: 'Game vs. Northern York', startTime: '19:00' },
+      { id: 'practice', kind: 'event', eventType: 'Practice', name: 'Practice <test>', startTime: '16:30', notes: 'Bring indoor shoes' },
+      { id: 'film-review', kind: 'event', eventType: 'Film Review', name: 'Film Review', notes: 'Review red-zone coverage' },
+      { id: 'other', kind: 'event', eventType: 'Other', name: 'Team Activity', notes: 'Bring equipment' },
+      { id: 'game', kind: 'game', eventType: 'Game', opponent: 'Northern York', name: 'Game vs. Northern York', startTime: '19:00', location: 'North Gym' },
     ]]])
     const month = renderToStaticMarkup(createElement(MonthCalendar, { month: january, eventsByDate, showHeading: true, highlightCurrent: true, canEdit: true }))
     assert.ok(month.includes('schedule-centered-month'))
     assert.ok(month.includes('Practice &lt;test&gt;'))
+    assert.match(month, /class="schedule-event-label"><svg[^>]*aria-hidden="true"[^>]*>[\s\S]*?<span class="schedule-event-name">Practice &lt;test&gt;<\/span>/)
+    assert.ok(month.includes('class="schedule-event-notes" title="Bring indoor shoes">Bring indoor shoes</span>'))
+    assert.ok(month.includes('class="schedule-event-notes" title="Review red-zone coverage">Review red-zone coverage</span>'))
+    assert.ok(month.includes('class="schedule-event-notes" title="Bring equipment">Bring equipment</span>'))
     assert.ok(month.includes('vs. Northern York'))
+    assert.ok(month.includes('class="schedule-event-location" title="North Gym">North Gym</span>'))
     assert.ok(month.includes('Drag Northern York'))
     assert.ok(month.includes('Add event 2026-01-15'))
     const year = renderToStaticMarkup(createElement(YearCalendar, { date: january, eventsByDate }))

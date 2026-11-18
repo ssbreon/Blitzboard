@@ -5314,6 +5314,10 @@ html.is-drilling-through * {
   background: var(--input-bg);
 }
 
+.schedule-print-title {
+  display: none;
+}
+
 .schedule-grid-view > .data-grid-compact {
   display: flex;
   flex: 1;
@@ -5383,12 +5387,12 @@ html.is-drilling-through * {
 }
 
 .schedule-quarter .schedule-event-content {
-  flex-wrap: wrap;
-  overflow: visible;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .schedule-quarter .schedule-event-name {
-  flex-basis: 100%;
+  flex-basis: auto;
 }
 
 .schedule-calendar-heading {
@@ -5581,6 +5585,11 @@ html.is-drilling-through * {
   color: #687386;
 }
 
+.schedule-day.today {
+  background: color-mix(in srgb, #1f4d2b 8%, var(--input-bg));
+  box-shadow: inset 0 0 0 1px #1f4d2b;
+}
+
 .schedule-day.today > header > span {
   display: inline-grid;
   place-items: center;
@@ -5769,20 +5778,62 @@ html.is-drilling-through * {
   min-width: 0;
   flex: 1;
   width: auto;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.schedule-event-time {
+.schedule-event-details {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.schedule-event-label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.schedule-event-label > svg {
   flex: none;
-  white-space: nowrap;
-  font-size: 12px;
 }
 
 .schedule-football {
+  width: 14px;
   flex: none;
   font-size: 14px;
   line-height: 1;
+  text-align: center;
+}
+
+.schedule-event-details .schedule-event-label {
+  flex: none;
+}
+
+.schedule-event-notes,
+.schedule-event-location {
+  box-sizing: border-box;
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.schedule-event-time {
+  align-self: flex-start;
+  flex: none;
+  white-space: nowrap;
+  font-size: 12px;
 }
 
 @media (max-height: 700px) {
@@ -7445,6 +7496,15 @@ html.is-drilling-through * {
     color: #000;
   }
 
+  .team-schedule .schedule-print-title {
+    display: block !important;
+    visibility: visible !important;
+    margin: 0 0 12px;
+    color: #000;
+    font-size: 20px;
+    font-weight: 700;
+  }
+
   .team-schedule .schedule-toolbar,
   .team-schedule .schedule-day-add,
   .team-schedule .schedule-event-drag-handle {
@@ -7471,6 +7531,10 @@ html.is-drilling-through * {
     grid-template-rows: none !important;
     grid-auto-rows: minmax(78px, auto);
     flex: none;
+  }
+
+  .team-schedule .schedule-days::before {
+    display: none !important;
   }
 
   .team-schedule .schedule-quarter > .schedule-calendar {

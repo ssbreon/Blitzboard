@@ -21,7 +21,7 @@ const CATEGORY_COLORS = {
 }
 
 export function getCategoryBadgeStyle(category) {
-  const color = CATEGORY_COLORS[category] || CATEGORY_COLORS['Play Call']
+  const color = CATEGORY_COLORS[category] || (typeof category === 'string' && category.startsWith('Game - ') ? CATEGORY_COLORS.Game : CATEGORY_COLORS['Play Call'])
   return { '--badge-hue': color.hue, '--badge-saturation': color.saturation }
 }
 

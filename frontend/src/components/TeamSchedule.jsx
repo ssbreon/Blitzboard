@@ -69,9 +69,9 @@ const scheduleGridColumns = [
   { key: 'eventDate', header: 'Date', render: (value) => value ? parseDate(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—' },
   { key: 'startTime', header: 'Time', render: (value) => value ? calendarTime({ startTime: value }) : '—' },
   { key: 'name', header: 'Event', render: (value, event) => event.kind === 'game' ? gameEventLabel(event) : value },
-  { key: 'eventType', header: 'Type', render: renderCategoryBadge },
+  { key: 'eventType', header: 'Type', render: (value, event) => renderCategoryBadge(event.kind === 'game' && event.gameSite ? `${value} - ${event.gameSite}` : value) },
   { key: 'location', header: 'Location', render: (value) => value || '—' },
-  { key: 'gameSite', header: 'Site', render: (value) => value || '—' },
+  { key: 'notes', header: 'Notes', render: (value) => value || '—' },
 ]
 
 export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, canCreateGame, canDelete, onCancel, onSave, onDelete }) {
@@ -194,10 +194,12 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
 function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onContextMenu, onDragEvent, onDragEnd }) {
   const eventKey = `${event.kind}-${event.id}`
   const eventClass = `schedule-event schedule-event-${event.kind === 'game' ? 'game' : event.eventType.toLowerCase().replaceAll(' ', '-')}`
+  const showNotes = ['Practice', 'Film Review', 'Other'].includes(event.eventType)
+  const eventIcon = event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />
   const isMoving = movingEventKey === eventKey
   return <div className={eventClass} onContextMenu={(contextEvent) => onContextMenu(contextEvent, event)}>
     <button type="button" className="schedule-event-content" onClick={() => onOpenEvent(event)} title={`${calendarTime(event)} ${event.name}`}>
-      {event.kind === 'game' ? <><span className="schedule-football" aria-hidden="true">🏈</span>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{gameEventLabel(event)}</span></> : <>{event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />}{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-name">{event.name}</span></>}
+      {event.kind === 'game' ? <>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-details"><span className="schedule-event-label"><span className="schedule-football" aria-hidden="true">🏈</span><span className="schedule-event-name">{gameEventLabel(event)}</span></span>{event.location?.trim() && <span className="schedule-event-location" title={event.location}>{event.location}</span>}</span></> : <>{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}{showNotes ? <span className="schedule-event-details"><span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>{event.notes?.trim() && <span className="schedule-event-notes" title={event.notes}>{event.notes}</span>}</span> : <span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>}</>}
     </button>
     {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
       dragEvent.dataTransfer.effectAllowed = 'move'
@@ -385,10 +387,42 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }, [api, loadStart, loadEnd, loadSummary, loadRequestKey])
 
   const { start: periodStart, end: periodEnd } = schedulePeriod(calendarDate, mode)
+  const periodLabel = mode === ScheduleView.YEAR
+    ? String(calendarDate.getFullYear())
+    : mode === ScheduleView.MONTH
+      ? calendarDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+      : `${parseDate(periodStart).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} - ${parseDate(periodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+  const printTitle = `Team Schedule - ${periodLabel}`
   const todayKey = dateKey(new Date())
   const periodEvents = events
     .filter((event) => event.eventDate >= periodStart && event.eventDate <= periodEnd)
     .sort((left, right) => right.eventDate.localeCompare(left.eventDate))
+
+  useEffect(() => {
+    if (practiceId) return undefined
+    const originalTitle = document.title
+    let printHeading
+    const setPrintTitle = () => {
+      document.title = printTitle
+      if (printHeading?.isConnected) return
+      printHeading = document.createElement('h1')
+      printHeading.className = 'schedule-print-title'
+      printHeading.textContent = printTitle
+      document.querySelector('.team-schedule')?.prepend(printHeading)
+    }
+    const restoreTitle = () => {
+      printHeading?.remove()
+      printHeading = null
+      document.title = originalTitle
+    }
+    window.addEventListener('beforeprint', setPrintTitle)
+    window.addEventListener('afterprint', restoreTitle)
+    return () => {
+      window.removeEventListener('beforeprint', setPrintTitle)
+      window.removeEventListener('afterprint', restoreTitle)
+      restoreTitle()
+    }
+  }, [printTitle, practiceId])
 
   function openEvent(event) {
     if (event.kind === 'game') onOpenGame(event)
