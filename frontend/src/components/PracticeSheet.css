@@ -73,14 +73,14 @@
 .practice-period { position: relative; margin-bottom: 14px; border: 1px solid var(--form-border); border-radius: 4px; background: transparent; }
 .practice-period.is-drop-before { box-shadow: inset 0 3px 0 var(--navy-light); }
 .practice-period.is-drop-after { box-shadow: inset 0 -3px 0 var(--navy-light); }
-.practice-period-heading { position: relative; display: grid; grid-template-columns: auto 130px 90px minmax(200px, 1fr) max-content auto; align-items: end; gap: 12px; padding: 12px 12px 12px 56px; background: var(--form-bg); border-bottom: 1px solid var(--form-border); }
+.practice-period-heading { position: relative; display: grid; grid-template-columns: auto 130px 90px minmax(200px, 1fr) max-content auto; align-items: end; gap: 12px; padding: 2px 12px 12px 56px; background: var(--form-bg); border-bottom: 1px solid var(--form-border); }
 .practice-period-drag-handle { position: absolute; top: 0; bottom: 0; left: 0; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 40px; min-height: 0; height: auto; padding: 0; border: 0; border-right: 1px solid var(--form-border); border-radius: 0; background: var(--column-header-bg); color: var(--text); cursor: grab; }
 .practice-period-drag-handle:active { cursor: grabbing; }
 .practice-period-drag-handle:disabled { opacity: .45; cursor: default; }
 .practice-period-content { min-width: 0; margin-left: 40px; margin-bottom: 20px; margin-right: 20px }
 .practice-period-number { grid-column: 1; grid-row: 1; align-self: center; color: var(--navy-light); font-size: 20px; font-weight: 700; }
 .practice-period-group-breakdown { white-space: nowrap; }
-.practice-sheet label { display: grid; min-width: 0; gap: 5px; color: var(--text); font-size: 12px; font-weight: 650; }
+.practice-sheet label { display: grid; min-width: 0; color: var(--text); font-size: 12px; font-weight: 650; }
 .practice-sheet input, .practice-sheet select, .practice-sheet textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--form-border); border-radius: 4px; background: var(--input-bg); color: var(--text-h); font: inherit; font-size: 14px; }
 .practice-sheet input:disabled, .practice-sheet select:disabled, .practice-sheet textarea:disabled { opacity: 1; color: var(--text-h); }
 .practice-sheet textarea { resize: vertical; }
