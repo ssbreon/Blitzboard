@@ -1,5 +1,5 @@
 .practice-sheet { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; color: var(--text-h); background: whitesmoke; text-align: left; }
-.practice-sheet-header { box-sizing: border-box; display: grid; flex: 0 0 auto; min-height: 160px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--form-border); background-image: linear-gradient(rgba(10, 25, 47, .42), rgba(10, 25, 47, .42)), linear-gradient(#0A192F, #0A192F), url('/football_practice.png'); background-blend-mode: multiply, color, normal; background-position: center; background-size: cover; color: #fff; }
+.practice-sheet-header { box-sizing: border-box; display: grid; flex: 0 0 auto; min-height: 160px; grid-template-columns: minmax(0, 1fr); align-items: center; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--form-border); background-image: linear-gradient(rgba(10, 25, 47, .42), rgba(10, 25, 47, .42)), linear-gradient(#0A192F, #0A192F), url('/football_practice.png'); background-blend-mode: multiply, color, normal; background-position: center; background-size: cover; color: #fff; }
 .practice-sheet-header-details { min-width: 0; }
 .practice-sheet-header-meta-overlay { display: inline-flex; max-width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 4px; background: rgba(4, 13, 26, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 .practice-sheet-header h1 { margin: 3px 0 8px; font-size: 26px; line-height: 1.2; overflow-wrap: anywhere; letter-spacing: 0; color: #fff; }
@@ -8,9 +8,9 @@
 .practice-sheet-dress-row { display: flex; width: fit-content; max-width: 100%; align-items: baseline; gap: 20px; min-width: 0; }
 .practice-sheet-dress { display: flex; flex: none; align-items: baseline; gap: 8px; margin: 0; color: #e5edf5; font-size: 14px; }
 .practice-sheet-dress strong { color: #fff; }
-.practice-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-@media (max-width: 700px) { .practice-sheet-header { grid-template-columns: minmax(0, 1fr); } .practice-sheet-actions { justify-self: end; } }
-.practice-sheet-content { flex: 1; min-width: 0; min-height: 0; width: 100%; padding: 6px; overflow: auto; box-sizing: border-box; }
+@media (max-width: 700px) { .practice-sheet-header { grid-template-columns: minmax(0, 1fr); } }
+.practice-sheet-content { flex: 1; min-width: 0; min-height: 0; width: 100%; padding: 6px; overflow: auto; box-sizing: border-box; background:var(--form-bg) }
+.practice-sheet-content:has(> .data-grid-compact) { display: flex; flex-direction: column; }
 .practice-sheet-event-notes { display: flex; flex: 0 1 auto; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; color: #e5edf5; font-size: 14px; white-space: nowrap; }
 .practice-sheet-event-notes strong { flex: none; color: #fff; }
 .practice-sheet-event-notes span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -22,8 +22,8 @@
 .practice-plan-dropdown { right: 0; z-index: 20; }
 .practice-plan-dropdown .data-grid-menu-panes { min-height: 100%; }
 .practice-plan-dropdown .data-grid-menu-actions { border-left: 1px solid var(--context-menu-border); }
-.practice-sheet-content > .data-grid-compact { min-width: 0; }
-.practice-sheet-content > .data-grid-compact .data-grid-table-wrap { max-height: min(60vh, 640px); }
+.practice-sheet-content > .data-grid-compact { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.practice-sheet-content > .data-grid-compact .data-grid-table-wrap { flex: 1; max-height: none; background: var(--gray-gutter); }
 .practice-grid-activities { display: block; min-width: 260px; line-height: 1.35; white-space: normal; }
 .practice-grid-activity-list { display: grid; }
 .practice-grid-activity-group { display: grid; grid-template-columns: minmax(48px, auto) minmax(0, 1fr); align-items: start; gap: 10px; padding: 6px 0; }
@@ -79,7 +79,7 @@
 	.practice-sheet { display: block; overflow: visible; height: auto; background: white; color: black; }
 	.practice-sheet-header { flex: none; }
 	.practice-sheet-content { display: block; width: auto; max-width: none; min-height: 0; overflow: visible; margin: 0 auto; }
-	.practice-sheet-actions, .practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-script-launcher, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
+	.practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-script-launcher, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
 	.practice-period-content[hidden] { display: block !important; }
 	.practice-print-value { display: block; color: black; font-size: 14px; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
 	.practice-period { break-inside: avoid; }

@@ -286,6 +286,18 @@ button:active:not(:disabled):not([role^='menuitem']) {
   min-height: 0;
 }
 
+.game-scout-plays-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.game-scout-plays-grid .data-grid-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  background: var(--gray-gutter);
+}
+
 html.is-drilling-through,
 html.is-drilling-through * {
   cursor: wait !important;

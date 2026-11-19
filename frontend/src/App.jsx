@@ -1038,6 +1038,8 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
           { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll },
         ]}
+        className={isGamePlan ? 'game-scout-plays-grid' : ''}
+        hidePager={isGamePlan}
         onRowDoubleClick={onOpenPlay}
         rowActions={rowActions}
       />}
