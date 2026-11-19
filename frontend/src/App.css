@@ -2835,6 +2835,10 @@ html.is-drilling-through * {
   resize: vertical;
 }
 
+.account-settings-suggestions > .dialog-field + .dialog-field {
+  margin-top: 12px;
+}
+
 .team-logo-picker {
   display: flex;
   align-items: center;

@@ -28,7 +28,7 @@ import { PlayDesigner } from './components/PlayDesigner'
 import { PlaybookSlideshow } from './components/PlaybookSlideshow'
 import { PrintPreviewDialog } from './components/PrintPreviewDialog'
 import { TeamSchedule } from './components/TeamSchedule'
-import { GamePlanHeader, GamePlanWorkspace } from './components/GamePlanWorkspace'
+import { GamePlanWorkspace } from './components/GamePlanWorkspace'
 import { PracticeScriptPlayGrid } from './components/PracticeScriptPlayGrid'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_PLAY_TEMPLATE, findPlayTemplate } from './utils/formations'
 import { scoutPlayName } from './utils/gamePlanWorkspace'
@@ -157,9 +157,9 @@ function GamePlanBanner({ game }) {
   </section>
 }
 
-function gameCardItemDefaultName(game, card) {
+function gameCardItemDefaultName(game, card, unit = card.unit) {
   const opponent = (game.opponent || game.name || '').replace(/^Game vs\.\s*/i, '').trim()
-  if (card.tab === 'installs') return `${card.unit} Install${opponent ? ` for ${opponent}` : ''}`
+  if (card.tab === 'installs') return `${opponent ? `${opponent} ` : ''}${unit} Install`
   if (card.tab === 'scout') return `${card.unit} Practice Script${opponent ? ` for ${opponent}` : ''}`
   const label = card.unit === 'Special Teams' ? 'Special Teams Scout' : card.title.split(' - ')[1]
   return [opponent, label, game.year || new Date().getFullYear()].filter(Boolean).join(' ')
@@ -170,9 +170,10 @@ function scoutingReportDefaultName(game, unit) {
   return `${unit || 'Game'} Scouting Report${opponent ? ` for ${opponent}` : ''}`
 }
 
-function GameCardItemDialog({ card, initialName, practices = [], initialPracticeEventId, onCancel, onCreate }) {
+function GameCardItemDialog({ game, card, initialName, practices = [], initialPracticeEventId, onCancel, onCreate }) {
   const [name, setName] = useState(initialName)
   const [unit, setUnit] = useState(card.unit)
+  const [nameEdited, setNameEdited] = useState(false)
   const [practiceEventId, setPracticeEventId] = useState(initialPracticeEventId || '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -195,8 +196,12 @@ function GameCardItemDialog({ card, initialName, practices = [], initialPractice
     <form className="dialog-panel" onSubmit={submit} aria-busy={saving}>
       <h2><Plus size={22} aria-hidden="true" />Add {card.tab === 'installs' ? 'Install' : 'Practice Script'}</h2>
       <DialogCloseButton onClick={onCancel} disabled={saving} />
-      <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="dialog-field"><span>Unit</span><select value={unit} onChange={(event) => setUnit(event.target.value)}>{GAME_PLAN_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label>
+      <label className="dialog-field"><span>Unit</span><select value={unit} onChange={(event) => {
+        const nextUnit = event.target.value
+        setUnit(nextUnit)
+        if (card.tab === 'installs' && !nameEdited) setName(gameCardItemDefaultName(game, card, nextUnit))
+      }}>{GAME_PLAN_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label>
+      <label className="dialog-field"><span>Name</span><input autoFocus required value={name} onChange={(event) => { setNameEdited(true); setName(event.target.value) }} /></label>
       {card.tab === 'scout' && <label className="dialog-field"><span>Practice</span><select required value={practiceEventId} onChange={(event) => setPracticeEventId(event.target.value)}><option value="">Select a linked practice</option>{practices.map((practice) => <option key={practice.id} value={practice.id}>{practice.eventDate} - {practice.name}</option>)}</select></label>}
       <ErrorDialog error={error} message="We couldn't create this item. Please try again." />
       <div className="dialog-actions">
@@ -972,6 +977,10 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
           onSecondaryNew={onNewGrouping}
           secondaryNewLabel="New Grouping"
           busy={busy || installSaving}
+          menuItems={[
+            ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
+            { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll },
+          ]}
           rowActions={installRowActions}
           onRowDoubleClick={onOpenPlay}
         />}
@@ -1346,16 +1355,6 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     } catch (failure) {
       setStatusError({ ...failure, message: `Unable to prepare Scout Play: ${failure.message}` })
     }
-  }
-
-  function handleBackToGamePlan() {
-    requestLeave(() => {
-      setDesigner(null)
-      setSlideshow(false)
-      setGameCard(null)
-      setCardPlaybook(null)
-      setGamePlanTab('overview')
-    }, 'Return to Game Plan')
   }
 
   async function handlePrintGrouping(parentId, grouping, collection) {
@@ -1903,6 +1902,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       </form></div>}
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} scoutGrouping={groupingDialog.scoutGrouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
       {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
+        {newDialog?.target === 'gameCardItem' && <GameCardItemDialog game={parent} card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
       {showNewPlaybookDialog && (
         <NewCollectionDialog
           title="Add New Playbook"
@@ -1921,7 +1921,6 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         />
       )}
 
-      {!restoring && parent?.kind === 'gamePlan' && (cardPlaybook || designer?.kind === 'scoutPlay') && <GamePlanHeader game={parent} onBack={handleBackToGamePlan} />}
       {!restoring && slideshowCollection && <PlaybookSlideshow key={`${slideshowCollection.kind}-${slideshowCollection.id}`} api={api} collection={slideshowCollection} />}
       {!restoring && designer && (
         <PlayDesigner
@@ -1967,6 +1966,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowType="Play"
           fetchRows={gameCard?.tab === 'scout' ? fetchCardPlaybookRows : fetchCardPlaybookPlays}
           onReorder={(ids) => api.reorderPlays(cardPlaybook.id, ids)}
+          onSlideshow={gameCard?.tab === 'installs' ? () => requestLeave(() => {
+            setDesigner(null)
+            setSlideshow(true)
+          }, 'Open slideshow') : undefined}
           onNew={writable && gameCard?.tab === 'scout' ? (practiceScriptDraft, groupingId) => setNewDialog({ target: 'play', parentId: cardPlaybook.id, category: cardPlaybook.category, practiceScript: true, practiceScriptDraft, groupingId, initialName: scoutPlayName(practiceScriptDraft) }) : undefined}
           onNewGrouping={writable && ['installs', 'scout'].includes(gameCard?.tab) ? () => setGroupingDialog({ parentId: cardPlaybook.id, scoutGrouping: gameCard?.tab === 'scout' }) : undefined}
           onEditGrouping={(grouping) => setGroupingDialog({ parentId: cardPlaybook.id, grouping })}

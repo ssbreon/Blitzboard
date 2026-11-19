@@ -57,6 +57,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [error, setError] = useState(null)
   const [notice, setNotice] = useState('')
   const formDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
+  const selectedSuggestionField = SUGGESTION_FIELDS.find(({ id }) => id === suggestionField)?.label || 'Field'
   const suggestionDirty = view === 'settings' && JSON.stringify(suggestionTexts) !== JSON.stringify(savedSuggestionTexts)
   const dirty = formDirty || suggestionDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
@@ -359,11 +360,11 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
             <div id="account-settings-panel-preferences" role="tabpanel" aria-labelledby="account-settings-tab-preferences" hidden={settingsTab !== 'preferences'}>
               {preferences}
             </div>
-            <div id="account-settings-panel-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-suggestions" hidden={settingsTab !== 'suggestions'}>
+            <div id="account-settings-panel-suggestions" className="account-settings-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-suggestions" hidden={settingsTab !== 'suggestions'}>
               <label className="dialog-field"><span>Field</span>
                 <select value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>{SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select>
               </label>
-              <label className="dialog-field"><span>Suggestions</span>
+              <label className="dialog-field"><span>Suggestions for {selectedSuggestionField}</span>
                 <textarea rows="8" value={suggestionTexts[suggestionField] || ''} onChange={(event) => {
                   setSuggestionTexts((current) => ({ ...current, [suggestionField]: event.target.value }))
                   setNotice('')
