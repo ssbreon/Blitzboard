@@ -359,9 +359,10 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
               <div className="account-menu-actions" role="group" aria-label="Account">
                 <div className="account-menu-section-label">{user.name} (<span className="account-role">{workspace?.role || user.roles.join(', ')}</span>)</div>
                 <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'profile')}><UserRound className="menu-item-icon" aria-hidden="true" />Profile</button>
-                <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 {workspace?.kind === 'team' && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
                 {!workspace?.alphaEnabled && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
+                <div className="account-menu-divider" role="separator" />
+                <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 <div className="account-menu-divider" role="separator" />
                 <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onAbout() }}><Info className="menu-item-icon" aria-hidden="true" />About Blitzboard...</button>
                 <div className="account-menu-divider" role="separator" />

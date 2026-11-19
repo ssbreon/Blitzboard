@@ -146,6 +146,7 @@ function adjustmentDesign(slide, fallback) {
 
 // Render and manage the interactive play-designing workspace.
 export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, onNameApplied, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
+  const textAppearanceRef = useRef(null)
   const drawingMaskId = useId()
   const assignmentsId = `${drawingMaskId}-assignments`
   const [assignmentsOpen, setAssignmentsOpen] = useState(false)
@@ -1903,7 +1904,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         )}
       </div>
       ) : textAppearanceVisible ? (
-      <div className="player-appearance-panel" aria-label="Text appearance" onClick={() => finishDrawingPath()}>
+      <div ref={textAppearanceRef} className="player-appearance-panel" aria-label="Text appearance" onClick={() => finishDrawingPath()}>
         <span className="player-label-field">Text</span>
         <div className="player-appearance-group" role="group" aria-label="Text color">
           <button
@@ -2235,13 +2236,15 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 onKeyDown={(event) => event.stopPropagation()}
                 onBlur={(event) => {
                   const focusRemainsWithinAnnotation = event.currentTarget.parentElement?.contains(event.relatedTarget)
-                  // Remove empty notes on blur; otherwise deselect only after focus leaves the annotation.
+                  const focusMovesToTextAppearance = textAppearanceRef.current?.contains(event.relatedTarget)
                   if (!annotation.text.trim()) {
                     setTextAnnotations((current) => current.filter((item) => item.id !== annotation.id))
                     setSelectedTextId((current) => (current === annotation.id ? null : current))
                     setEditingTextId((current) => (current === annotation.id ? null : current))
                   } else if (!focusRemainsWithinAnnotation) {
-                    setSelectedTextId((current) => (current === annotation.id ? null : current))
+                    if (!focusMovesToTextAppearance) {
+                      setSelectedTextId((current) => (current === annotation.id ? null : current))
+                    }
                     setEditingTextId((current) => (current === annotation.id ? null : current))
                   }
                 }}
