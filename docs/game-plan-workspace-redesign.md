@@ -4,7 +4,7 @@
 
 Replace the folder-based Game Plan experience with a coach-centric Game Week
 Workspace. Coaches should quickly see the opponent, preparation records and
-counts, and the next activity linked to the Game Plan.
+counts, and the next event linked to the Game Plan.
 
 This specification incorporates the product decisions from the redesign review.
 It does not authorize implementation of the deferred features below.
@@ -14,20 +14,20 @@ It does not authorize implementation of the deferred features below.
 - Keep Team Schedule calendar navigation: select a Game event, then open its Game Plan.
 - Replace the Game Plan folder tree with Overview, Installs, Practice, and Scout tabs.
 - Default newly opened Game Plans to Overview.
-- Show real records, counts, and linked schedule activities.
+- Show real records, counts, and linked schedule events.
 - Preserve existing editing, slideshow, duplication, deletion, and permissions.
 - Do not display sample statistics, fabricated insights, or readiness percentages.
 - Defer AI summaries, AI recommendations, and structured scouting intelligence.
 
 ## Game Week Definition
 
-Game Week is the collection of activities associated with a specific Game Plan.
+Game Week is the collection of events associated with a specific Game Plan.
 It is not calculated from season dates or calendar week boundaries.
 
 - GamePlan remains the workspace root and is anchored to a Game TeamEvent.
-- Other TeamEvents may optionally be linked to the Game Plan as activities.
+- Other TeamEvents may optionally be linked to the Game Plan as events.
 - Examples include Practice, Walkthrough, Film Session, and Scout Meeting.
-- These examples describe activities, not a requirement to rename existing event types.
+- These examples describe linked events and do not require renaming existing event types.
 - An event is not part of a Game Plan merely because it occurs near game day.
 - Do not generate a numbered season-week label from dates.
 
@@ -61,15 +61,15 @@ counts, overall readiness, unit readiness percentages, or percentage progress ba
 Summarize Offense, Defense, and Special Teams using actual content counts. Do not
 label scouting-report counts as tendency counts.
 
-### Next Activity
+### Next Event
 
 Display the next upcoming preparation TeamEvent explicitly linked to the current
 Game Plan, ordered by its scheduled start. Show its name, date, time, and event
-type, with access to the activity.
+type, with access to the event.
 
 Do not substitute the next event on the team's general calendar. The anchor game
-is shown in the header, not used as a fallback Game Plan activity. If no linked
-upcoming activity exists, show an empty state and an authorized linking action.
+is shown in the header, not used as a fallback Game Plan event. If no linked
+upcoming event exists, show an empty state and an authorized linking action.
 
 Show linked script/play totals only when supported by real data. Do not describe
 play-entry counts as repetitions unless explicit repetition data exists.
@@ -98,7 +98,7 @@ Practice Scripts are first-class children of a Practice TeamEvent, rather than
 independent game-level containers with a date inferred from their name.
 
 - A Practice event may own multiple scripts.
-- Show practices linked to this Game Plan in a chronological activity timeline.
+- Show practices linked to this Game Plan in a chronological event timeline.
 - Show each practice's scripts beneath that event, with one-click editor access.
 - Show script unit and actual play-entry counts.
 - Link an existing Practice event or create one through the existing schedule flow.
@@ -178,16 +178,16 @@ the unified infrastructure rather than searching only report text.
 
 The layout refactor is primarily frontend work, but the approved behavior also
 requires targeted persistence/API support for Practice-event script ownership,
-Game Plan activity associations, and unified search scopes and result context.
+Game Plan event associations, and unified search scopes and result context.
 Workflow status is not part of the initial release. Existing Active/Archived
 record lifecycle controls remain. Existing storage primitives may be reused; a
 broad backend redesign is not a goal, and a frontend-only implementation is not
 assumed.
 
-Game Plan activities support multiple Game Plan links. A practice that owns
+Linked events support multiple Game Plan links. A practice that owns
 scripts cannot be deleted or unlinked from its last Game Plan until the scripts
 are reassigned or deleted. Game Plan deletion also enforces this safeguard and
-removes that Game Plan's links from surviving activities. A shared practice and
+removes that Game Plan's links from surviving events. A shared practice and
 its scripts remain available through their other linked Game Plans.
 
 GamePlan remains the root. Existing install and script content may retain its
@@ -201,13 +201,13 @@ creation/editing, adding only the associations needed by the Game Plan workspace
 ## Acceptance Criteria
 
 - Opening a game from the unchanged calendar opens its Game Plan Overview.
-- The opponent, game details, active content counts, and next linked activity are visible.
+- The opponent, game details, active content counts, and next linked event are visible.
 - Counts reflect real active records and refresh after mutations.
 - No Draft/Ready workflow status, readiness percentage, or fabricated scouting intelligence appears.
 - Active/Archived remains the only record lifecycle state exposed in the workspace.
 - Installs, practice scripts, and scouting records open with one click from their lists.
 - Practice Scripts belong to Practice events; legacy unassigned scripts remain accessible.
-- Unlinked calendar events never appear as the Game Plan's Next Activity.
+- Unlinked calendar events never appear as the Game Plan's Next Event.
 - Search defaults to this Game Plan and reuses the existing unified infrastructure.
 - Search results show source type and applicable Game Plan context.
 - Existing editing, slideshow, duplication, deletion, and permissions continue to work.

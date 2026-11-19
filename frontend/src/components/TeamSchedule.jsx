@@ -29,7 +29,7 @@ function savedScheduleView() {
 }
 const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Team Meal', 'Other']
 const PRACTICE_DRESSES = ['Full Pads', 'Half Pads', 'Uppers', 'Helmets']
-const EVENT_TYPE_ICONS = {
+export const EVENT_TYPE_ICONS = {
   Game: Trophy,
   Practice: Dumbbell,
   'Film Review': ClipboardList,
