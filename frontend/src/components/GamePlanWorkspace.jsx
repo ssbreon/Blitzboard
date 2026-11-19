@@ -166,7 +166,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
         /></label>
       },
     })),
-    { key: 'createdAt', header: 'Added', render: (_, item) => item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '\u2014' },
+    { key: 'updatedAt', header: 'Last Modified', render: (_, item) => item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '\u2014' },
     { key: 'ownerName', header: 'Owner', render: (value) => value || '\u2014' },
   ]
 

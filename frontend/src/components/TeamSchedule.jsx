@@ -287,14 +287,14 @@ function ScheduleEventContextMenu({ event, position, canEdit, canDelete, onClose
   )
 }
 
-function ScheduleDays({ month, mode, eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey, onDropTarget, onMoveEvent, onAddEvent, ...eventProps }) {
+function ScheduleDays({ month, mode, eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey, pulseToday, onDropTarget, onMoveEvent, onAddEvent, ...eventProps }) {
   const days = buildCalendarDays(month, mode)
   const today = dateKey(new Date())
   return <>
     <div className="schedule-weekdays" aria-hidden="true">{WEEKDAYS.map((label) => <div key={label}>{label}</div>)}</div>
     <div className="schedule-days">{days.map((date) => {
       const key = dateKey(date)
-      return <section key={key} className={`schedule-day${date.getMonth() !== month.getMonth() && mode === 'month' ? ' outside-month' : ''}${key === today ? ' today' : ''}${dropTargetDate === key ? ' schedule-drop-target' : ''}`} aria-label={displayDate(date)}
+      return <section key={key} className={`schedule-day${date.getMonth() !== month.getMonth() && mode === 'month' ? ' outside-month' : ''}${key === today ? ' today' : ''}${pulseToday && key === today ? ' today-pulse' : ''}${dropTargetDate === key ? ' schedule-drop-target' : ''}`} aria-label={displayDate(date)}
         onDragOver={(dragEvent) => {
           if (!canEdit || !draggedEvent || draggedEvent.eventDate === key || movingEventKey) return
           dragEvent.preventDefault()
@@ -358,6 +358,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
+  const [todayPulse, setTodayPulse] = useState(null)
   const viewMenuRef = useRef(null)
   const { start: loadStart, end: loadEnd } = scheduleLoadPeriod(calendarDate, mode, displayMode)
   const loadSummary = mode === ScheduleView.YEAR && displayMode === 'calendar'
@@ -367,6 +368,12 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   useEffect(() => {
     try { localStorage.setItem('teamScheduleView', mode) } catch { return }
   }, [mode])
+
+  useEffect(() => {
+    if (!todayPulse) return undefined
+    const timer = setTimeout(() => setTodayPulse(null), 2500)
+    return () => clearTimeout(timer)
+  }, [todayPulse])
 
   useEffect(() => {
     if (!viewMenuOpen) return undefined
@@ -557,7 +564,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     eventsByDate.get(event.eventDate).push(event)
   }
   const calendarProps = {
-    eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey,
+    eventsByDate, canEdit, draggedEvent, dropTargetDate, movingEventKey, pulseToday: Boolean(todayPulse),
     onDropTarget: setDropTargetDate, onMoveEvent: moveEventToDate,
     onAddEvent: (date) => setDialog({ date }), onOpenEvent: openEvent,
     onContextMenu: openEventContextMenu,
@@ -578,7 +585,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
           <label className="schedule-jump-picker" htmlFor="jump-to-date"><span>Jump to</span><input className="date-picker" id="jump-to-date" aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
         </div>
         <div className="schedule-toolbar-controls">
-          <button type="button" className="schedule-secondary-button" onClick={() => setCalendarDate(new Date())}>Today</button>
+          <button type="button" className="schedule-secondary-button" onClick={() => { setCalendarDate(new Date()); setTodayPulse({}) }}>Today</button>
           <button type="button" className="schedule-icon-button" aria-label="Previous period" onClick={() => moveCalendar(-1)}><ChevronLeft size={20} /></button>
           <label className="schedule-month-picker"><span className="sr-only">Choose month</span><input type="month" value={monthKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(`${event.target.value}-01`)) }} /></label>
           <button type="button" className="schedule-icon-button" aria-label="Next period" onClick={() => moveCalendar(1)}><ChevronRight size={20} /></button>

@@ -26,9 +26,9 @@ function renderGridCell(column, row) {
   )
 }
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, hidePager = false, hideToolbar = false, onReorder, canReorderRows, className = '' }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, openHintKey, hidePager = false, hideToolbar = false, onReorder, canReorderRows, className = '' }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
-  const openHintStorageKey = `blitzboard:data-grid-open-hint:${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  const openHintStorageKey = openHintKey ? `blitzboard:data-grid-open-hint:${openHintKey}` : null
   const [fetchedRows, setRows] = useState([])
   const rows = items ?? fetchedRows
   const [loading, setLoading] = useState(true)
@@ -54,6 +54,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   const [pendingPageIds, setPendingPageIds] = useState([])
   const [reorderError, setReorderError] = useState(null)
   const [showOpenHint, setShowOpenHint] = useState(() => {
+    if (!openHintStorageKey) return false
     try {
       return typeof window !== 'undefined' && window.localStorage.getItem(openHintStorageKey) !== 'dismissed'
     } catch {
@@ -67,6 +68,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
 
   function dismissOpenHint() {
     setShowOpenHint(false)
+    if (!openHintStorageKey) return
     try {
       window.localStorage.setItem(openHintStorageKey, 'dismissed')
     } catch {
@@ -423,16 +425,6 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
           )}
         </div>
       </div>}
-      {onRowDoubleClick && showOpenHint && !suppressOpenHint && pageRows.some((row) => row.rowType !== 'grouping') && (
-        <div className="data-grid-open-hint" role="status">
-          <Info size={16} aria-hidden="true" />
-          <span className="data-grid-open-hint-desktop">Double-click a row to open it, or choose Open from its actions menu.</span>
-          <span className="data-grid-open-hint-touch">Choose Open from a row actions menu to open it.</span>
-          <button type="button" className="data-grid-open-hint-dismiss" aria-label="Dismiss open tip" onClick={dismissOpenHint}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-      )}
       {isLoading && <LoadingIndicator className="data-grid-status data-grid-loading" label={`Loading ${title.toLowerCase()}...`} />}
       <ErrorDialog error={error} message={`We couldn't load ${title.toLowerCase()}. Please refresh the list to try again.`} />
       <ErrorDialog error={reorderError} message={`We couldn't save the new order of ${title.toLowerCase()}. Please try again.`} />
@@ -647,6 +639,16 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
               </span>
               {selectedRowCount > 1 && <span className="data-grid-selected-count" aria-live="polite">{selectedRowCount} selected</span>}
             </div>
+            {onRowDoubleClick && showOpenHint && !suppressOpenHint && pageRows.some((row) => row.rowType !== 'grouping') && (
+              <div className="data-grid-open-hint" role="status">
+                <Info size={16} aria-hidden="true" />
+                <span className="data-grid-open-hint-desktop">Double-click a row to open it, or choose Open from its actions menu.</span>
+                <span className="data-grid-open-hint-touch">Choose Open from a row actions menu to open it.</span>
+                <button type="button" className="data-grid-open-hint-dismiss" aria-label="Dismiss open tip" onClick={dismissOpenHint}>
+                  <X size={16} aria-hidden="true" />
+                </button>
+              </div>
+            )}
             <div className="data-grid-pager-controls">
               <button type="button" disabled={showAllPages || currentPage === 0} onClick={() => setPage((p) => p - 1)}>
                 Previous

@@ -2139,6 +2139,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             reloadToken={playbooksReloadToken + cacheVersion}
             busy={statusSaving}
             title="Playbooks"
+            openHintKey="playbooks"
             columns={timezoneColumns(PLAYBOOK_GRID_COLUMNS, authUser.preferences?.timezone)}
             rowIcon={BookOpen}
             rowType="Playbook"
