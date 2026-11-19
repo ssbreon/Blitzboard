@@ -1488,7 +1488,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   function layoutColumn(title, options, selectedValue, onSelect) {
     return (
       <div className="play-layout-column" role="group" aria-label={title} key={title}>
-        <h3>{title}</h3>
+        <div className="account-menu-section-label">{title}</div>
         {options.map(({ value, label }) => {
           const selected = value === selectedValue
           return (
@@ -1758,39 +1758,74 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             </div>
           )}
           {menuOpen && (
-            <div className="toolbar-dropdown" role="menu">
-              <button type="button" role="menuitem" onClick={() => flipPlay('horizontal')}>
-                <FlipVertical2 className="menu-item-icon" aria-hidden="true" />
-                Flip Horizontal
-              </button>
-              <button type="button" role="menuitem" onClick={() => flipPlay('vertical')}>
-                <FlipHorizontal2 className="menu-item-icon" aria-hidden="true" />
-                Flip Vertical
-              </button>
-              <button type="button" role="menuitem" onClick={restartPlay}>
-                <RotateCcw className="menu-item-icon" aria-hidden="true" />
-                Restart Play
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={restartAdjustment}
-                disabled={!activeSlideId || saving || Boolean(removingSlideId)}
-              >
-                <Undo2 className="menu-item-icon" aria-hidden="true" />
-                Restart Adjustment
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setPrintOpen(true)
-                }}
-              >
-                <Printer className="menu-item-icon" aria-hidden="true" />
-                Print...
-              </button>
+            <div className="toolbar-dropdown data-grid-toolbar-dropdown play-designer-menu-dropdown" role="menu" aria-label="Play options">
+              <div className="data-grid-menu-panes">
+                <div className="play-designer-menu-view" role="group" aria-label="View">
+                  <div className="account-menu-section-label">View</div>
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={!assignmentsOpen}
+                    onClick={() => {
+                      setAssignmentsOpen(false)
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <Pencil size={16} className="data-grid-option-icon" aria-hidden="true" />
+                    <span>Design View</span>
+                    <Check size={16} className="play-designer-view-check" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={assignmentsOpen}
+                    disabled={!assignmentsAvailable}
+                    onClick={() => {
+                      setAssignmentsOpen(true)
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <ClipboardList size={16} className="data-grid-option-icon" aria-hidden="true" />
+                    <span>Assignments View</span>
+                    <Check size={16} className="play-designer-view-check" aria-hidden="true" />
+                  </button>
+                </div>
+                <div className="data-grid-menu-actions" role="group" aria-label="Actions">
+                  <div className="account-menu-section-label">Actions</div>
+                  <button type="button" role="menuitem" onClick={() => flipPlay('horizontal')}>
+                    <FlipVertical2 className="menu-item-icon" aria-hidden="true" />
+                    Flip Horizontal
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => flipPlay('vertical')}>
+                    <FlipHorizontal2 className="menu-item-icon" aria-hidden="true" />
+                    Flip Vertical
+                  </button>
+                  <button type="button" role="menuitem" onClick={restartPlay}>
+                    <RotateCcw className="menu-item-icon" aria-hidden="true" />
+                    Restart Play
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={restartAdjustment}
+                    disabled={!activeSlideId || saving || Boolean(removingSlideId)}
+                  >
+                    <Undo2 className="menu-item-icon" aria-hidden="true" />
+                    Restart Adjustment
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setPrintOpen(true)
+                    }}
+                  >
+                    <Printer className="menu-item-icon" aria-hidden="true" />
+                    Print...
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

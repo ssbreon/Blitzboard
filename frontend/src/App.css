@@ -2638,7 +2638,8 @@ html.is-drilling-through * {
 
 .account-menu-section-label {
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: 10px;
+  text-transform: uppercase;
   text-align: left;
   overflow-wrap: anywhere;
   color: var(--text);
@@ -4001,10 +4002,11 @@ html.is-drilling-through * {
 .play-layout-dropdown {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  gap: 0;
   width: min(900px, calc(100vw - 32px));
   max-width: calc(100vw - 32px);
-  padding: 10px;
+  padding: 0;
+  overflow: hidden;
 
   @media (max-width: 1024px) {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4019,12 +4021,19 @@ html.is-drilling-through * {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  padding: 6px;
+  border-right: 1px solid var(--context-menu-border);
 
-  h3 {
-    margin: 2px 4px 6px;
-    color: var(--text-h);
-    font-size: 12px;
-    line-height: 1.3;
+  &:nth-child(odd) {
+    background: #fff;
+  }
+
+  &:nth-child(even) {
+    background: var(--context-menu-bg);
+  }
+
+  &:last-child {
+    border-right: none;
   }
 
   button {
@@ -4033,6 +4042,7 @@ html.is-drilling-through * {
     gap: 5px;
     min-height: 30px;
     padding: 6px 4px;
+    background: transparent;
     font-size: 12px;
     line-height: 1.25;
     overflow-wrap: anywhere;
@@ -4331,6 +4341,33 @@ html.is-drilling-through * {
       font-size: 13px;
     }
   }
+}
+
+.play-designer-menu-view {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 6px;
+  background: #fff;
+  border-right: 1px solid var(--context-menu-border);
+
+  button[aria-checked='false'] {
+    background: transparent;
+  }
+
+  button[aria-checked='true'] {
+    background: var(--accent-bg);
+    color: var(--text-h);
+  }
+
+  button[aria-checked='false'] .play-designer-view-check {
+    visibility: hidden;
+  }
+}
+
+.play-designer-view-check {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .data-grid-status-filter button {

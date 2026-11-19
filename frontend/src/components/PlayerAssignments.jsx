@@ -67,21 +67,6 @@ export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open
     }
   }, [anchorRef, fieldHeight, open, sectionRef, undocked])
 
-  useEffect(() => {
-    if (!open || undocked) return undefined
-    function dismissOutside(event) {
-      const target = event.target
-      if (
-        sectionRef.current?.contains(target)
-        || anchorRef.current?.contains(target)
-        || (target instanceof Element && target.closest('.play-designer-field [data-marker-id]'))
-      ) return
-      onOpenChange(false)
-    }
-    document.addEventListener('pointerdown', dismissOutside, true)
-    return () => document.removeEventListener('pointerdown', dismissOutside, true)
-  }, [anchorRef, onOpenChange, open, sectionRef, undocked])
-
   useLayoutEffect(() => {
     if (!undocked) return undefined
     function keepInViewport() {
