@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowDown, ArrowUp, BookOpen, CalendarDays, Check, ClipboardList, Clock3, GripVertical, Menu, Pencil, Plus, Printer, RefreshCw, Save, Table2, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, BookOpen, BookOpenCheck, CalendarDays, Check, ClipboardList, Clock3, GripVertical, Link, Menu, Pencil, Plus, Printer, RefreshCw, Save, Table2, Trash2 } from 'lucide-react'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { DialogCloseButton } from './DialogCloseButton'
 import { DataGrid } from './DataGrid'
+import { linkedPracticeEventIds } from '../utils/gamePlanWorkspace'
 import './PracticeSheet.css'
 
 const newActivity = () => ({ id: crypto.randomUUID(), name: '', group: 'Team', coach: '' })
-const CREATE_PRACTICE_SCRIPT_OPTION = '__create_new_practice_script__'
 export const ACTIVITY_GROUPS = ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE']
 const newPeriod = (startTime = '', duration = '', name = '') => ({ id: crypto.randomUUID(), name, startTime, duration, groupBreakdown: 'No', activities: [newActivity()] })
 const parsePracticeClockTime = (value) => /^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/.exec(value || '')
@@ -31,8 +32,17 @@ export const PRACTICE_PLAN_GRID_COLUMNS = [
   { key: 'minutes', header: 'Minutes' },
   { key: 'period', header: 'Period' },
   { key: 'activities', header: 'Activities', render: (groups) => <div className="practice-grid-activities">{groups.length ? <div className="practice-grid-activity-list">{groups.map(({ group, activities }) => <div className="practice-grid-activity-group" key={group}><span className="practice-grid-activity-group-label">{group}</span><div className="practice-grid-activity-items">{activities.map((activity, index) => <div className="practice-grid-activity-item" key={`${activity.name}-${index}`}><span className="practice-grid-activity-name">{activity.name}</span>{activity.coach && <span className="practice-grid-activity-coach">Coach {activity.coach}</span>}</div>)}</div></div>)}</div> : <span className="practice-grid-activity-empty">—</span>}</div> },
-  { key: 'practiceScript', header: 'Practice Script', render: (value) => value || '—' },
 ]
+
+export function reorderPracticeSheetAttachments(playbookIds, draggedId, targetId) {
+  const sourceIndex = playbookIds.indexOf(draggedId)
+  const targetIndex = playbookIds.indexOf(targetId)
+  if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return playbookIds
+  const reordered = [...playbookIds]
+  reordered.splice(sourceIndex, 1)
+  reordered.splice(reordered.indexOf(targetId), 0, draggedId)
+  return reordered
+}
 
 // Normalize a period's group breakdown to the supported Yes or No values.
 export function practicePeriodGroupBreakdown(period = {}) {
@@ -40,7 +50,7 @@ export function practicePeriodGroupBreakdown(period = {}) {
 }
 
 // Render the practice plan and manage its editing, loading, and save lifecycle.
-export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, scripts, onCreatePracticeScript, onOpenScript }) {
+export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, playbooks, playbooksLoading = false, onCreatePracticeScript, onOpenScript, onPrintAttachments }) {
   const [event, setEvent] = useState(null)
   const [sheet, setSheet] = useState({ periods: [] })
   const [dirty, setDirty] = useState(false)
@@ -51,7 +61,14 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   const [menuOpen, setMenuOpen] = useState(false)
   const [activityToDelete, setActivityToDelete] = useState(null)
   const menuRef = useRef(null)
-  const [scheduleScripts, setScheduleScripts] = useState([])
+  const [schedulePlaybooks, setSchedulePlaybooks] = useState([])
+  const [loadingPlaybooks, setLoadingPlaybooks] = useState(false)
+  const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false)
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState(new Set())
+  const [draggingAttachmentId, setDraggingAttachmentId] = useState(null)
+  const [attachmentDropTarget, setAttachmentDropTarget] = useState(null)
+  const [printDialogOpen, setPrintDialogOpen] = useState(false)
+  const [printAttachmentsSelected, setPrintAttachmentsSelected] = useState(true)
   const [draggingPeriodId, setDraggingPeriodId] = useState(null)
   const [periodDropTarget, setPeriodDropTarget] = useState(null)
 
@@ -65,37 +82,41 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
       const practiceSheet = result.practiceSheet || { periods: [] }
       const hasEmptyGroups = practiceSheet.periods?.some((period) => period.activities?.some((activity) => !activity.group))
       const hasMissingGroupBreakdown = practiceSheet.periods?.some((period) => period.groupBreakdown !== 'Yes' && period.groupBreakdown !== 'No')
-      // Normalize legacy fields on load and mark editable sheets dirty so the defaults can be saved.
-      setSheet(hasEmptyGroups || hasMissingGroupBreakdown ? {
+      const hasLegacyPeriodScripts = practiceSheet.periods?.some((period) => Object.hasOwn(period, 'practiceScriptId'))
+      const shouldNormalize = hasEmptyGroups || hasMissingGroupBreakdown || hasLegacyPeriodScripts
+      // Normalize legacy period fields on load so scripts are associated only with the Practice Sheet.
+      setSheet(shouldNormalize ? {
         ...practiceSheet,
-        periods: practiceSheet.periods.map((period) => ({
-          ...period,
-          groupBreakdown: period.groupBreakdown === 'Yes' ? 'Yes' : 'No',
-          activities: (period.activities || []).map((activity) => activity.group ? activity : { ...activity, group: 'Team' }),
-        })),
+        periods: practiceSheet.periods.map((period) => {
+          const normalizedPeriod = { ...period }
+          delete normalizedPeriod.practiceScriptId
+          return {
+            ...normalizedPeriod,
+            groupBreakdown: period.groupBreakdown === 'Yes' ? 'Yes' : 'No',
+            activities: (period.activities || []).map((activity) => activity.group ? activity : { ...activity, group: 'Team' }),
+          }
+        }),
       } : practiceSheet)
-      setDirty(Boolean(canEdit && (hasEmptyGroups || hasMissingGroupBreakdown)))
+      setDirty(Boolean(canEdit && shouldNormalize))
       setError(null)
     }).catch((failure) => { if (active) setError(failure) })
     return () => { active = false }
   }, [api, eventId, revision, onEventLoaded])
 
   useEffect(() => {
-    // Prefer scripts supplied by the parent; fetch only when this sheet owns the lookup.
-    if (scripts !== undefined || !event) return undefined
+    // Prefer playbooks supplied by the parent; fetch only when this sheet owns the lookup.
+    if (playbooks !== undefined || !event) return undefined
     let active = true
+    setLoadingPlaybooks(true)
     api.listPlaybooks()
       .then(({ items }) => {
         if (!active) return
-        const gamePlanIds = new Set(event.gamePlanIds || [])
-        setScheduleScripts(items.filter((item) => item.recordStatus !== 'Archived'
-          && item.gameCardId?.endsWith('-scout')
-          && item.practiceEventId === eventId
-          && (!item.gamePlanId || gamePlanIds.has(item.gamePlanId))))
+        setSchedulePlaybooks(items)
       })
-      .catch(() => { if (active) setScheduleScripts([]) })
+      .catch((failure) => { if (active) { setSchedulePlaybooks([]); setError(failure) } })
+      .finally(() => { if (active) setLoadingPlaybooks(false) })
     return () => { active = false }
-  }, [api, event, eventId, scripts])
+  }, [api, event, playbooks])
 
   useEffect(() => {
     function warnBeforeUnload(event) {
@@ -107,10 +128,10 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }, [dirty])
 
   useEffect(() => {
-    // Let the parent coordinate navigation guards with this sheet's dirty and saving state.
-    onGuardChange?.({ dirty, saving: busy, canSave: false })
+    // Let the parent save the latest sheet before continuing navigation.
+    onGuardChange?.({ dirty, saving: busy, canSave: true, save })
     return () => onGuardChange?.(null)
-  }, [dirty, busy, onGuardChange])
+  }, [dirty, busy, sheet, eventId, api, onSaved, onGuardChange])
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -139,11 +160,6 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   }
 
   function changePeriod(index, patch) {
-    if (patch.practiceScriptId === CREATE_PRACTICE_SCRIPT_OPTION) {
-      // Creating a script is a separate workflow, not a value to save on this period.
-      onCreatePracticeScript?.(eventId)
-      return
-    }
     changePeriods((periods) => {
       const next = periods.map((period, current) => current === index ? { ...period, ...patch } : period)
       // A timing edit shifts only later periods; the edited period keeps its chosen start time.
@@ -227,12 +243,118 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   const periods = sheet.periods || []
   const lastPeriod = periods[periods.length - 1]
   const canAddPeriod = !lastPeriod || Boolean(practicePeriodEndTime(lastPeriod.startTime, lastPeriod.duration))
-  const linkedScripts = scripts ?? scheduleScripts
-  const availableScripts = onCreatePracticeScript
-    ? [...linkedScripts, { id: CREATE_PRACTICE_SCRIPT_OPTION, name: '(create new Practice Script)' }]
-    : linkedScripts
-  const gridRows = practicePlanGridRows(periods, linkedScripts)
+  const gamePlanIds = new Set(event.gamePlanIds || [])
+  const attachablePlaybooks = (playbooks ?? schedulePlaybooks).filter((playbook) => {
+    const supportedType = playbook.gameCardId?.endsWith('-scout') || playbook.gameCardId?.endsWith('-installs')
+    const alreadyAttached = linkedPracticeEventIds(playbook).includes(eventId)
+    return supportedType && (alreadyAttached || (playbook.recordStatus !== 'Archived' && gamePlanIds.has(playbook.gamePlanId)))
+  })
+  const attachedItems = attachablePlaybooks.filter((playbook) => linkedPracticeEventIds(playbook).includes(eventId))
+  const attachedById = new Map(attachedItems.map((playbook) => [playbook.id, playbook]))
+  const orderedAttachedIds = Array.isArray(sheet.attachedPlaybookIds) ? sheet.attachedPlaybookIds : []
+  const orderedAttachedPlaybooks = orderedAttachedIds.map((id) => attachedById.get(id)).filter(Boolean)
+  const orderedAttachedSet = new Set(orderedAttachedPlaybooks.map((playbook) => playbook.id))
+  const attachedPlaybooks = [...orderedAttachedPlaybooks, ...attachedItems.filter((playbook) => !orderedAttachedSet.has(playbook.id))]
+  const attachmentChanges = attachablePlaybooks.some((playbook) => selectedAttachmentIds.has(playbook.id) !== linkedPracticeEventIds(playbook).includes(eventId))
+  const gridRows = practicePlanGridRows(periods)
   const gridColumns = PRACTICE_PLAN_GRID_COLUMNS
+
+  function openAttachmentDialog() {
+    setSelectedAttachmentIds(new Set(attachedPlaybooks.map((playbook) => playbook.id)))
+    setAttachmentDialogOpen(true)
+  }
+
+  function requestPrintSheet() {
+    setMenuOpen(false)
+    if (!attachedPlaybooks.length) {
+      window.print()
+      return
+    }
+    setPrintAttachmentsSelected(true)
+    setPrintDialogOpen(true)
+  }
+
+  function confirmPrintSheet() {
+    setPrintDialogOpen(false)
+    window.setTimeout(() => {
+      if (printAttachmentsSelected && attachedPlaybooks.length && onPrintAttachments) {
+        const attachmentsToPrint = [...attachedPlaybooks]
+        window.addEventListener('afterprint', () => onPrintAttachments(attachmentsToPrint), { once: true })
+      }
+      window.print()
+    }, 0)
+  }
+
+  function updateAttachmentOrder(nextIds) {
+    setSheet((current) => ({ ...current, attachedPlaybookIds: nextIds }))
+    setDirty(true)
+  }
+
+  function dragAttachmentOver(input, targetId) {
+    if (!draggingAttachmentId || draggingAttachmentId === targetId) return
+    input.preventDefault()
+    input.dataTransfer.dropEffect = 'move'
+    setAttachmentDropTarget(targetId)
+  }
+
+  function dropAttachment(input, targetId) {
+    input.preventDefault()
+    const sourceId = input.dataTransfer.getData('text/plain') || draggingAttachmentId
+    const currentIds = attachedPlaybooks.map((playbook) => playbook.id)
+    const nextIds = reorderPracticeSheetAttachments(currentIds, sourceId, targetId)
+    if (nextIds !== currentIds) updateAttachmentOrder(nextIds)
+    setDraggingAttachmentId(null)
+    setAttachmentDropTarget(null)
+  }
+
+  function finishAttachmentDrag() {
+    setDraggingAttachmentId(null)
+    setAttachmentDropTarget(null)
+  }
+
+  function moveAttachmentWithKeyboard(playbookId, direction) {
+    const currentIds = attachedPlaybooks.map((playbook) => playbook.id)
+    const sourceIndex = currentIds.indexOf(playbookId)
+    const targetIndex = sourceIndex + direction
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= currentIds.length) return
+    const nextIds = [...currentIds]
+    ;[nextIds[sourceIndex], nextIds[targetIndex]] = [nextIds[targetIndex], nextIds[sourceIndex]]
+    updateAttachmentOrder(nextIds)
+  }
+
+  async function saveAttachments() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      await Promise.all(attachablePlaybooks.map((playbook) => {
+        const currentIds = linkedPracticeEventIds(playbook)
+        const isSelected = selectedAttachmentIds.has(playbook.id)
+        if (isSelected === currentIds.includes(eventId)) return Promise.resolve()
+        const practiceEventIds = isSelected ? [...currentIds, eventId] : currentIds.filter((id) => id !== eventId)
+        return api.updatePlaybook(playbook.id, { practiceEventIds })
+      }))
+      const currentAttachedIds = attachedPlaybooks.map((playbook) => playbook.id)
+      const nextAttachedPlaybookIds = [
+        ...currentAttachedIds.filter((id) => selectedAttachmentIds.has(id)),
+        ...attachablePlaybooks.filter((playbook) => selectedAttachmentIds.has(playbook.id) && !currentAttachedIds.includes(playbook.id)).map((playbook) => playbook.id),
+      ]
+      const nextSheet = { ...sheet, attachedPlaybookIds: nextAttachedPlaybookIds }
+      const savedEvent = await api.updateScheduleEvent(eventId, { practiceSheet: nextSheet })
+      setSchedulePlaybooks((current) => current.map((playbook) => {
+        if (!attachablePlaybooks.some((item) => item.id === playbook.id)) return playbook
+        const practiceEventIds = linkedPracticeEventIds(playbook).filter((id) => id !== eventId)
+        if (!selectedAttachmentIds.has(playbook.id)) return { ...playbook, practiceEventIds }
+        return { ...playbook, practiceEventIds: [...practiceEventIds, eventId] }
+      }))
+      setEvent(savedEvent)
+      setSheet(savedEvent.practiceSheet || nextSheet)
+      setDirty(false)
+      setAttachmentDialogOpen(false)
+      onSaved?.()
+    } catch (failure) { setError(failure) }
+    finally { setBusy(false) }
+  }
   return <section className="practice-sheet" aria-label="Practice sheet" aria-busy={busy}>
     {canEdit && breadcrumbSettingsTarget && createPortal(<button type="button" className="breadcrumb-settings breadcrumb-settings-icon-only" onClick={() => leave(() => onEditEvent(event))} disabled={busy} title="Edit Event" aria-label="Edit Event"><Pencil size={18} aria-hidden="true" /></button>, breadcrumbSettingsTarget)}
     <header className="practice-sheet-header">
@@ -250,18 +372,17 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     />}
     <div className="practice-sheet-content">
       <datalist id="practice-period-suggestions">{periodSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
-      <div className="practice-sheet-section-heading practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="schedule-primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
+      <div className="practice-sheet-section-heading practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="schedule-primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}{canEdit && <button type="button" className="schedule-secondary-button practice-sheet-attach-button" onClick={openAttachmentDialog} disabled={busy || loadingPlaybooks || playbooksLoading}><Link size={16} />Attach Script or Install</button>}{attachedPlaybooks.map((playbook) => { const isInstall = playbook.gameCardId?.endsWith('-installs'); const AttachmentIcon = isInstall ? BookOpenCheck : ClipboardList; const itemType = isInstall ? 'Install' : 'Practice Script'; return <span key={playbook.id} className={`practice-sheet-attachment${attachmentDropTarget === playbook.id ? ' is-drop-target' : ''}`} onDragOver={(input) => dragAttachmentOver(input, playbook.id)} onDrop={(input) => dropAttachment(input, playbook.id)} onDragLeave={() => { if (attachmentDropTarget === playbook.id) setAttachmentDropTarget(null) }}><button type="button" className="practice-sheet-attachment-grip" aria-label={`Reorder ${playbook.name}`} title="Drag or use arrow keys to reorder" draggable={canEdit && !busy} disabled={!canEdit || busy} onDragStart={(input) => { input.dataTransfer.effectAllowed = 'move'; input.dataTransfer.setData('text/plain', playbook.id); setDraggingAttachmentId(playbook.id) }} onDragEnd={finishAttachmentDrag} onKeyDown={(input) => { if (input.key === 'ArrowLeft' || input.key === 'ArrowRight') { input.preventDefault(); moveAttachmentWithKeyboard(playbook.id, input.key === 'ArrowLeft' ? -1 : 1) } }}><GripVertical size={16} aria-hidden="true" /></button><button type="button" className="practice-sheet-attachment-pill" onClick={() => onOpenScript?.(playbook)} disabled={!onOpenScript || busy} title={`Open ${itemType}: ${playbook.name}`}><AttachmentIcon size={16} aria-hidden="true" /><span>{playbook.name}</span></button><span className="practice-print-value">{playbook.name}</span></span>})}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
         <button type="button" className="hamburger-button" aria-label="Practice Plan options" aria-haspopup="true" aria-expanded={menuOpen} title="Practice Plan options" onClick={() => setMenuOpen((open) => !open)}><Menu size={19} aria-hidden="true" /></button>
         {menuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown practice-plan-dropdown" role="menu" aria-label="Practice Plan options"><div className="data-grid-menu-panes">
           <div className="data-grid-status-filter" role="group" aria-label="Practice Plan view"><div className="account-menu-section-label">View</div>{[{ id: 'planning', label: 'Planning View', icon: ClipboardList }, { id: 'grid', label: 'Grid View', icon: Table2 }].map(({ id, label, icon: Icon }) => <button key={id} type="button" role="menuitemradio" aria-checked={practicePlanView === id} onClick={() => { setPracticePlanView(id); setMenuOpen(false) }}><Icon size={16} className="data-grid-option-icon" aria-hidden="true" /><span>{label}</span><Check size={16} className="data-grid-status-check" aria-hidden="true" /></button>)}</div>
-          <div className="data-grid-menu-actions" role="group" aria-label="Practice Plan actions"><div className="account-menu-section-label">Actions</div><button type="button" role="menuitem" onClick={refreshPractice}><RefreshCw className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Refresh</span></button><button type="button" role="menuitem" onClick={() => { setMenuOpen(false); window.print() }}><Printer className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Print</span></button></div>
+          <div className="data-grid-menu-actions" role="group" aria-label="Practice Plan actions"><div className="account-menu-section-label">Actions</div><button type="button" role="menuitem" onClick={refreshPractice}><RefreshCw className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Refresh</span></button><button type="button" role="menuitem" onClick={requestPrintSheet}><Printer className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Print Sheet...</span></button></div>
         </div></div>}
       </div>{canEdit && <button type="button" className="schedule-secondary-button" onClick={refreshPractice} disabled={!dirty || busy}>Cancel</button>}{canEdit && <button type="button" className="schedule-primary-button" onClick={save} disabled={!dirty || busy}><Save size={16} />{busy ? 'Saving...' : 'Save Sheet'}</button>}</div>
       {practicePlanView === 'grid' ? <DataGrid title="Practice Plan" rowIcon={Clock3} rowType="Period" columns={gridColumns} items={gridRows} compact hideToolbar hidePager /> : <>
       {!periods.length && <p className="practice-sheet-empty">No periods added.</p>}
       {periods.map((period, periodIndex) => {
         const periodId = period.id || String(periodIndex)
-        const selectedScript = availableScripts.find((script) => script.id === period.practiceScriptId)
         const periodContentId = `practice-period-content-${periodIndex}`
         const groupBreakdown = practicePeriodGroupBreakdown(period)
         // Activity details are shown only when this period has a group breakdown.
@@ -284,10 +405,6 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
           <label><span>Start</span><input aria-label={`Period ${periodIndex + 1} start`} type="time" required value={period.startTime || ''} disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { startTime: input.target.value })} /><span className="practice-print-value">{period.startTime || '-'}</span></label>
           <label><span>Minutes</span><input aria-label={`Period ${periodIndex + 1} minutes`} type="number" min="1" step="1" required value={period.duration ?? ''} disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { duration: input.target.value })} /><span className="practice-print-value">{period.duration || '-'}</span></label>
           <label><span>Period</span><input aria-label={`Period ${periodIndex + 1} name`} list="practice-period-suggestions" value={period.name || ''} placeholder="Period name" disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { name: input.target.value })} /><span className="practice-print-value">{period.name || '-'}</span></label>
-          <div className="practice-period-script-control">
-            <label className="practice-period-script-select"><span>Practice Script</span><select aria-label={`Practice Script for period ${periodIndex + 1}`} value={period.practiceScriptId || ''} disabled={!canEdit || busy || !availableScripts.length} onChange={(input) => changePeriod(periodIndex, { practiceScriptId: input.target.value })}><option value=""></option>{period.practiceScriptId && !availableScripts.some((script) => script.id === period.practiceScriptId) && <option value={period.practiceScriptId}>Unavailable script</option>}{availableScripts.map((script) => <option key={script.id} value={script.id}>{script.name}</option>)}</select><span className="practice-print-value">{selectedScript?.name || '—'}</span></label>
-            {selectedScript && onOpenScript && <button type="button" className="practice-script-launcher" title="Open Practice Script" aria-label={`Open Practice Script ${selectedScript.name}`} onClick={() => onOpenScript(selectedScript)}><BookOpen size={17} aria-hidden="true" /></button>}
-          </div>
           <label className="practice-period-group-breakdown"><span>Group Breakdown</span><select aria-label={`Group Breakdown for period ${periodIndex + 1}`} value={groupBreakdown} disabled={!canEdit || busy} onChange={(input) => changePeriod(periodIndex, { groupBreakdown: input.target.value })}><option value="No">No</option><option value="Yes">Yes</option></select><span className="practice-print-value">{groupBreakdown}</span></label>
           {canEdit && <div className="practice-period-tools"><button type="button" title="Move period up" aria-label={`Move period ${periodIndex + 1} up`} disabled={busy || periodIndex === 0} onClick={() => movePeriod(periodIndex, -1)}><ArrowUp size={16} /></button><button type="button" title="Move period down" aria-label={`Move period ${periodIndex + 1} down`} disabled={busy || periodIndex === periods.length - 1} onClick={() => movePeriod(periodIndex, 1)}><ArrowDown size={16} /></button><button type="button" title="Delete period" aria-label={`Delete period ${periodIndex + 1}`} disabled={busy} onClick={() => { if (window.confirm('Delete this period and its activities?')) changePeriods((current) => cascadePracticePeriodStarts(current.filter((_, index) => index !== periodIndex))) }}><Trash2 size={16} /></button></div>}
         </div>
@@ -308,6 +425,16 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
       </section>})}
       </>}
     </div>
+      {attachmentDialogOpen && <div className="schedule-overlay" onMouseDown={(input) => { if (input.target === input.currentTarget && !busy) setAttachmentDialogOpen(false) }}><form className="schedule-dialog practice-sheet-attachment-dialog" role="dialog" aria-modal="true" aria-labelledby="practice-sheet-attachments-title" aria-busy={busy} onSubmit={(input) => { input.preventDefault(); saveAttachments() }}>
+        <header className="schedule-dialog-header"><div><Link size={20} aria-hidden="true" /><h2 id="practice-sheet-attachments-title">Attach to Practice Sheet</h2></div><DialogCloseButton onClick={() => setAttachmentDialogOpen(false)} disabled={busy} /></header>
+        <div className="schedule-dialog-body practice-sheet-attachment-options">{attachablePlaybooks.length ? attachablePlaybooks.map((playbook) => <label className="practice-sheet-attachment-option" key={playbook.id}><input type="checkbox" checked={selectedAttachmentIds.has(playbook.id)} disabled={busy} onChange={(input) => setSelectedAttachmentIds((current) => { const next = new Set(current); if (input.target.checked) next.add(playbook.id); else next.delete(playbook.id); return next })} /><span><strong>{playbook.name}</strong><small>{playbook.gameCardId?.endsWith('-installs') ? 'Install' : 'Practice Script'}{playbook.category ? ` · ${playbook.category}` : ''}{playbook.recordStatus === 'Archived' ? ' · Archived' : ''}</small></span></label>) : <p className="practice-sheet-empty">No Practice Scripts or Installs are available from this Practice's linked Game Plans.</p>}</div>
+        <footer className="schedule-dialog-actions">{onCreatePracticeScript && event.gamePlanIds?.length > 0 && <button type="button" className="schedule-secondary-button practice-sheet-new-script-button" onClick={() => { setAttachmentDialogOpen(false); onCreatePracticeScript(eventId) }} disabled={busy}><Plus size={16} />New Practice Script</button>}<button type="button" className="schedule-secondary-button" onClick={() => setAttachmentDialogOpen(false)} disabled={busy}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={busy || !attachmentChanges}>{busy ? 'Saving...' : 'Save Attachments'}</button></footer>
+      </form></div>}
+      {printDialogOpen && <div className="schedule-overlay" onMouseDown={(input) => { if (input.target === input.currentTarget) setPrintDialogOpen(false) }}><section className="schedule-dialog practice-sheet-print-dialog" role="dialog" aria-modal="true" aria-labelledby="practice-sheet-print-title">
+        <header className="schedule-dialog-header"><div><Printer size={20} aria-hidden="true" /><h2 id="practice-sheet-print-title">Print Practice Sheet</h2></div><DialogCloseButton onClick={() => setPrintDialogOpen(false)} /></header>
+        <div className="schedule-dialog-body"><p>{attachedPlaybooks.length} attached {attachedPlaybooks.length === 1 ? 'item is' : 'items are'} available to print after the Practice Sheet.</p><label className="practice-sheet-print-attachments"><input type="checkbox" checked={printAttachmentsSelected} onChange={(input) => setPrintAttachmentsSelected(input.target.checked)} /><span>Print attached Practice Scripts and Installs after the schedule</span></label></div>
+        <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => setPrintDialogOpen(false)}>Cancel</button><button type="button" className="schedule-primary-button" onClick={confirmPrintSheet}><Printer size={16} />Print</button></footer>
+      </section></div>}
   </section>
 }
 
@@ -371,13 +498,12 @@ export function summarizePracticeActivities(activities = []) {
 }
 
 // Map practice periods and linked scripts into rows for the plan grid.
-export function practicePlanGridRows(periods = [], scripts = []) {
+export function practicePlanGridRows(periods = []) {
   return periods.map((period, periodIndex) => ({
     id: period.id || String(periodIndex),
     period: period.name || `Period ${periodIndex + 1}`,
     start: period.startTime || '',
     minutes: period.duration || '',
     activities: groupPracticeActivities(period.activities || []),
-    practiceScript: scripts.find((script) => script.id === period.practiceScriptId)?.name || '',
   }))
 }

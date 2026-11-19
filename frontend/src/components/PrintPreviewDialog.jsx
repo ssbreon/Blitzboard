@@ -79,7 +79,7 @@ function printFieldHeight(sheet, orientation, perPage, showTitle) {
   return (sheet.height - footerSpace - PRINT_GRID_GAP - perPage * (titleSpace + PRINT_CELL_VERTICAL_INSETS)) / perPage
 }
 
-export function PrintPreviewDialog({ api, play, plays, collection, parentCollectionName, onClose }) {
+export function PrintPreviewDialog({ api, play, plays, collection, parentCollectionName, onClose, autoPrint = false, onAfterPrint }) {
   const items = play ? [play] : plays || []
   const [printedDate] = useState(() => new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date()))
   const [pageSizeId, setPageSizeId] = useState(PAGE_SIZES[0].id)
@@ -92,6 +92,20 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
   const [scale, setScale] = useState(1)
   const [teamLogo, setTeamLogo] = useState(null)
   const stageRef = useRef(null)
+  const afterPrintCallback = useRef(onAfterPrint)
+
+  useEffect(() => { afterPrintCallback.current = onAfterPrint }, [onAfterPrint])
+
+  useEffect(() => {
+    if (!autoPrint) return undefined
+    const handleAfterPrint = () => afterPrintCallback.current?.()
+    window.addEventListener('afterprint', handleAfterPrint, { once: true })
+    const timer = window.setTimeout(() => window.print(), 0)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [autoPrint])
 
   const pageSize = PAGE_SIZES.find((size) => size.id === pageSizeId) || PAGE_SIZES[0]
   const sheet = sheetPixels(pageSize, orientation)

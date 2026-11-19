@@ -17,8 +17,31 @@
 .practice-sheet-section-heading { display: flex; justify-content: flex-start; align-items: center; gap: 12px; margin-bottom: 14px; }
 .practice-sheet-section-heading h2 { display: inline; margin: 0 12px 0 0; font-size: 20px; }
 .practice-sheet-section-heading span, .practice-sheet-empty { color: var(--text); font-size: 13px; }
-.practice-plan-controls { display: flex; align-items: center; gap: 8px; width: 100%; }
+.practice-plan-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
 .practice-plan-controls > .practice-plan-menu { margin-left: auto; }
+.practice-sheet-attachment { display: inline-flex; align-items: center; flex-direction: row; min-width: 0; }
+.practice-sheet-attachment.is-drop-target { outline: 2px solid var(--navy-light); outline-offset: 2px; }
+.practice-sheet-attach-button + .practice-sheet-attachment { margin-left: 2px; padding-left: 8px; border-left: 1px solid var(--form-border); }
+.practice-sheet-attachment-grip { display: inline-flex; width: 25px; min-width: 25px; height: 34px; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--form-border); border-right: 0; border-radius: 4px 0 0 4px; background: var(--column-header-bg); color: var(--text); cursor: grab; }
+.practice-sheet-attachment-grip:active { cursor: grabbing; }
+.practice-sheet-attachment-grip:disabled { cursor: default; opacity: .6; }
+.practice-sheet-attachment-pill { display: inline-flex; max-width: 260px; min-height: 34px; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--form-border); border-radius: 0 4px 4px 0; background: var(--left-pane-bg); color: var(--text-h); font-size: 12px; cursor: pointer; }
+.practice-sheet-attachment-pill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.practice-sheet-attachment-pill:disabled { cursor: default; }
+.practice-sheet-attachment-dialog { max-width: 560px; }
+.practice-sheet-print-dialog { max-width: 520px; }
+.practice-sheet-print-dialog .schedule-dialog-body { box-sizing: border-box; min-width: 0; overflow-x: hidden; }
+.practice-sheet-print-dialog .schedule-dialog-body > p { margin: 0; }
+.practice-sheet .practice-sheet-print-attachments { display: flex !important; width: 100%; min-width: 0; flex-direction: row; align-items: center; gap: 10px !important; font-size: 14px; font-weight: 400; cursor: pointer; }
+.practice-sheet .practice-sheet-print-attachments input { box-sizing: border-box; width: 18px; min-width: 18px; min-height: 18px; height: 18px; flex: 0 0 18px; padding: 0; accent-color: var(--navy-light); }
+.practice-sheet .practice-sheet-print-attachments span { min-width: 0; flex: 1; line-height: 1.4; }
+.practice-sheet-attachment-dialog .practice-sheet-new-script-button { margin-right: auto; }
+.practice-sheet-attachment-options { display: grid; max-height: min(60vh, 480px); gap: 0; overflow-y: auto; }
+.practice-sheet-attachment-option { display: grid !important; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 10px !important; padding: 10px 0; border-bottom: 1px solid var(--form-border); cursor: pointer; }
+.practice-sheet-attachment-option input { width: 18px; min-height: 18px; height: 18px; padding: 0; accent-color: var(--navy-light); }
+.practice-sheet-attachment-option span { display: grid; gap: 3px; min-width: 0; }
+.practice-sheet-attachment-option strong { color: var(--text-h); font-size: 14px; overflow-wrap: anywhere; }
+.practice-sheet-attachment-option small { color: var(--text); font-size: 12px; }
 .practice-plan-dropdown { right: 0; z-index: 20; }
 .practice-plan-dropdown .data-grid-menu-panes { min-height: 100%; }
 .practice-plan-dropdown .data-grid-menu-actions { border-left: 1px solid var(--context-menu-border); }
@@ -49,28 +72,26 @@
 .practice-period { position: relative; margin-bottom: 14px; border: 1px solid var(--form-border); border-radius: 4px; background: transparent; }
 .practice-period.is-drop-before { box-shadow: inset 0 3px 0 var(--navy-light); }
 .practice-period.is-drop-after { box-shadow: inset 0 -3px 0 var(--navy-light); }
-.practice-period-heading { position: relative; display: grid; grid-template-columns: auto 130px 90px minmax(200px, 1fr) minmax(180px, 1.3fr) minmax(100px, .45fr) auto; align-items: end; gap: 12px; padding: 12px 12px 12px 56px; background: var(--form-bg); border-bottom: 1px solid var(--form-border); }
+.practice-period-heading { position: relative; display: grid; grid-template-columns: auto 130px 90px minmax(200px, 1fr) max-content auto; align-items: end; gap: 12px; padding: 12px 12px 12px 56px; background: var(--form-bg); border-bottom: 1px solid var(--form-border); }
 .practice-period-drag-handle { position: absolute; top: 0; bottom: 0; left: 0; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; width: 40px; min-height: 0; height: auto; padding: 0; border: 0; border-right: 1px solid var(--form-border); border-radius: 0; background: var(--column-header-bg); color: var(--text); cursor: grab; }
 .practice-period-drag-handle:active { cursor: grabbing; }
 .practice-period-drag-handle:disabled { opacity: .45; cursor: default; }
 .practice-period-content { min-width: 0; margin-left: 40px; margin-bottom: 20px; margin-right: 20px }
 .practice-period-number { grid-column: 1; grid-row: 1; align-self: center; color: var(--navy-light); font-size: 20px; font-weight: 700; }
-.practice-period-script-control { display: grid; grid-template-columns: minmax(0, 1fr) 34px; align-items: end; gap: 6px; min-width: 0; }
+.practice-period-group-breakdown { white-space: nowrap; }
 .practice-sheet label { display: grid; min-width: 0; gap: 5px; color: var(--text); font-size: 12px; font-weight: 650; }
 .practice-sheet input, .practice-sheet select, .practice-sheet textarea { box-sizing: border-box; width: 100%; min-width: 0; min-height: 38px; padding: 8px; border: 1px solid var(--form-border); border-radius: 4px; background: var(--input-bg); color: var(--text-h); font: inherit; font-size: 14px; }
 .practice-sheet input:disabled, .practice-sheet select:disabled, .practice-sheet textarea:disabled { opacity: 1; color: var(--text-h); }
 .practice-sheet textarea { resize: vertical; }
 .practice-period-tools { display: flex; gap: 2px; }
 .practice-period-tools button, .practice-activity-tools button { display: inline-flex; justify-content: center; align-items: center; width: 34px; height: 34px; border: 0; border-radius: 4px; background: transparent; color: var(--text); }
-.practice-script-launcher { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 38px; padding: 0; border: 1px solid var(--form-border); border-radius: 4px; background: var(--input-bg); color: var(--navy-light); cursor: pointer; }
-.practice-script-launcher:hover { background: var(--column-header-bg); }
 .practice-period-tools button:disabled, .practice-activity-tools button:disabled { opacity: .35; }
 .practice-activity { display: grid; grid-template-columns: 1fr 2fr 1fr auto; gap: 10px; align-items: end; padding: 12px; border-bottom: 1px solid var(--form-border); }
 .practice-activity-tools { display: flex; grid-column: -2; grid-row: 1; }
 .practice-add-activity { display: inline-flex; align-items: center; gap: 5px; margin: 10px 12px; padding: 4px; border: 0; background: transparent; color: var(--navy-light); font-size: 13px; font-weight: 650; }
 .practice-print-value { display: none; }
 .practice-sheet button:focus-visible, .practice-sheet input:focus-visible, .practice-sheet textarea:focus-visible { outline: 2px solid var(--navy-light); outline-offset: 2px; }
-@media (max-width: 700px) { .practice-sheet-header { align-items: flex-start; flex-direction: column; padding: 18px 16px; } .practice-sheet-content { padding: 18px 16px; } .practice-period-heading { grid-template-columns: auto minmax(0, 1fr) minmax(80px, 110px); } .practice-period-heading label:nth-of-type(1) { grid-column: 2 / 4; grid-row: 1; } .practice-period-heading label:nth-of-type(2) { grid-column: 2; grid-row: 2; } .practice-period-heading label:nth-of-type(3) { grid-column: 3; grid-row: 2; } .practice-period-script-control { grid-column: 2 / 4; grid-row: 3; } .practice-period-group-breakdown { grid-column: 2 / 4; grid-row: 4; } .practice-period-tools { grid-column: 2 / 4; grid-row: 5; justify-content: flex-end; } .practice-activity { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .practice-activity-tools { grid-column: 1 / -1; grid-row: auto; justify-content: flex-end; } }
+@media (max-width: 700px) { .practice-sheet-header { align-items: flex-start; flex-direction: column; padding: 18px 16px; } .practice-sheet-content { padding: 18px 16px; } .practice-period-heading { grid-template-columns: auto minmax(0, 1fr) minmax(80px, 110px); } .practice-period-heading label:nth-of-type(1) { grid-column: 2 / 4; grid-row: 1; } .practice-period-heading label:nth-of-type(2) { grid-column: 2; grid-row: 2; } .practice-period-heading label:nth-of-type(3) { grid-column: 3; grid-row: 2; } .practice-period-group-breakdown { grid-column: 2 / 4; grid-row: 3; } .practice-period-tools { grid-column: 2 / 4; grid-row: 4; justify-content: flex-end; } .practice-activity { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .practice-activity-tools { grid-column: 1 / -1; grid-row: auto; justify-content: flex-end; } }
 @media print {
 	#root:has(.practice-sheet) { height: auto !important; overflow: visible !important; }
 	#root:has(.practice-sheet) > :has(.practice-sheet) { display: block !important; height: auto !important; overflow: visible !important; }
@@ -79,7 +100,7 @@
 	.practice-sheet { display: block; overflow: visible; height: auto; background: white; color: black; }
 	.practice-sheet-header { flex: none; }
 	.practice-sheet-content { display: block; width: auto; max-width: none; min-height: 0; overflow: visible; margin: 0 auto; }
-	.practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-script-launcher, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
+	.practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-sheet-attach-button, .practice-sheet-attachment-pill, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
 	.practice-period-content[hidden] { display: block !important; }
 	.practice-print-value { display: block; color: black; font-size: 14px; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
 	.practice-period { break-inside: avoid; }

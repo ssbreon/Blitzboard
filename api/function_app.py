@@ -517,6 +517,20 @@ def reorder_pages(entity_type, parent_id, payload):
     return response({"items": [{"id": item_id, "page": index} for index, item_id in enumerate(ids, start=1)]})
 
 
+def practice_event_ids(record):
+    if "practiceEventIds" in record:
+        event_ids = record["practiceEventIds"]
+        if not isinstance(event_ids, list) or any(not isinstance(item, str) or not item for item in event_ids) or len(set(event_ids)) != len(event_ids):
+            raise accounts.AccountError("VALIDATION_ERROR", "practiceEventIds must be a list of unique Practice event IDs")
+        return event_ids
+    event_id = record.get("practiceEventId")
+    if event_id in (None, ""):
+        return []
+    if not isinstance(event_id, str):
+        raise accounts.AccountError("VALIDATION_ERROR", "practiceEventId must be a Practice event ID")
+    return [event_id]
+
+
 def validate_preparation_links(entity_type, record):
     workspace = request_workspace.get()
     if entity_type == "scheduleEvents":
@@ -528,19 +542,21 @@ def validate_preparation_links(entity_type, record):
             if game is None or not accounts.belongs(game, workspace):
                 raise accounts.AccountError("VALIDATION_ERROR", "Linked Game Plan was not found in this workspace")
         if record.get("id"):
-            has_scripts = any(book.get("practiceEventId") == record["id"] for book in storage.list("playbooks", workspace_id=workspace["id"]))
-            if has_scripts and record.get("eventType") != "Practice":
-                raise accounts.AccountError("VALIDATION_ERROR", "An event with Practice Scripts must remain a Practice")
-            if has_scripts and not links:
-                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's scripts before unlinking its last Game Plan", 409)
-    if entity_type == "playbooks" and record.get("practiceEventId"):
-        if not isinstance(record["practiceEventId"], str):
-            raise accounts.AccountError("VALIDATION_ERROR", "practiceEventId must be a Practice event ID")
-        event = storage.get("scheduleEvents", record["practiceEventId"])
-        if event is None or not accounts.belongs(event, workspace) or event.get("eventType") != "Practice":
-            raise accounts.AccountError("VALIDATION_ERROR", "Practice Scripts require a Practice event in this workspace")
-        if not (record.get("gameCardId") or "").endswith("-scout"):
-            raise accounts.AccountError("VALIDATION_ERROR", "Only Practice Scripts may belong to a Practice event")
+            has_preparation_items = any(record["id"] in practice_event_ids(book)
+                                         for book in storage.list("playbooks", workspace_id=workspace["id"]))
+            if has_preparation_items and record.get("eventType") != "Practice":
+                raise accounts.AccountError("VALIDATION_ERROR", "An event linked to preparation items must remain a Practice")
+            if has_preparation_items and not links:
+                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's preparation items before unlinking its last Game Plan", 409)
+    if entity_type == "playbooks":
+        event_ids = practice_event_ids(record)
+        if event_ids:
+            if not (record.get("gameCardId") or "").endswith(("-scout", "-installs")):
+                raise accounts.AccountError("VALIDATION_ERROR", "Only Practice Scripts and Installs may belong to Practice events")
+            for event_id in event_ids:
+                event = storage.get("scheduleEvents", event_id)
+                if event is None or not accounts.belongs(event, workspace) or event.get("eventType") != "Practice":
+                    raise accounts.AccountError("VALIDATION_ERROR", "Practice Scripts and Installs require Practice events in this workspace")
 
 
 def create_record(entity_type, payload, owner_id, parent_id=None):
@@ -752,7 +768,7 @@ def dispatch(req, user, workspace, role):
         games_by_id = {game["id"]: game for game in games}
         if scope == "gamePlan" and (not game_read or game_id not in games_by_id):
             return not_found("Game plan", game_id)
-        fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "practiceEventId", "installPlays", "template", "unit", "category", "recordStatus", "workspaceId", "ownerId")
+        fields = ("id", "name", "year", "entityType", "parentId", "gamePlanId", "gameCardId", "practiceEventId", "practiceEventIds", "installPlays", "template", "unit", "category", "recordStatus", "workspaceId", "ownerId")
         books = storage.list("playbooks", owner_id=owner_id, fields=fields) if play_read else []
         books_by_id = {book["id"]: book for book in books}
         events = storage.list("scheduleEvents", owner_id=owner_id) if game_read else []
@@ -760,8 +776,14 @@ def dispatch(req, user, workspace, role):
                              for event in events if event.get("eventType") == "Practice"}
         direct_contexts = {}
         for book in books:
-            direct_contexts[book["id"]] = (practice_contexts.get(book["practiceEventId"], set()) if book.get("practiceEventId")
-                                          else {book["gamePlanId"]} if book.get("gamePlanId") in games_by_id else set())
+            event_ids = practice_event_ids(book)
+            if event_ids:
+                contexts = set().union(*(practice_contexts.get(event_id, set()) for event_id in event_ids))
+                if (book.get("gameCardId") or "").endswith("-installs") and book.get("gamePlanId") in games_by_id:
+                    contexts.add(book["gamePlanId"])
+                direct_contexts[book["id"]] = contexts
+            else:
+                direct_contexts[book["id"]] = {book["gamePlanId"]} if book.get("gamePlanId") in games_by_id else set()
         book_contexts = {book_id: set(contexts) for book_id, contexts in direct_contexts.items()}
         reference_contexts = {}
         for book in books:
@@ -831,8 +853,8 @@ def dispatch(req, user, workspace, role):
                 return response({"error": {"code": "VALIDATION_ERROR", "message": error}}, 400)
             return update_record("scheduleEvents", event_id, payload)
         if method == "DELETE":
-            if any(book.get("practiceEventId") == event_id for book in storage.list("playbooks", owner_id=owner_id)):
-                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's scripts before deleting the event", 409)
+            if any(event_id in practice_event_ids(book) for book in storage.list("playbooks", owner_id=owner_id)):
+                raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Reassign or delete this practice's preparation items before deleting the event", 409)
             storage.delete("scheduleEvents", event_id)
             return func.HttpResponse(status_code=204)
 
@@ -880,7 +902,7 @@ def dispatch(req, user, workspace, role):
                 return update_record("gamePlans", game_plan_id, body(req))
             if method == "DELETE":
                 linked_events = [event for event in storage.list("scheduleEvents", owner_id=owner_id) if game_plan_id in event.get("gamePlanIds", [])]
-                script_event_ids = {book.get("practiceEventId") for book in storage.list("playbooks", owner_id=owner_id) if book.get("practiceEventId")}
+                script_event_ids = {event_id for book in storage.list("playbooks", owner_id=owner_id) for event_id in practice_event_ids(book)}
                 if any(event["id"] in script_event_ids and len(event["gamePlanIds"]) == 1 for event in linked_events):
                     raise accounts.AccountError("PRACTICE_HAS_SCRIPTS", "Link the practice to another Game Plan, or reassign or delete its scripts before deleting this Game Plan", 409)
                 for event in linked_events:

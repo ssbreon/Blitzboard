@@ -618,6 +618,43 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("PATCH", f"playbooks/{script['id']}", "local-coach", {"workflowStatus": "Ready"}).status_code, 200)
         self.assertNotIn("workflowStatus", response_json(call_api("GET", f"playbooks/{script['id']}", "local-coach")))
 
+    def test_installs_and_practice_scripts_can_link_to_multiple_practices(self):
+        game = response_json(call_api("POST", "game-plans", "local-coach", {"name": "Falcons"}))
+        event_payload = {"eventType": "Practice", "eventDate": "2026-11-11", "gamePlanIds": [game["id"]]}
+        practices = [response_json(call_api("POST", "schedule-events", "local-coach", {**event_payload, "name": name}))
+                     for name in ("Monday Practice", "Wednesday Practice")]
+        event_ids = [event["id"] for event in practices]
+        item_ids = []
+        for game_card_id in ("offense-scout", "offense-installs"):
+            with self.subTest(game_card_id=game_card_id):
+                item = response_json(call_api("POST", "playbooks", "local-coach", {
+                    "name": "Preparation", "gamePlanId": game["id"], "gameCardId": game_card_id,
+                    "practiceEventIds": event_ids,
+                }))
+                item_ids.append(item["id"])
+                self.assertEqual(item["practiceEventIds"], event_ids)
+                self.assertEqual(call_api("PATCH", f"schedule-events/{event_ids[0]}", "local-coach", {"eventType": "Other"}).status_code, 400)
+                self.assertEqual(call_api("DELETE", f"schedule-events/{event_ids[1]}", "local-coach").status_code, 409)
+        duplicate_link = call_api("POST", "playbooks", "local-coach", {
+            "name": "Duplicate links", "gamePlanId": game["id"], "gameCardId": "offense-installs",
+            "practiceEventIds": [event_ids[0], event_ids[0]],
+        })
+        self.assertEqual(duplicate_link.status_code, 400)
+        foreign_practice = response_json(call_api("POST", "schedule-events", "other-coach", {
+            "name": "Private Practice", "eventType": "Practice", "eventDate": "2026-11-11",
+        }))
+        foreign_link = call_api("POST", "playbooks", "local-coach", {
+            "name": "Foreign link", "gamePlanId": game["id"], "gameCardId": "offense-installs",
+            "practiceEventIds": [event_ids[0], foreign_practice["id"]],
+        })
+        self.assertEqual(foreign_link.status_code, 400)
+        search_request = FakeRequest("GET", "search", "local-coach")
+        search_request.params = {"q": "Preparation", "scope": "gamePlan", "gamePlanId": game["id"]}
+        search_result = function_app.api(search_request)
+        self.assertEqual(sorted(item["id"] for item in response_json(search_result)["items"]), sorted(item_ids))
+        self.assertEqual(call_api("PATCH", f"playbooks/{item_ids[0]}", "local-coach", {"practiceEventIds": []}).status_code, 200)
+        self.assertEqual(call_api("DELETE", f"game-plans/{game['id']}", "local-coach").status_code, 409)
+
     def test_team_meal_schedule_event_is_accepted(self):
         event = response_json(call_api("POST", "schedule-events", "local-coach", {
             "name": "Team Dinner", "eventType": "Team Meal", "eventDate": "2026-11-19",

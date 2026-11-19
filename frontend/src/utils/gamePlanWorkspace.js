@@ -14,8 +14,26 @@ export function generatedPracticeScriptPayload(event, unit) {
     category: unit,
     year: Number(event.eventDate.slice(0, 4)),
     gameCardId,
-    practiceEventId: event.id,
+    practiceEventIds: [event.id],
   }
+}
+
+export function linkedPracticeEventIds(record) {
+  if (Array.isArray(record?.practiceEventIds)) return record.practiceEventIds
+  return record?.practiceEventId ? [record.practiceEventId] : []
+}
+
+export function linkableGamePlanActivities(gameId, gameDate, events) {
+  const [year, month, day] = (gameDate || '').split('-').map(Number)
+  const cutoff = gameDate ? new Date(year, month - 1, day - 14) : null
+  const cutoffDate = cutoff ? `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}` : ''
+  return events
+    .filter((event) => (!gameDate || event.eventDate <= gameDate) && (!cutoffDate || event.eventDate >= cutoffDate) && !event.gamePlanIds?.includes(gameId))
+    .sort((left, right) => {
+      const leftDateTime = `${left.eventDate}T${left.startTime || ''}`
+      const rightDateTime = `${right.eventDate}T${right.startTime || ''}`
+      return rightDateTime.localeCompare(leftDateTime) || (left.name || '').localeCompare(right.name || '')
+    })
 }
 
 export function gamePreparation(gameId, books, events, reports) {
@@ -25,8 +43,8 @@ export function gamePreparation(gameId, books, events, reports) {
   return {
     activities,
     installs: books.filter((book) => book.gamePlanId === gameId && book.gameCardId?.endsWith('-installs')),
-    scripts: books.filter((book) => book.gameCardId?.endsWith('-scout') && (book.practiceEventId
-      ? practiceIds.has(book.practiceEventId) : book.gamePlanId === gameId)),
+    scripts: books.filter((book) => book.gameCardId?.endsWith('-scout') && (linkedPracticeEventIds(book).length
+      ? linkedPracticeEventIds(book).some((eventId) => practiceIds.has(eventId)) : book.gamePlanId === gameId)),
     reports,
   }
 }

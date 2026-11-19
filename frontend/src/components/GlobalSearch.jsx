@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BookOpen, CalendarDays, ScanSearch, Search, X } from 'lucide-react'
+import { BookOpen, BookOpenCheck, CalendarDays, ClipboardList, ScanSearch, Search, X } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -12,7 +12,7 @@ const COLUMNS = [
   { key: 'gamePlanContexts', header: 'Game Plan', render: (value) => value?.map((context) => context.name).join(', ') || '--' },
   { key: 'year', header: 'Year', render: (value) => value == null || value === '' ? '--' : value },
 ]
-const ICONS = { Playbook: BookOpen, Game: CalendarDays, Install: BookOpen, 'Practice Script': BookOpen, 'Scouting Report': ScanSearch, 'Scout Play': ScanSearch, Play: PlayDiagramIcon }
+const ICONS = { Playbook: BookOpen, Game: CalendarDays, Install: BookOpenCheck, 'Practice Script': ClipboardList, 'Scouting Report': ScanSearch, 'Scout Play': ScanSearch, Play: PlayDiagramIcon }
 
 export function GlobalSearch({ api, onOpen, disabled }) {
   const [query, setQuery] = useState('')

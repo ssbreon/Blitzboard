@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, Dumbbell, FolderOpen, GripVertical, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, Dumbbell, FolderOpen, GripVertical, Link, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { DialogCloseButton } from './DialogCloseButton'
@@ -213,9 +213,10 @@ function CalendarEventPill({ event, canEdit, movingEventKey, onOpenEvent, onCont
   const showNotes = ['Practice', 'Film Review', 'Other'].includes(event.eventType)
   const eventIcon = event.eventType === 'Film Review' ? <ClipboardList size={14} aria-hidden="true" /> : event.eventType === 'Practice' ? <Dumbbell size={14} aria-hidden="true" /> : <Clock3 size={14} aria-hidden="true" />
   const isMoving = movingEventKey === eventKey
+  const linkedIndicator = event.kind !== 'game' && event.gamePlanIds?.length > 0 ? <span className="schedule-event-link-indicator" title="Linked to a Game" aria-label="Linked to a Game"><Link size={12} aria-hidden="true" /></span> : null
   return <div className={eventClass} onContextMenu={(contextEvent) => onContextMenu(contextEvent, event)}>
     <button type="button" className="schedule-event-content" onClick={() => onOpenEvent(event)} title={`${calendarTime(event)} ${event.name}`}>
-      {event.kind === 'game' ? <>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-details"><span className="schedule-event-label"><span className="schedule-football" aria-hidden="true">🏈</span><span className="schedule-event-name">{gameEventLabel(event)}</span></span>{event.location?.trim() && <span className="schedule-event-location" title={event.location}>{event.location}</span>}{event.result && <span className={gameResultClass(event.result)}>{event.result}</span>}</span></> : <>{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}{showNotes ? <span className="schedule-event-details"><span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>{event.notes?.trim() && <span className="schedule-event-notes" title={event.notes}>{event.notes}</span>}</span> : <span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span></span>}</>}
+      {event.kind === 'game' ? <>{calendarTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}<span className="schedule-event-details"><span className="schedule-event-label"><span className="schedule-football" aria-hidden="true">🏈</span><span className="schedule-event-name">{gameEventLabel(event)}</span></span>{event.location?.trim() && <span className="schedule-event-location" title={event.location}>{event.location}</span>}{event.result && <span className={gameResultClass(event.result)}>{event.result}</span>}</span></> : <>{eventTime(event) && <span className="schedule-event-time">{calendarTime(event)}</span>}{showNotes ? <span className="schedule-event-details"><span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span>{linkedIndicator}</span>{event.notes?.trim() && <span className="schedule-event-notes" title={event.notes}>{event.notes}</span>}</span> : <span className="schedule-event-label">{eventIcon}<span className="schedule-event-name">{event.name}</span>{linkedIndicator}</span>}</>}
     </button>
     {canEdit && <button type="button" className="schedule-event-drag-handle" aria-label={`${isMoving ? 'Saving' : 'Drag'} ${event.kind === 'game' ? gameOpponent(event) || 'game' : event.name}`} title={isMoving ? 'Saving event' : 'Drag event'} disabled={isMoving} draggable={!isMoving} aria-busy={isMoving} onDragStart={(dragEvent) => {
       dragEvent.dataTransfer.effectAllowed = 'move'
@@ -341,7 +342,7 @@ export function YearCalendar({ date, eventsByDate, onSelectMonth }) {
   </div>
 }
 
-export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, locationSuggestions = [], periodSuggestions = [], practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, practiceSheetRevisionToken }) {
+export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, locationSuggestions = [], periodSuggestions = [], practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
   const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState(savedScheduleView)
@@ -564,7 +565,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }
 
   if (practiceId) return <main className="team-schedule">
-    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} periodSuggestions={periodSuggestions} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} periodSuggestions={periodSuggestions} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onPrintAttachments={onPrintPracticeAttachments} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
     {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} locationSuggestions={locationSuggestions} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
     {eventToDelete && <DeleteConfirmationDialog message={`Are you sure you want to delete "${eventToDelete.name}"? This cannot be undone.`} onCancel={() => setEventToDelete(null)} onConfirm={async () => { await removeEvent(eventToDelete); setEventToDelete(null); onClosePractice() }} />}
   </main>

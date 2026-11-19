@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, BookOpen, CalendarDays, ClipboardList, Copy, Link, Plus, Presentation, ScanSearch, Trash2, Unlink } from 'lucide-react'
+import { Archive, ArchiveRestore, ArrowLeft, ArrowRight, BookOpen, BookOpenCheck, CalendarDays, ClipboardList, Copy, Link, Plus, Presentation, ScanSearch, Trash2, Unlink } from 'lucide-react'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
 import { DataGrid } from './DataGrid'
@@ -7,7 +7,7 @@ import { DialogCloseButton } from './DialogCloseButton'
 import { getCategoryBadgeStyle } from './CategoryBadge'
 import { ScheduleEventDialog } from './TeamSchedule'
 import { PracticeSheet } from './PracticeSheet'
-import { GAME_UNITS, gamePreparation, generatedPracticeScriptPayload, nextPreparationActivity, playEntryCount } from '../utils/gamePlanWorkspace'
+import { GAME_UNITS, gamePreparation, generatedPracticeScriptPayload, linkableGamePlanActivities, linkedPracticeEventIds, nextPreparationActivity, playEntryCount } from '../utils/gamePlanWorkspace'
 import { findPlayTemplate } from '../utils/formations'
 import './GamePlanWorkspace.css'
 
@@ -35,7 +35,7 @@ export function GamePlanUnitFilter({ selectedUnits, onToggle }) {
   })}</div>
 }
 
-export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken }) {
+export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [revision, setRevision] = useState(0)
@@ -68,6 +68,12 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   const prep = gamePreparation(game.id, data?.books || [], data?.events || [], data?.reports || [])
   const activeItems = (items) => items.filter((item) => item.recordStatus !== 'Archived')
   const practices = prep.activities.filter((event) => event.eventType === 'Practice')
+  const practiceEvent = prep.activities.find((event) => event.id === practiceId)
+  const practiceGamePlanIds = new Set(practiceEvent?.gamePlanIds || [game.id])
+  const practicePlaybooks = (data?.books || []).filter((item) => {
+    const isInstallOrScript = item.gameCardId?.endsWith('-installs') || item.gameCardId?.endsWith('-scout')
+    return isInstallOrScript && (practiceGamePlanIds.has(item.gamePlanId) || linkedPracticeEventIds(item).includes(practiceId))
+  })
   const next = nextPreparationActivity(prep.activities)
   const selectedUnit = selectedUnits.length === 1 ? selectedUnits[0] : 'Offense'
   const cardFor = (item) => cards.find((card) => card.id === item.gameCardId)
@@ -84,7 +90,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
       : [...current, unit])
   }
 
-  const availableEvents = (data?.events || []).filter((event) => !event.gamePlanIds?.includes(game.id))
+  const availableEvents = linkableGamePlanActivities(game.id, game.gameDate, data?.events || [])
   const groups = [{ id: 'installs', label: 'Installs', items: prep.installs }, { id: 'practiceScripts', label: 'Practice Scripts', items: prep.scripts }, { id: 'scoutingReports', label: 'Scouting Reports', items: prep.reports }]
   const summaryItems = groups.flatMap((group) => {
     const groupItems = activeItems(group.items).filter((item) => !selectedUnits.length || selectedUnits.includes(item.unit || item.category || game.category))
@@ -128,7 +134,27 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
     { key: 'name', header: 'Content' },
     { key: 'unit', header: 'Unit' },
     { key: 'details', header: 'Details' },
-    { key: 'practiceEventId', header: 'Practice', render: (_, item) => item.gamePlanGroup === 'practiceScripts' ? <select aria-label={`Practice for ${item.name}`} value={item.practiceEventId || ''} disabled={readOnly || busy} onDoubleClick={(event) => event.stopPropagation()} onChange={(event) => mutate(() => api.updatePlaybook(item.id, { practiceEventId: event.target.value, gamePlanId: game.id }))}><option value="">Unassigned</option>{practices.map((practice) => <option key={practice.id} value={practice.id}>{dateLabel(practice.eventDate)} - {practice.name}</option>)}</select> : '\u2014' },
+    ...practices.map((practice) => ({
+      key: `practice-${practice.id}`,
+      header: `Practice - ${dateLabel(practice.eventDate)} - ${practice.name}`,
+      render: (_, item) => {
+        if (!['installs', 'practiceScripts'].includes(item.gamePlanGroup)) return '\u2014'
+        const practiceEventIds = linkedPracticeEventIds(item)
+        return <label className="gp-practice-checkbox-cell"><input
+          className="gp-practice-checkbox"
+          type="checkbox"
+          aria-label={`Link ${item.name} to ${practice.name}`}
+          checked={practiceEventIds.includes(practice.id)}
+          disabled={readOnly || busy}
+          onChange={(event) => {
+            const nextPracticeEventIds = event.target.checked
+              ? [...practiceEventIds, practice.id]
+              : practiceEventIds.filter((eventId) => eventId !== practice.id)
+            mutate(() => api.updatePlaybook(item.id, { practiceEventIds: nextPracticeEventIds, gamePlanId: game.id }))
+          }}
+        /></label>
+      },
+    })),
     { key: 'createdAt', header: 'Added', render: (_, item) => item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '\u2014' },
     { key: 'ownerName', header: 'Owner', render: (value) => value || '\u2014' },
   ]
@@ -139,7 +165,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   }
 
   if (practiceId) return <section className="gp-workspace">
-    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={!readOnly} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={(request) => onCreateScoutPlay?.({ ...request, gamePlanId: game.id })} onCreatePracticeScript={canCreate ? (practiceEventId) => addItem('scout', practiceEventId) : undefined} onOpenScoutPlay={onOpenScoutPlay} onEditEvent={setActivityDialog} onSaved={() => setRevision((value) => value + 1)} scripts={activeItems(prep.scripts).filter((script) => script.practiceEventId === practiceId)} onOpenScript={(script) => onOpen(cardFor(script), script)} />
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={!readOnly} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={(request) => onCreateScoutPlay?.({ ...request, gamePlanId: game.id })} onCreatePracticeScript={canCreate ? (practiceEventId) => addItem('scout', practiceEventId) : undefined} onOpenScoutPlay={onOpenScoutPlay} onEditEvent={setActivityDialog} onSaved={() => setRevision((value) => value + 1)} playbooks={practicePlaybooks} playbooksLoading={!data} onOpenScript={(item) => onOpen(cardFor(item), item)} onPrintAttachments={onPrintPracticeAttachments} />
     {activityDialog && <ScheduleEventDialog api={api} initialEvent={activityDialog} canEdit={!readOnly} canCreateGame={false} canDelete={false} onCancel={() => setActivityDialog(null)} onSave={async (payload) => {
       await api.updateScheduleEvent(activityDialog.id, payload)
       setActivityDialog(null)
@@ -152,13 +178,13 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
     <GamePlanHeader game={game} />
     <ErrorDialog error={error} message="We couldn't complete the workspace action. Your existing records are unchanged unless the action succeeded." />
     {!data ? <div className="gp-empty">{error ? <button type="button" onClick={() => setRevision((value) => value + 1)}>Retry</button> : <LoadingIndicator compact label="Loading Game Plan..." />}</div> : <div className="gp-overview">
-      <section className="gp-section gp-summary-section"><DataGrid id="gp-summary-grid" title="Game Plan" columns={summaryColumns} items={summaryItems} hidePager busy={busy} suppressOpenHint toolbarContent={<div className="gp-summary-toolbar-content"><GamePlanUnitFilter selectedUnits={selectedUnits} onToggle={toggleUnit} /><div className="data-grid-toolbar-actions gp-quick-actions">{!readOnly && <><button type="button" className="schedule-primary-button" onClick={() => addItem('installs')} disabled={busy || !canCreate} title={!canCreate ? 'Playbook limit reached' : undefined}><Plus size={16} />Install</button><button type="button" className="schedule-primary-button" onClick={() => addItem('scout')} disabled={busy || !canCreate} title={!canCreate ? 'Playbook limit reached' : undefined}><Plus size={16} />Practice Script</button></>}{onNewReport && <button type="button" className="schedule-primary-button" onClick={() => setReportUnit(selectedUnit)} disabled={busy}><Plus size={16} />Scout Report</button>}</div></div>} menuItems={[{ label: 'Link Activity', icon: Link, disabled: readOnly, onClick: () => setLinkOpen(true) }, { label: 'New Activity', icon: CalendarDays, disabled: readOnly, onClick: () => setActivityDialog('new') }]} getRowIcon={(item) => ({ installs: BookOpen, practiceScripts: ClipboardList, scoutingReports: ScanSearch })[item.gamePlanGroup || item.id]} rowActions={summaryRowActions} onRowDoubleClick={(item) => {
+      <section className="gp-section gp-summary-section"><DataGrid id="gp-summary-grid" title="Game Plan" columns={summaryColumns} items={summaryItems} hidePager busy={busy} suppressOpenHint toolbarContent={<div className="gp-summary-toolbar-content"><GamePlanUnitFilter selectedUnits={selectedUnits} onToggle={toggleUnit} /><div className="data-grid-toolbar-actions gp-quick-actions">{!readOnly && <><button type="button" className="schedule-primary-button" onClick={() => addItem('installs')} disabled={busy || !canCreate} title={!canCreate ? 'Playbook limit reached' : undefined}><Plus size={16} />Install</button><button type="button" className="schedule-primary-button" onClick={() => addItem('scout')} disabled={busy || !canCreate} title={!canCreate ? 'Playbook limit reached' : undefined}><Plus size={16} />Practice Script</button></>}{onNewReport && <button type="button" className="schedule-primary-button" onClick={() => setReportUnit(selectedUnit)} disabled={busy}><Plus size={16} />Scout Report</button>}</div></div>} menuItems={[{ label: 'Link Activity', icon: Link, disabled: readOnly, onClick: () => setLinkOpen(true) }, { label: 'New Activity', icon: CalendarDays, disabled: readOnly, onClick: () => setActivityDialog('new') }]} getRowIcon={(item) => ({ installs: BookOpenCheck, practiceScripts: ClipboardList, scoutingReports: ScanSearch })[item.gamePlanGroup || item.id]} rowActions={summaryRowActions} onRowDoubleClick={(item) => {
         if (item.rowType === 'grouping') return
         if (item.gamePlanGroup === 'scoutingReports') onOpenReport(item)
         else onOpen(cardFor(item), item)
       }} /></section>
       <aside className="gp-overview-sidebar" aria-label="Game Plan schedule">
-        <section className="gp-section gp-next"><header><div><p className="gp-eyebrow">Schedule</p><h2>Next Activity</h2></div>{!readOnly && <button type="button" className="gp-secondary" onClick={() => setLinkOpen(true)}><Link size={16} />Link Activity</button>}</header>{next ? <button type="button" className="gp-event-card gp-next-event" onClick={() => openActivity(next)}><CalendarDays size={24} aria-hidden="true" /><span className="gp-event-copy"><small>{next.eventType} · {dateLabel(next.eventDate)}</small><strong>{next.name}</strong><span>{timeLabel(next.startTime)}</span>{next.eventType === 'Practice' && <span>{activeItems(prep.scripts).filter((script) => script.practiceEventId === next.id).reduce((total, script) => total + playEntryCount(script), 0)} scripted play entries</span>}</span><ArrowRight size={18} aria-hidden="true" /></button> : <p className="gp-empty">No upcoming Game Plan activities linked.</p>}</section>
+        <section className="gp-section gp-next"><header><div><p className="gp-eyebrow">Schedule</p><h2>Next Activity</h2></div>{!readOnly && <button type="button" className="gp-secondary" onClick={() => setLinkOpen(true)}><Link size={16} />Link Activity</button>}</header>{next ? <button type="button" className="gp-event-card gp-next-event" onClick={() => openActivity(next)}><CalendarDays size={24} aria-hidden="true" /><span className="gp-event-copy"><small>{next.eventType} · {dateLabel(next.eventDate)}</small><strong>{next.name}</strong><span>{timeLabel(next.startTime)}</span>{next.eventType === 'Practice' && <span>{activeItems(prep.scripts).filter((script) => linkedPracticeEventIds(script).includes(next.id)).reduce((total, script) => total + playEntryCount(script), 0)} scripted play entries</span>}</span><ArrowRight size={18} aria-hidden="true" /></button> : <p className="gp-empty">No upcoming Game Plan activities linked.</p>}</section>
         {prep.activities.length > 0 && <section className="gp-section"><header><h2>Linked Activities</h2></header><div className="gp-activities">{prep.activities.map((event) => <article className="gp-event-card gp-linked-event-card" key={event.id}><button type="button" className="gp-linked-event-open" onClick={() => openActivity(event)}><CalendarDays size={20} aria-hidden="true" /><span className="gp-event-copy"><small>{event.eventType} · {dateLabel(event.eventDate)}</small><strong>{event.name}</strong><span>{timeLabel(event.startTime)}</span></span></button>{!readOnly && <ToolButton icon={Unlink} label={`Unlink ${event.name}`} disabled={busy} onClick={() => mutate(() => api.updateScheduleEvent(event.id, { gamePlanIds: event.gamePlanIds.filter((id) => id !== game.id) }))} />}</article>)}</div></section>}
         </aside>
       </div>}

@@ -467,7 +467,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {} }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {} }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -890,7 +890,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         onAdd={onAddGameCardItem} onOpen={onOpenGameCardItem} onSlideshow={onSlideshow}
         onDuplicate={onDuplicateGameCardItem} onDelete={onDeleteGameCardItem}
         onNewReport={onNew} onOpenReport={onOpenPlay} reportActions={rowActions}
-        practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} practiceSheetRevisionToken={practiceSheetRevisionToken}
+        practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onPrintPracticeAttachments={onPrintPracticeAttachments} practiceSheetRevisionToken={practiceSheetRevisionToken}
         />
       </> : <>
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
@@ -1104,6 +1104,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [showNewPlaybookDialog, setShowNewPlaybookDialog] = useState(false)
   const [printPlay, setPrintPlay] = useState(null)
   const [printCollection, setPrintCollection] = useState(null)
+  const [practicePrintQueue, setPracticePrintQueue] = useState([])
   const [playbooksReloadToken, setPlaybooksReloadToken] = useState(0)
   const [playsReloadToken, setPlaysReloadToken] = useState(0)
   const [scoutPlaysReloadToken, setScoutPlaysReloadToken] = useState(0)
@@ -1143,7 +1144,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       year: Number(parent.year || new Date().getFullYear()),
       gamePlanId: parent.id,
       gameCardId: card.id,
-      ...(card.tab === 'scout' && { practiceEventId }),
+      ...(card.tab === 'scout' && { practiceEventIds: [practiceEventId] }),
     })
     setPlaybooksReloadToken((token) => token + 1)
     setNewDialog(null)
@@ -1165,7 +1166,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       year: item.year,
       gamePlanId: item.gamePlanId,
       gameCardId: item.gameCardId,
-      ...(item.practiceEventId && { practiceEventId: item.practiceEventId }),
+      ...(Array.isArray(item.practiceEventIds)
+        ? { practiceEventIds: [...item.practiceEventIds] }
+        : item.practiceEventId ? { practiceEventId: item.practiceEventId } : {}),
       ...(Array.isArray(item.installPlays) && { installPlays: item.installPlays }),
     })
     try {
@@ -1230,6 +1233,29 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     setPrintCollection({ collection: { ...row, kind }, plays: result.items })
   }
 
+  async function showPracticeAttachmentPrint(playbook) {
+    try {
+      const result = await api.listPlaybookRows(playbook.id)
+      setPrintCollection({ collection: { ...playbook, kind: 'playbook' }, plays: result.items, autoPrint: true })
+    } catch (failure) {
+      setPracticePrintQueue([])
+      setStatusError({ ...failure, message: `Unable to print "${playbook.name}": ${failure.message}` })
+    }
+  }
+
+  function handlePrintPracticeAttachments(playbooks) {
+    const [first, ...remaining] = playbooks
+    setPracticePrintQueue(remaining)
+    if (first) showPracticeAttachmentPrint(first)
+  }
+
+  function printNextPracticeAttachment() {
+    const [next, ...remaining] = practicePrintQueue
+    setPracticePrintQueue(remaining)
+    if (next) showPracticeAttachmentPrint(next)
+    else setPrintCollection(null)
+  }
+
   function handleOpenGameCardItem(card, item, present = false) {
     requestLeave(() => {
       setPractice(null)
@@ -1246,6 +1272,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     try {
       const game = script.gamePlanId ? { ...await api.getGamePlan(script.gamePlanId), kind: 'gamePlan' } : null
       const card = GAME_CARD_VIEWS.find((item) => item.id === script.gameCardId)
+      const itemType = card?.tab === 'installs' ? 'Install' : 'Practice Script'
       requestLeave(() => {
         setPractice(null)
         setDesigner(null)
@@ -1253,7 +1280,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         if (game && card) {
           setParent(game)
           setGamePlanUnit(card.unit)
-          setGamePlanTab('practiceScripts')
+          setGamePlanTab(card.tab === 'installs' ? 'installs' : 'practiceScripts')
           setGameCard(card)
           setCardPlaybook({ ...script, kind: 'playbook' })
         } else {
@@ -1261,9 +1288,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           setGameCard(null)
           setCardPlaybook(null)
         }
-      }, 'Open Practice Script')
+      }, `Open ${itemType}`)
     } catch (failure) {
-      setStatusError({ ...failure, message: `Unable to open Practice Script: ${failure.message}` })
+      setStatusError({ ...failure, message: `Unable to open preparation item: ${failure.message}` })
     }
   }
 
@@ -1916,10 +1943,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {printPlay && <PrintPreviewDialog play={printPlay.play} parentCollectionName={printPlay.collectionName} onClose={() => setPrintPlay(null)} />}
       {printCollection && (
         <PrintPreviewDialog
+          key={`${printCollection.collection.id}-${printCollection.autoPrint ? 'auto' : 'manual'}`}
           api={api}
           plays={printCollection.plays}
           collection={printCollection.collection}
-          onClose={() => setPrintCollection(null)}
+          autoPrint={printCollection.autoPrint}
+          onAfterPrint={printCollection.autoPrint ? printNextPracticeAttachment : undefined}
+          onClose={() => { setPrintCollection(null); setPracticePrintQueue([]) }}
         />
       )}
 
@@ -2062,6 +2092,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onPracticeLoaded={handlePracticeLoaded}
           onCreateScoutPlay={handleCreatePracticeScoutPlay}
           onOpenScoutPlay={handleOpenPracticeScoutPlay}
+          onPrintPracticeAttachments={handlePrintPracticeAttachments}
           practiceSheetRevisionToken={practiceSheetRevisionToken}
         />
         </BreadcrumbView>
@@ -2094,6 +2125,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             onOpenScoutPlay={handleOpenPracticeScoutPlay}
             onOpenScript={handleOpenSchedulePracticeScript}
             onCreatePracticeScript={writable && workspace.usage.playbooks < workspace.limits.playbooks ? handleCreateSchedulePracticeScript : undefined}
+            onPrintPracticeAttachments={handlePrintPracticeAttachments}
             practiceSheetRevisionToken={practiceSheetRevisionToken}
           />
         </>

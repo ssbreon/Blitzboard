@@ -5638,8 +5638,7 @@ html.is-drilling-through * {
 }
 
 .schedule-day.today {
-  background: color-mix(in srgb, #1f4d2b 8%, var(--input-bg));
-  box-shadow: inset 0 0 0 1px #1f4d2b;
+  box-shadow: inset 0 0 0 1px var(--navy-light);
 }
 
 .schedule-day.today > header > span {
@@ -5647,9 +5646,12 @@ html.is-drilling-through * {
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  background: #1f4d2b;
+  background:var(--navy-light);
   color: #f0fdf4;
+  margin-left: -6px;
+  margin-top: -8px;
+  border-bottom-right-radius: 4px;
+  padding-right: 3px;
 }
 
 .schedule-day > header {
@@ -5877,6 +5879,14 @@ html.is-drilling-through * {
 
 .schedule-event-label > svg {
   flex: none;
+}
+
+.schedule-event-link-indicator {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: center;
+  opacity: 0.75;
 }
 
 .schedule-football {

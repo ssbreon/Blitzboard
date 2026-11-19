@@ -5,12 +5,13 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import { ScheduleView, defaultRelatedGameId, duplicateScheduleEventPayload, practiceGamePlans, practiceGamePlanRange, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate, buildCalendarDays } from '../utils/scheduleCalendar.js'
-import { gamePreparation, generatedPracticeScriptPayload, nextPreparationActivity, scoutPlayName } from '../utils/gamePlanWorkspace.js'
+import { gamePreparation, generatedPracticeScriptPayload, linkableGamePlanActivities, nextPreparationActivity, scoutPlayName } from '../utils/gamePlanWorkspace.js'
 
 test('game preparation uses explicit activity links and preserves unassigned legacy scripts', () => {
   const events = [
     { id: 'unlinked', eventType: 'Practice', eventDate: '2026-11-10', startTime: '15:00' },
     { id: 'practice', eventType: 'Practice', eventDate: '2026-11-11', startTime: '15:00', gamePlanIds: ['game'] },
+    { id: 'practice-two', eventType: 'Practice', eventDate: '2026-11-12', startTime: '15:00', gamePlanIds: ['game'] },
     { id: 'film', eventType: 'Film Review', eventDate: '2026-11-12', gamePlanIds: ['game'] },
   ]
   const books = [
@@ -18,16 +19,17 @@ test('game preparation uses explicit activity links and preserves unassigned leg
     { id: 'legacy', gamePlanId: 'game', gameCardId: 'offense-scout' },
     { id: 'shared', gamePlanId: 'other', practiceEventId: 'practice', gameCardId: 'defense-scout' },
     { id: 'unrelated', gamePlanId: 'game', practiceEventId: 'unlinked', gameCardId: 'offense-scout' },
+    { id: 'multi-practice', gameCardId: 'offense-scout', practiceEventIds: ['practice', 'practice-two'] },
   ]
   const prep = gamePreparation('game', books, events, [])
-  assert.deepEqual(prep.scripts.map((item) => item.id), ['legacy', 'shared'])
+  assert.deepEqual(prep.scripts.map((item) => item.id), ['legacy', 'shared', 'multi-practice'])
   assert.deepEqual(prep.installs.map((item) => item.id), ['install'])
   assert.equal(nextPreparationActivity(prep.activities, new Date('2026-11-11T12:00')).id, 'practice')
   assert.equal(nextPreparationActivity(prep.activities, new Date('2026-11-13T12:00')), null)
   const practice = { id: 'practice-id', name: 'Wednesday Practice', eventDate: '2026-11-11' }
   assert.deepEqual(generatedPracticeScriptPayload(practice, 'Offense'), {
     name: 'Wednesday Practice - Offense Script', category: 'Offense', year: 2026,
-    gameCardId: 'offense-scout', practiceEventId: 'practice-id',
+    gameCardId: 'offense-scout', practiceEventIds: ['practice-id'],
   })
   assert.equal(generatedPracticeScriptPayload(practice, 'Defense').gameCardId, 'defense-scout')
   assert.equal(generatedPracticeScriptPayload(practice, 'Special Teams').gameCardId, 'special-teams-scout')
@@ -55,7 +57,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     const { MonthCalendar, YearCalendar, ScheduleEventDialog } = await server.ssrLoadModule('/src/components/TeamSchedule.jsx')
     const { CategoryBadge, getCategoryBadgeStyle } = await server.ssrLoadModule('/src/components/CategoryBadge.jsx')
     const { GamePlanHeader, GamePlanUnitFilter, GamePlanWorkspace } = await server.ssrLoadModule('/src/components/GamePlanWorkspace.jsx')
-    const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows, practiceSheetTimeLabel, practiceSheetDateLabel, defaultPracticePeriodStart } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
+    const { PracticeSheet, ACTIVITY_GROUPS, PRACTICE_PLAN_GRID_COLUMNS, practicePeriodEndTime, practicePeriodGroupBreakdown, cascadePracticePeriodStarts, reorderPracticePeriods, reorderPracticeSheetAttachments, groupPracticeActivities, summarizePracticeActivities, practicePlanGridRows, practiceSheetTimeLabel, practiceSheetDateLabel, defaultPracticePeriodStart } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
     const { PracticeScriptPlayGrid } = await server.ssrLoadModule('/src/components/PracticeScriptPlayGrid.jsx')
     const { DataGrid } = await server.ssrLoadModule('/src/components/DataGrid.jsx')
     assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
@@ -88,14 +90,16 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.equal(practicePeriodGroupBreakdown(), 'No')
     assert.equal(practicePeriodGroupBreakdown({}), 'No')
     assert.equal(practicePeriodGroupBreakdown({ groupBreakdown: 'Yes' }), 'Yes')
-    assert.deepEqual(PRACTICE_PLAN_GRID_COLUMNS.map((column) => column.header), ['Start', 'Minutes', 'Period', 'Activities', 'Practice Script'])
+    assert.deepEqual(reorderPracticeSheetAttachments(['install-a', 'script-b', 'install-c'], 'install-c', 'install-a'), ['install-c', 'install-a', 'script-b'])
+    assert.deepEqual(reorderPracticeSheetAttachments(['install-a', 'script-b'], 'missing', 'install-a'), ['install-a', 'script-b'])
+    assert.deepEqual(PRACTICE_PLAN_GRID_COLUMNS.map((column) => column.header), ['Start', 'Minutes', 'Period', 'Activities'])
     const practiceGridRows = practicePlanGridRows([
-      { id: 'offense', name: 'Offense', startTime: '15:30', duration: '20', practiceScriptId: 'script-1', activities: [{ group: 'QB', name: 'Dropback', coach: 'Smith' }], scripts: [{ id: 'play-1', offPlay: 'H-JET' }, { id: 'play-2', offPlay: 'PLUTO' }] },
+      { id: 'offense', name: 'Offense', startTime: '15:30', duration: '20', activities: [{ group: 'QB', name: 'Dropback', coach: 'Smith' }], scripts: [{ id: 'play-1', offPlay: 'H-JET' }, { id: 'play-2', offPlay: 'PLUTO' }] },
       { id: 'defense', name: 'Defense', startTime: '15:50', duration: '10', activities: [{ group: 'LB', name: 'Pursuit' }], scripts: [] },
-    ], [{ id: 'script-1', name: 'Offense Script' }])
-    assert.deepEqual(practiceGridRows.map(({ start, minutes, period, activities, practiceScript }) => ({ start, minutes, period, activities, practiceScript })), [
-      { start: '15:30', minutes: '20', period: 'Offense', activities: [{ group: 'QB', activities: [{ name: 'Dropback', coach: 'Smith' }] }], practiceScript: 'Offense Script' },
-      { start: '15:50', minutes: '10', period: 'Defense', activities: [{ group: 'LB', activities: [{ name: 'Pursuit', coach: '' }] }], practiceScript: '' },
+    ])
+    assert.deepEqual(practiceGridRows.map(({ start, minutes, period, activities }) => ({ start, minutes, period, activities })), [
+      { start: '15:30', minutes: '20', period: 'Offense', activities: [{ group: 'QB', activities: [{ name: 'Dropback', coach: 'Smith' }] }] },
+      { start: '15:50', minutes: '10', period: 'Defense', activities: [{ group: 'LB', activities: [{ name: 'Pursuit', coach: '' }] }] },
     ])
     assert.equal(practicePeriodEndTime('15:30', '20'), '15:50')
     assert.equal(practicePeriodEndTime('23:50', '20'), '00:10')
@@ -312,4 +316,17 @@ test('duplicating a practice preserves an independent copy of its sheet', () => 
   assert.deepEqual(copy.practiceSheet, practiceSheet)
   copy.practiceSheet.periods[0].activities[0].name = 'Changed'
   assert.equal(practiceSheet.periods[0].activities[0].name, 'Install')
+})
+
+test('Game Plan activity links show the fourteen days before the game date and sort newest first', () => {
+  const events = [
+    { id: 'outside', eventDate: '2026-11-04', startTime: '18:00', name: 'Outside window' },
+    { id: 'cutoff', eventDate: '2026-11-05', startTime: '08:00', name: 'Cutoff day' },
+    { id: 'game-day-late', eventDate: '2026-11-19', startTime: '18:00', name: 'Game day late' },
+    { id: 'game-day-early', eventDate: '2026-11-19', startTime: '08:00', name: 'Game day early' },
+    { id: 'future', eventDate: '2026-11-20', startTime: '12:00', name: 'Future' },
+    { id: 'already-linked', eventDate: '2026-11-19', startTime: '20:00', name: 'Already linked', gamePlanIds: ['game'] },
+  ]
+  assert.deepEqual(linkableGamePlanActivities('game', '2026-11-19', events).map((event) => event.id), ['game-day-late', 'game-day-early', 'cutoff'])
+  assert.deepEqual(linkableGamePlanActivities('game', '2026-11-20', events).map((event) => event.id), ['future', 'game-day-late', 'game-day-early'])
 })

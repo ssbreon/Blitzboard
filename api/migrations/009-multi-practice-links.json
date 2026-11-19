@@ -1,0 +1,11 @@
+{
+  "version": 9,
+  "provider": "azure-cosmos-nosql",
+  "description": "Allows installs and practice scripts to be associated with multiple practice events.",
+  "fields": {
+    "playbooks.practiceEventIds": "Optional array of unique scheduleEvents IDs; each referenced event must be a Practice in the same workspace",
+    "playbooks.practiceEventId": "Legacy optional single Practice event ID; read when practiceEventIds is absent"
+  },
+  "legacyCompatibility": "No bulk data rewrite is required. Existing practiceEventId values continue to be honored when practiceEventIds is absent. An empty practiceEventIds array means unassigned.",
+  "lifecycle": "Practice events referenced by installs or scripts cannot be deleted, changed to another event type, or unlinked from their last Game Plan until the preparation items are reassigned or deleted."
+}
