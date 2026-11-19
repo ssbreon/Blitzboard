@@ -26,7 +26,7 @@ function renderGridCell(column, row) {
   )
 }
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, openHintKey, hidePager = false, hideToolbar = false, onReorder, canReorderRows, className = '' }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, openHintKey, hidePager = false, hideToolbar = false, hideToolbarMenu = false, onReorder, canReorderRows, className = '' }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
   const openHintStorageKey = openHintKey ? `blitzboard:data-grid-open-hint:${openHintKey}` : null
   const [fetchedRows, setRows] = useState([])
@@ -370,7 +370,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
             </div>
           )}
         </div>}
-        <div className="toolbar-menu data-grid-toolbar-menu" ref={menuRef}>
+        {!hideToolbarMenu && <div className="toolbar-menu data-grid-toolbar-menu" ref={menuRef}>
           {statusFilter && selectedStatus === 'Archived' && (
             <span className="data-grid-archived-indicator" role="status" aria-label="Viewing archived records" title="Viewing archived records">
               <Archive size={18} aria-hidden="true" />
@@ -423,7 +423,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
               ) : dropdownActions}
             </div>
           )}
-        </div>
+        </div>}
       </div>}
       {isLoading && <LoadingIndicator className="data-grid-status data-grid-loading" label={`Loading ${title.toLowerCase()}...`} />}
       <ErrorDialog error={error} message={`We couldn't load ${title.toLowerCase()}. Please refresh the list to try again.`} />
