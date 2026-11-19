@@ -10,6 +10,7 @@ import { PracticeSheet } from './PracticeSheet'
 import { GAME_UNITS, gamePreparation, generatedPracticeScriptPayload, linkableGamePlanActivities, linkedPracticeEventIds, playEntryCount } from '../utils/gamePlanWorkspace'
 import { findPlayTemplate } from '../utils/formations'
 import './GamePlanWorkspace.css'
+import './PracticeSheet.css'
 
 const today = () => {
   const date = new Date()
@@ -48,7 +49,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   const [activityDialog, setActivityDialog] = useState(null)
   const [practiceRevision, setPracticeRevision] = useState(0)
   const [linkOpen, setLinkOpen] = useState(false)
-  const [linkId, setLinkId] = useState('')
+  const [linkIds, setLinkIds] = useState(new Set())
   const [reportUnit, setReportUnit] = useState(null)
   const [selectedUnits, setSelectedUnits] = useState([])
 
@@ -95,7 +96,12 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
       : [...current, unit])
   }
 
-  const availableEvents = linkableGamePlanActivities(game.id, game.gameDate, data?.events || [])
+  const availableEvents = linkableGamePlanActivities(game.gameDate, data?.events || [])
+
+  function closeLinkDialog() {
+    setLinkOpen(false)
+    setLinkIds(new Set())
+  }
   const groups = [{ id: 'installs', label: 'Installs', items: prep.installs }, { id: 'practiceScripts', label: 'Practice Scripts', items: prep.scripts }, { id: 'scoutingReports', label: 'Scouting Reports', items: prep.reports }]
   const summaryItems = groups.flatMap((group) => {
     const groupItems = activeItems(group.items).filter((item) => !selectedUnits.length || selectedUnits.includes(item.unit || item.category || game.category))
@@ -197,10 +203,10 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
       <div className="schedule-dialog-body"><label className="schedule-field"><span>Unit</span><select autoFocus value={reportUnit} onChange={(event) => setReportUnit(event.target.value)}>{GAME_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label></div>
       <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => setReportUnit(null)}>Cancel</button><button type="submit" className="schedule-primary-button">Continue</button></footer>
     </form></div>}
-    {linkOpen && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setLinkOpen(false) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="link-game-plan-event-title" aria-busy={busy} onSubmit={(event) => { event.preventDefault(); const activity = availableEvents.find((item) => item.id === linkId); if (activity) mutate(async () => { await api.updateScheduleEvent(activity.id, { gamePlanIds: [...(activity.gamePlanIds || []), game.id] }); setLinkOpen(false); setLinkId('') }) }}>
-      <header className="schedule-dialog-header"><div><Link size={20} aria-hidden="true" /><h2 id="link-game-plan-event-title">Link Game Plan Event</h2></div><DialogCloseButton onClick={() => setLinkOpen(false)} disabled={busy} /></header>
-      <div className="schedule-dialog-body"><label className="schedule-field"><span>Team event</span><select autoFocus required value={linkId} onChange={(event) => setLinkId(event.target.value)} disabled={busy}><option value="">Select an event</option>{availableEvents.map((event) => <option key={event.id} value={event.id}>{dateLabel(event.eventDate)} - {event.name} ({event.eventType})</option>)}</select></label></div>
-      <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => { setLinkOpen(false); setActivityDialog('new') }} disabled={busy}><Plus size={16} />New Event</button><button type="button" className="schedule-secondary-button" onClick={() => setLinkOpen(false)} disabled={busy}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={!linkId || busy}>{busy ? 'Linking...' : 'Link'}</button></footer>
+    {linkOpen && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeLinkDialog() }}><form className="schedule-dialog practice-sheet-attachment-dialog" role="dialog" aria-modal="true" aria-labelledby="link-game-plan-event-title" aria-busy={busy} onSubmit={(event) => { event.preventDefault(); const activities = availableEvents.filter((item) => linkIds.has(item.id)); if (activities.length) mutate(async () => { await Promise.all(activities.map((activity) => api.updateScheduleEvent(activity.id, { gamePlanIds: [...(activity.gamePlanIds || []), game.id] }))); closeLinkDialog() }) }}>
+      <header className="schedule-dialog-header"><div><Link size={20} aria-hidden="true" /><h2 id="link-game-plan-event-title">Link Game Plan Events</h2></div><DialogCloseButton onClick={closeLinkDialog} disabled={busy} /></header>
+      <div className="schedule-dialog-body practice-sheet-attachment-options">{availableEvents.length ? availableEvents.map((event) => <label className="practice-sheet-attachment-option" key={event.id}><input type="checkbox" checked={linkIds.has(event.id)} disabled={busy} onChange={(input) => setLinkIds((current) => { const next = new Set(current); if (input.target.checked) next.add(event.id); else next.delete(event.id); return next })} /><span><strong>{event.name}</strong><small>{dateLabel(event.eventDate)} · {event.eventType}</small></span></label>) : <p className="practice-sheet-empty">No events are available to link to this Game Plan.</p>}</div>
+      <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button gp-link-new-event-button" onClick={() => { closeLinkDialog(); setActivityDialog('new') }} disabled={busy}><Plus size={16} />New Event</button><button type="button" className="schedule-secondary-button" onClick={closeLinkDialog} disabled={busy}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={!linkIds.size || busy}>{busy ? 'Linking...' : 'Link'}</button></footer>
     </form></div>}
     {activityDialog && <ScheduleEventDialog api={api} key={activityDialog.id || 'new'} initialEvent={activityDialog === 'new' ? undefined : activityDialog} initialDate={today()} canEdit={!readOnly} canCreateGame={false} canDelete={false} onCancel={() => setActivityDialog(null)} onSave={async (payload) => {
       if (activityDialog === 'new') {

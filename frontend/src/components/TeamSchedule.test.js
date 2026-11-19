@@ -326,7 +326,8 @@ test('Game Plan activity links show the fourteen days before the game date and s
     { id: 'game-day-early', eventDate: '2026-11-19', startTime: '08:00', name: 'Game day early' },
     { id: 'future', eventDate: '2026-11-20', startTime: '12:00', name: 'Future' },
     { id: 'already-linked', eventDate: '2026-11-19', startTime: '20:00', name: 'Already linked', gamePlanIds: ['game'] },
+    { id: 'linked-elsewhere', eventDate: '2026-11-19', startTime: '19:00', name: 'Linked elsewhere', gamePlanIds: ['other-game'] },
   ]
-  assert.deepEqual(linkableGamePlanActivities('game', '2026-11-19', events).map((event) => event.id), ['game-day-late', 'game-day-early', 'cutoff'])
-  assert.deepEqual(linkableGamePlanActivities('game', '2026-11-20', events).map((event) => event.id), ['future', 'game-day-late', 'game-day-early'])
+  assert.deepEqual(linkableGamePlanActivities('2026-11-19', events).map((event) => event.id), ['game-day-late', 'game-day-early', 'cutoff'])
+  assert.deepEqual(linkableGamePlanActivities('2026-11-20', events).map((event) => event.id), ['future', 'game-day-late', 'game-day-early'])
 })

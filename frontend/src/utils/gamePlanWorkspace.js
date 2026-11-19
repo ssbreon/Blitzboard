@@ -23,12 +23,12 @@ export function linkedPracticeEventIds(record) {
   return record?.practiceEventId ? [record.practiceEventId] : []
 }
 
-export function linkableGamePlanActivities(gameId, gameDate, events) {
+export function linkableGamePlanActivities(gameDate, events) {
   const [year, month, day] = (gameDate || '').split('-').map(Number)
   const cutoff = gameDate ? new Date(year, month - 1, day - 14) : null
   const cutoffDate = cutoff ? `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}` : ''
   return events
-    .filter((event) => (!gameDate || event.eventDate <= gameDate) && (!cutoffDate || event.eventDate >= cutoffDate) && !event.gamePlanIds?.includes(gameId))
+    .filter((event) => (!gameDate || event.eventDate <= gameDate) && (!cutoffDate || event.eventDate >= cutoffDate) && !event.gamePlanIds?.length)
     .sort((left, right) => {
       const leftDateTime = `${left.eventDate}T${left.startTime || ''}`
       const rightDateTime = `${right.eventDate}T${right.startTime || ''}`

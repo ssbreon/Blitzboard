@@ -19,15 +19,15 @@
 .practice-sheet-section-heading span, .practice-sheet-empty { color: var(--text); font-size: 13px; }
 .practice-plan-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; width: 100%; }
 .practice-plan-controls > .practice-plan-menu { margin-left: auto; }
-.practice-sheet-attachment { display: inline-flex; align-items: center; flex-direction: row; min-width: 0; }
-.practice-sheet-attachment.is-drop-target { outline: 2px solid var(--navy-light); outline-offset: 2px; }
-.practice-sheet-attach-button + .practice-sheet-attachment { margin-left: 2px; padding-left: 8px; border-left: 1px solid var(--form-border); }
-.practice-sheet-attachment-grip { display: inline-flex; width: 25px; min-width: 25px; height: 34px; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--form-border); border-right: 0; border-radius: 4px 0 0 4px; background: var(--column-header-bg); color: var(--text); cursor: grab; }
-.practice-sheet-attachment-grip:active { cursor: grabbing; }
-.practice-sheet-attachment-grip:disabled { cursor: default; opacity: .6; }
-.practice-sheet-attachment-pill { display: inline-flex; max-width: 260px; min-height: 34px; align-items: center; gap: 6px; padding: 6px 9px; border: 1px solid var(--form-border); border-radius: 0 4px 4px 0; background: var(--left-pane-bg); color: var(--text-h); font-size: 12px; cursor: pointer; }
-.practice-sheet-attachment-pill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.practice-sheet-attachment-pill:disabled { cursor: default; }
+.practice-sheet-body { display: flex; flex: 1; min-width: 0; min-height: 0; }
+.practice-sheet-body > .practice-sheet-content { min-width: 0; }
+.practice-sheet-sidebar { flex: 0 0 320px; width: 320px; }
+.gp-event-card.practice-attachment-card { gap: 10px; padding: 0 8px 0 0; align-items: stretch; }
+.practice-attachment-card.is-drop-target { outline: 2px solid var(--navy-light); outline-offset: 2px; }
+.practice-attachment-card .gp-linked-event-open { padding: 6px 0; }
+.practice-attachment-grip { display: inline-flex; flex: 0 0 28px; width: 28px; align-self: stretch; align-items: center; justify-content: center; padding: 0; border: 0; border-right: 1px solid var(--form-border); border-radius: 5px 0 0 5px; background: var(--column-header-bg); color: var(--text); cursor: grab; }
+.practice-attachment-grip:active { cursor: grabbing; }
+.practice-attachment-grip:disabled { cursor: default; opacity: .6; }
 .practice-sheet-attachment-dialog { max-width: 560px; }
 .practice-sheet-print-dialog { max-width: 520px; }
 .practice-sheet-print-dialog .schedule-dialog-body { box-sizing: border-box; min-width: 0; overflow-x: hidden; }
@@ -58,6 +58,7 @@
 .practice-grid-activity-coach { color: var(--text); font-size: 12px; }
 .practice-grid-activity-empty { color: var(--text); }
 .practice-sheet-content > .data-grid-compact .data-grid-table td:nth-child(4) { vertical-align: top; }
+@media (max-width: 700px) { .practice-sheet-body { flex-direction: column; overflow-y: auto; } .practice-sheet-body > .practice-sheet-content { flex: none; overflow: visible; } .practice-sheet-sidebar { flex: none; width: auto; overflow: visible; border-left: 0; border-top: 4px solid var(--navy-light); padding: 16px; } }
 .practice-activities-grid { min-width: 0; }
 .practice-activities-grid-toolbar { padding: 6px 8px; }
 .practice-activities-grid > .data-grid { min-width: 0; flex: 0 0 auto; }
@@ -99,8 +100,9 @@
 	#root:has(.practice-sheet) .breadcrumb-view:has(.practice-sheet), #root:has(.practice-sheet) .gp-workspace:has(.practice-sheet) { display: block; height: auto; overflow: visible; }
 	.practice-sheet { display: block; overflow: visible; height: auto; background: white; color: black; }
 	.practice-sheet-header { flex: none; }
+	.practice-sheet-body { display: block; }
 	.practice-sheet-content { display: block; width: auto; max-width: none; min-height: 0; overflow: visible; margin: 0 auto; }
-	.practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-sheet-attach-button, .practice-sheet-attachment-pill, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
+	.practice-sheet-sidebar, .practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
 	.practice-period-content[hidden] { display: block !important; }
 	.practice-print-value { display: block; color: black; font-size: 14px; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
 	.practice-period { break-inside: avoid; }
