@@ -24,9 +24,8 @@ export function duplicateScheduleEventPayload(event) {
 
 export function practiceGamePlanRange(practiceDate) {
   const firstGameDate = new Date(`${practiceDate}T00:00:00Z`)
-  firstGameDate.setUTCDate(firstGameDate.getUTCDate() + 1)
   const lastGameDate = new Date(firstGameDate)
-  lastGameDate.setUTCDate(lastGameDate.getUTCDate() + 6)
+  lastGameDate.setUTCDate(lastGameDate.getUTCDate() + 7)
   return {
     start: firstGameDate.toISOString().slice(0, 10),
     end: lastGameDate.toISOString().slice(0, 10),
@@ -36,7 +35,7 @@ export function practiceGamePlanRange(practiceDate) {
 export function practiceGamePlans(practiceDate, gamePlans) {
   const { end } = practiceGamePlanRange(practiceDate)
   return gamePlans
-    .filter((game) => game.gameDate > practiceDate && game.gameDate <= end && game.recordStatus !== 'Archived')
+    .filter((game) => game.gameDate >= practiceDate && game.gameDate <= end && game.recordStatus !== 'Archived')
 }
 
 export function defaultRelatedGameId(games) {

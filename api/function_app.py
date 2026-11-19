@@ -592,14 +592,14 @@ def update_record(entity_type, item_id, payload):
 
 
 def validate_schedule_event(payload, partial=False):
-    allowed_types = {"Practice", "Film Review", "Team Meeting", "Other"}
+    allowed_types = {"Practice", "Film Review", "Team Meeting", "Team Meal", "Other"}
     allowed_dresses = {"Full Pads", "Half Pads", "Uppers", "Helmets"}
     if not partial and not {"name", "eventType", "eventDate"}.issubset(payload):
         return "name, eventType, and eventDate are required"
     if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip()):
         return "name must be a non-empty string"
     if "eventType" in payload and payload["eventType"] not in allowed_types:
-        return "eventType must be Practice, Film Review, Team Meeting, or Other"
+        return "eventType must be Practice, Film Review, Team Meeting, Team Meal, or Other"
     if "dress" in payload and payload["dress"] not in allowed_dresses | {""}:
         return "dress must be Full Pads, Half Pads, Uppers, or Helmets"
     if payload.get("dress") and payload.get("eventType") != "Practice":

@@ -18,7 +18,7 @@ import { generatedPracticeScriptPayload } from '../utils/gamePlanWorkspace'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const SCHEDULE_VIEWS = Object.values(ScheduleView)
-const EVENT_INDICATORS = { Practice: '\u25cf', Game: '\u25a0', 'Team Meeting': '\u25b2', 'Film Review': '\u25c6', Other: '\u25cb' }
+const EVENT_INDICATORS = { Practice: '\u25cf', Game: '\u25a0', 'Team Meeting': '\u25b2', 'Team Meal': '\u25b2', 'Film Review': '\u25c6', Other: '\u25cb' }
 function savedScheduleView() {
   try {
     const saved = localStorage.getItem('teamScheduleView')
@@ -27,13 +27,14 @@ function savedScheduleView() {
     return ScheduleView.MONTH
   }
 }
-const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Other']
+const EVENT_TYPES = ['Practice', 'Film Review', 'Team Meeting', 'Team Meal', 'Other']
 const PRACTICE_DRESSES = ['Full Pads', 'Half Pads', 'Uppers', 'Helmets']
 const EVENT_TYPE_ICONS = {
   Game: Trophy,
   Practice: Dumbbell,
   'Film Review': ClipboardList,
   'Team Meeting': Users,
+  'Team Meal': Users,
   Other: CalendarDays,
 }
 const pad = (value) => String(value).padStart(2, '0')

@@ -618,6 +618,15 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("PATCH", f"playbooks/{script['id']}", "local-coach", {"workflowStatus": "Ready"}).status_code, 200)
         self.assertNotIn("workflowStatus", response_json(call_api("GET", f"playbooks/{script['id']}", "local-coach")))
 
+    def test_team_meal_schedule_event_is_accepted(self):
+        event = response_json(call_api("POST", "schedule-events", "local-coach", {
+            "name": "Team Dinner", "eventType": "Team Meal", "eventDate": "2026-11-19",
+            "startTime": "18:00", "endTime": "19:00", "location": "Cafeteria", "notes": "Bring the team",
+        }))
+        self.assertEqual(event["eventType"], "Team Meal")
+        self.assertEqual(event["location"], "Cafeteria")
+        self.assertEqual(event["notes"], "Bring the team")
+
     def test_schedule_range_filters_dates_inclusively_and_preserves_scope(self):
         for path, date_field, extra in (("schedule-events", "eventDate", {"eventType": "Practice"}), ("game-plans", "gameDate", {})):
             for date in ("2025-12-31", "2026-01-01", "2026-02-28", "2026-03-01"):

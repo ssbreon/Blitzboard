@@ -34,8 +34,8 @@ test('game preparation uses explicit activity links and preserves unassigned leg
   assert.equal(generatedPracticeScriptPayload(practice, 'No'), null)
 })
 
-test('new events can relate to active Game Plans in the following seven days', () => {
-  assert.deepEqual(practiceGamePlanRange('2026-11-11'), { start: '2026-11-12', end: '2026-11-18' })
+test('events can relate to active Game Plans on the same day and in the following seven days', () => {
+  assert.deepEqual(practiceGamePlanRange('2026-11-11'), { start: '2026-11-11', end: '2026-11-18' })
   const games = practiceGamePlans('2026-11-11', [
     { id: 'same-day', gameDate: '2026-11-11' },
     { id: 'next-day', gameDate: '2026-11-12' },
@@ -43,9 +43,9 @@ test('new events can relate to active Game Plans in the following seven days', (
     { id: 'day-eight', gameDate: '2026-11-19' },
     { id: 'archived', gameDate: '2026-11-14', recordStatus: 'Archived' },
   ])
-  assert.deepEqual(games.map((game) => game.id), ['next-day', 'day-seven'])
+  assert.deepEqual(games.map((game) => game.id), ['same-day', 'next-day', 'day-seven'])
   assert.equal(defaultRelatedGameId(games), '')
-  assert.equal(defaultRelatedGameId([games[0]]), 'next-day')
+  assert.equal(defaultRelatedGameId([games[0]]), 'same-day')
   assert.equal(defaultRelatedGameId([]), '')
 })
 
@@ -59,6 +59,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     const { PracticeScriptPlayGrid } = await server.ssrLoadModule('/src/components/PracticeScriptPlayGrid.jsx')
     const { DataGrid } = await server.ssrLoadModule('/src/components/DataGrid.jsx')
     assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
+    assert.deepEqual(getCategoryBadgeStyle('Team Meal'), getCategoryBadgeStyle('Team Meeting'))
     assert.ok(renderToStaticMarkup(createElement(CategoryBadge, { value: 'Game - Away' })).includes('>Game - Away</span>'))
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL', offPlay: 'GAMECOCKS LEFT', defFront: '4-2-5', defCoverage: 'C2' }), 'ACE HAIL GAMECOCKS LEFT vs 4-2-5 C2')
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL' }), 'ACE HAIL')
@@ -157,6 +158,16 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.ok(createPracticeDialog.includes('Half Pads'))
     assert.ok(createPracticeDialog.includes('Uppers'))
     assert.ok(createPracticeDialog.includes('Helmets'))
+    assert.ok(createPracticeDialog.includes('<option value="Team Meal">Team Meal</option>'))
+    const teamMealDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
+      initialEvent: { id: 'meal-id', kind: 'event', eventType: 'Team Meal', name: 'Team Dinner', eventDate: '2026-11-10', location: 'Cafeteria', notes: 'Bring the team', gamePlanIds: ['game-id'] },
+      canEdit: true, canCreateGame: false, canDelete: false, onCancel: () => {}, onSave: () => {},
+    }))
+    assert.ok(teamMealDialog.includes('<option value="Team Meal" selected="">Team Meal</option>'))
+    assert.ok(teamMealDialog.includes('>End</span>'))
+    assert.ok(teamMealDialog.includes('>Location</span>'))
+    assert.ok(teamMealDialog.includes('>Notes</span>'))
+    assert.ok(teamMealDialog.includes('>Related Game</span>'))
     const editPracticeDialog = renderToStaticMarkup(createElement(ScheduleEventDialog, {
       initialEvent: { id: 'practice-id', kind: 'event', eventType: 'Practice', name: 'Practice', eventDate: '2026-11-10', dress: 'Half Pads', gamePlanIds: ['game-id'] },
       canEdit: true, canCreateGame: false, canDelete: false, onCancel: () => {}, onSave: () => {},

@@ -17,6 +17,7 @@ const CATEGORY_COLORS = {
   Practice: { hue: 142, saturation: '58%' },
   'Film Review': { hue: 215, saturation: '72%' },
   'Team Meeting': { hue: 275, saturation: '62%' },
+  'Team Meal': { hue: 275, saturation: '62%' },
   Other: { hue: 220, saturation: '8%' },
 }
 
