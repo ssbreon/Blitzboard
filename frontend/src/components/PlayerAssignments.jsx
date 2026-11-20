@@ -164,11 +164,13 @@ export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open
           </button>
         ) : <h2><ClipboardList size={16} aria-hidden="true" />Player Assignments</h2>}
         <div className="play-assignments-dock-tools" role="toolbar" aria-label="Assignments docking">
-          <button type="button" aria-label="Docked" title="Docked" aria-pressed={!undocked} onClick={() => onUndockedChange(false)}>
+          <button type="button" aria-label="Dock player assignments" title="Keep assignments docked in the play" aria-pressed={!undocked} onClick={() => onUndockedChange(false)}>
             <PanelBottom size={16} aria-hidden="true" />
+            <span>Dock</span>
           </button>
-          <button type="button" aria-label="Undocked" title="Undocked" aria-pressed={undocked} onClick={undock}>
+          <button type="button" aria-label="Pop out player assignments" title="Open assignments as a movable panel" aria-pressed={undocked} onClick={undock}>
             <ExternalLink size={16} aria-hidden="true" />
+            <span>Pop out</span>
           </button>
         </div>
       </header>

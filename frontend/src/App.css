@@ -4140,16 +4140,25 @@ html.is-drilling-through * {
   gap: 2px;
 
   button {
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 30px;
-    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 68px;
+    height: 34px;
+    padding: 0 8px;
     border: 1px solid var(--secondary-button-border);
     border-radius: 4px;
     background: var(--secondary-button);
     color: var(--navy);
     cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+
+    svg {
+      flex: none;
+    }
 
     &[aria-pressed='true'] {
       border-color: var(--navy-light);
