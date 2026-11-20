@@ -59,9 +59,18 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(!granted.includes('value="admin"'))
     const settings = renderToStaticMarkup(createElement(AccountViews, {
       view: 'settings', user: { userId: 'owner', preferences: { timezone: 'UTC' } }, api: {},
-      workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, subscription: { kind: 'team' } },
+      workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, scoutingTendencies: { 'offense.formation': 'Run strength: pin and pull' }, subscription: { kind: 'team' } },
     }))
     assert.ok(settings.includes('Suggestion Lists'))
+    assert.ok(settings.includes('Scouting'))
+    assert.ok(settings.includes('Scouting Tendencies'))
+    assert.ok(settings.includes('Scouting Template'))
+    assert.ok(settings.includes('class="account-settings-suggestion-select" size="15"'))
+    assert.ok(settings.includes('<optgroup label="OFFENSE">'))
+    assert.ok(settings.includes('<optgroup label="DEFENSE">'))
+    assert.ok(settings.includes('<optgroup label="SPECIAL TEAMS">'))
+    assert.ok(settings.includes('<option value="offense.formation" selected="">Formation</option>'))
+    assert.ok(settings.includes('Run strength: pin and pull'))
     assert.ok(settings.includes('class="account-settings-suggestion-select" size="6"'))
     assert.ok(settings.includes('<option value="location" selected="">Location</option>'))
     assert.ok(settings.includes('<option value="period">Period</option>'))

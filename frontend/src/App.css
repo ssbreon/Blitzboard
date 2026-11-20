@@ -573,7 +573,8 @@ html.is-drilling-through * {
   padding-left: 5px;
 }
 
-.play-designer-assignments-toggle {
+.play-designer-assignments-toggle,
+.play-designer-scouting-toggle {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2633,6 +2634,26 @@ html.is-drilling-through * {
   max-width: none;
 }
 
+.account-form-dialog.account-preferences-dialog {
+  box-sizing: border-box;
+  flex-basis: 640px;
+  width: min(640px, calc(100vw - 32px));
+}
+
+.account-preferences-dialog .account-form {
+  max-width: none;
+}
+
+.account-form-dialog.account-scouting-dialog {
+  box-sizing: border-box;
+  flex-basis: 640px;
+  width: min(640px, calc(100vw - 32px));
+}
+
+.account-scouting-dialog .account-form {
+  max-width: none;
+}
+
 .team-invitation-dialog {
   box-sizing: border-box;
   width: min(520px, calc(100vw - 32px));
@@ -2802,6 +2823,8 @@ html.is-drilling-through * {
 #account-settings-panel-preferences:not([hidden]) {
   display: grid;
   gap: 18px;
+  box-sizing: border-box;
+  min-height: 253px;
 }
 
 .account-settings-suggestions {
@@ -2816,6 +2839,13 @@ html.is-drilling-through * {
 }
 
 #account-settings-panel-suggestions {
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--column-header-border);
+  border-radius: 6px;
+}
+
+#account-settings-panel-scouting {
   box-sizing: border-box;
   padding: 12px;
   border: 1px solid var(--column-header-border);
@@ -2862,6 +2892,10 @@ html.is-drilling-through * {
 }
 
 @media (max-width: 560px) {
+  #account-settings-panel-preferences:not([hidden]) {
+    min-height: 486px;
+  }
+
   .account-settings-suggestions {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -3001,6 +3035,11 @@ html.is-drilling-through * {
   border-bottom: 1px solid var(--border);
 }
 
+.account-settings-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .account-billing-tabs [role='tab'] {
   flex: 1;
   min-width: 0;
@@ -3021,9 +3060,11 @@ html.is-drilling-through * {
 
 .account-settings-tabs [role='tab'] {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .account-billing-tabs [role='tab']:hover {
@@ -4351,6 +4392,18 @@ html.is-drilling-through * {
 
 }
 
+.play-scouting-tendencies-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.play-scouting-tendencies-table {
+  col:first-child { width: 40%; }
+  col:nth-child(2) { width: 60%; }
+}
+
 .data-grid-toolbar-dropdown {
   width: 360px;
   min-width: 0;
@@ -4932,7 +4985,8 @@ html.is-drilling-through * {
 }
 
 .print-assignments-table {
-  width: 100%;
+  width: calc(100% - 16px);
+  margin-inline: auto;
   table-layout: fixed;
   border-collapse: collapse;
   color: #000;
@@ -4960,6 +5014,10 @@ html.is-drilling-through * {
   td {
     white-space: pre-wrap;
   }
+}
+
+.print-tendencies-table th:first-child {
+  width: 40%;
 }
 
 .print-assignment-continued {

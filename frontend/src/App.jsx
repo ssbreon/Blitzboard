@@ -468,7 +468,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {} }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {}, scoutingTendencies = {} }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -891,6 +891,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         onAdd={onAddGameCardItem} onOpen={onOpenGameCardItem} onSlideshow={onSlideshow}
         onDuplicate={onDuplicateGameCardItem} onDelete={onDeleteGameCardItem}
         onNewReport={onNew} onOpenReport={onOpenPlay} reportActions={rowActions}
+        scoutingTendencies={scoutingTendencies}
         practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onPrintPracticeAttachments={onPrintPracticeAttachments} practiceSheetRevisionToken={practiceSheetRevisionToken}
         />
       </> : <>
@@ -1452,7 +1453,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   }
 
   async function handleCreatePlay(name, gameType, templateId, theme, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption, selectedPerspective) {
-    const { target, parentId, unit, groupingId, practiceScriptRef, practiceScriptDraft } = newDialog
+    const { target, parentId, unit, groupingId, practiceScriptRef, practiceScriptDraft, scoutingTendencies } = newDialog
     if (!practiceScriptRef) setNewDialog(null)
     const playName = practiceScriptDraft ? scoutPlayName(practiceScriptDraft) : name
     const collection = cardPlaybook?.id === parentId ? cardPlaybook : parent?.id === parentId ? parent : null
@@ -1501,6 +1502,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             perspective,
             unit: playUnit,
             markers: initialMarkers,
+            ...(newDialog.scoutingReport && { scoutingTendencies }),
           })
     if (target === 'play' && groupingId) {
           await appendPlayToGrouping(parentId, groupingId, record.id)
@@ -1543,6 +1545,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       initialDrawings: record.drawings,
       initialTextAnnotations: record.textAnnotations,
       initialZones: record.zones,
+      initialScoutingTendencies: record.scoutingTendencies,
       initialTheme: record.theme,
       showAssignments: record.showAssignments,
       template: record.template,
@@ -1609,6 +1612,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         initialDrawings: row.drawings,
         initialTextAnnotations: row.textAnnotations,
         initialZones: row.zones,
+        initialScoutingTendencies: row.scoutingTendencies,
         initialTheme: row.theme,
         showAssignments: row.showAssignments,
         template: row.template,
@@ -1793,7 +1797,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       { key: 'print', label: 'Print...', icon: Printer, onClick: async (r) => {
         const play = await loadPlayDetails(kind, parentId, r)
         if (play) setPrintPlay({
-          play: { ...play, perspective: play.perspective || defaultPlayPerspective(collection?.category) },
+          play: { ...play, kind, perspective: play.perspective || defaultPlayPerspective(collection?.category) },
           collectionName: collection?.name,
         })
       } },
@@ -2054,6 +2058,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           parentRecord={parent}
           parentLabel="Game"
           locationSuggestions={workspace.suggestionLists?.location || []}
+          scoutingTendencies={workspace.scoutingTendencies || {}}
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
           showAffiliateRecommendations={workspace.subscription.kind === 'free'}
@@ -2072,7 +2077,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           rowType="Scout Play"
           fetchRows={fetchScoutPlays}
           onReorder={(ids) => api.reorderScoutPlays(parent.id, ids)}
-          onNew={writable ? (unit, tab) => setNewDialog({ target: 'scoutPlay', parentId: parent.id, unit, scoutingReport: tab === 'scoutingReports' }) : undefined}
+          onNew={writable ? (unit, tab, scoutingTemplate, tendencies) => setNewDialog({ target: 'scoutPlay', parentId: parent.id, unit, scoutingReport: tab === 'scoutingReports', scoutingTemplate, scoutingTendencies: tendencies }) : undefined}
           newLabel="Add Play"
           onOpenPlay={(row) => requestLeave(() => openDesignerForRow('scoutPlay', parent.id, row), 'Open scouting play')}
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}

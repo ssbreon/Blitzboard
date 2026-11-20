@@ -253,11 +253,14 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   getPlay: (bookId, id) => request(`/playbooks/${bookId}/plays/${id}`),
   updatePlay: (bookId, id, payload) => request(`/playbooks/${bookId}/plays/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deletePlay: (bookId, id) => request(`/playbooks/${bookId}/plays/${id}`, { method: 'DELETE' }),
-  listSlides: (bookId, playId, summary = false) => request(`/playbooks/${bookId}/plays/${playId}/slides${summary ? '?summary=true' : ''}`),
-  createSlide: (bookId, playId, payload) => request(`/playbooks/${bookId}/plays/${playId}/slides`, { method: 'POST', body: JSON.stringify(payload) }),
-  getSlide: (bookId, playId, slideId) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`),
-  updateSlide: (bookId, playId, slideId, payload) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
-  deleteSlide: (bookId, playId, slideId) => request(`/playbooks/${bookId}/plays/${playId}/slides/${slideId}`, { method: 'DELETE' }),
+  listSlides: (parentId, playId, summary = false, kind = 'play') => {
+    const path = kind === 'scoutPlay' ? `/game-plans/${parentId}/scout-plays/${playId}/slides` : `/playbooks/${parentId}/plays/${playId}/slides`
+    return request(`${path}${summary ? '?summary=true' : ''}`)
+  },
+  createSlide: (parentId, playId, payload, kind = 'play') => request(`${kind === 'scoutPlay' ? `/game-plans/${parentId}/scout-plays/${playId}` : `/playbooks/${parentId}/plays/${playId}`}/slides`, { method: 'POST', body: JSON.stringify(payload) }),
+  getSlide: (parentId, playId, slideId, kind = 'play') => request(`${kind === 'scoutPlay' ? `/game-plans/${parentId}/scout-plays/${playId}` : `/playbooks/${parentId}/plays/${playId}`}/slides/${slideId}`),
+  updateSlide: (parentId, playId, slideId, payload, kind = 'play') => request(`${kind === 'scoutPlay' ? `/game-plans/${parentId}/scout-plays/${playId}` : `/playbooks/${parentId}/plays/${playId}`}/slides/${slideId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+  deleteSlide: (parentId, playId, slideId, kind = 'play') => request(`${kind === 'scoutPlay' ? `/game-plans/${parentId}/scout-plays/${playId}` : `/playbooks/${parentId}/plays/${playId}`}/slides/${slideId}`, { method: 'DELETE' }),
   createExport: (payload) => request('/exports', { method: 'POST', body: JSON.stringify(payload) }),
   getExport: (id) => request(`/exports/${id}`),
   listGamePlans: (category, namePrefix, summary = false, range) => request(`/game-plans${scheduleQuery(range, listQuery(category, namePrefix, summary))}`),

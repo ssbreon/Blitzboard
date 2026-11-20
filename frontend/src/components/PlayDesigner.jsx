@@ -13,6 +13,7 @@ import { PlayDiagramIcon } from './PlayDiagramIcon'
 import { FIELD_DECORATIONS, FIELD_ORIENTATIONS, playCategoriesForCollection } from './NewPlayDialog'
 import { PrintPreviewDialog } from './PrintPreviewDialog'
 import { PlayerAssignments } from './PlayerAssignments'
+import { ScoutingTendencies } from './ScoutingTendencies'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
 import { findPlayTemplate, DEFAULT_GAME_TYPE, DEFAULT_PLAY_TEMPLATE, getTemplatesForGameType, PLAY_TEMPLATES, buildMarkersFromTemplate } from '../utils/formations'
 import { PLAY_THEMES, getTheme, normalizeThemeId } from '../utils/themes'
@@ -149,10 +150,15 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const textAppearanceRef = useRef(null)
   const drawingMaskId = useId()
   const assignmentsId = `${drawingMaskId}-assignments`
+  const scoutingTendenciesId = `${drawingMaskId}-scouting-tendencies`
   const [assignmentsOpen, setAssignmentsOpen] = useState(false)
   const [assignmentsUndocked, setAssignmentsUndocked] = useState(false)
   const assignmentsRef = useRef(null)
   const assignmentsAnchorRef = useRef(null)
+  const [scoutingTendenciesOpen, setScoutingTendenciesOpen] = useState(false)
+  const [scoutingTendenciesUndocked, setScoutingTendenciesUndocked] = useState(false)
+  const scoutingTendenciesRef = useRef(null)
+  const scoutingTendenciesAnchorRef = useRef(null)
   const categoryOptions = playCategoriesForCollection(record.parentCategory)
   const initialTemplate = findPlayTemplate(record.template)
   const initialGameType = record.gameType || initialTemplate?.gameType || DEFAULT_GAME_TYPE
@@ -163,6 +169,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const initialFieldZone = isGreenZoneOnlyCategory(initialCategory) ? DEFAULT_FIELD_ZONE : record.fieldZone || DEFAULT_FIELD_ZONE
   const initialPerspective = record.perspective || DEFAULT_PLAY_PERSPECTIVE
   const initialTheme = normalizeThemeId(record.initialTheme)
+  const initialScoutingTendencies = Array.isArray(record.initialScoutingTendencies) ? record.initialScoutingTendencies : []
   const [name, setName] = useState(record.name)
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
@@ -180,6 +187,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [fieldZone, setFieldZone] = useState(initialFieldZone)
   const [perspective, setPerspective] = useState(initialPerspective)
   const [theme, setTheme] = useState(initialTheme)
+  const [scoutingTendencies, setScoutingTendencies] = useState(initialScoutingTendencies)
+  const [savedScoutingTendencies, setSavedScoutingTendencies] = useState(initialScoutingTendencies)
   const showAssignments = true
   const [selectedId, setSelectedId] = useState(null)
   const [selectedDrawing, setSelectedDrawing] = useState(null)
@@ -232,7 +241,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [slides, setSlides] = useState([])
   const [slidesLoadError, setSlidesLoadError] = useState(false)
   const [slideDraftTitles, setSlideDraftTitles] = useState({})
-  const [slidesLoading, setSlidesLoading] = useState(record.kind === 'play')
+  const [slidesLoading, setSlidesLoading] = useState(['play', 'scoutPlay'].includes(record.kind))
   const [activeSlideId, setActiveSlideId] = useState(null)
   const [activeSlideTitle, setActiveSlideTitle] = useState('')
   const [editingSlideId, setEditingSlideId] = useState(null)
@@ -276,10 +285,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }, [])
 
   useEffect(() => {
-    if (record.kind !== 'play') return undefined
+    if (!['play', 'scoutPlay'].includes(record.kind)) return undefined
     // Ignore slide results if this record changes or the designer unmounts before they arrive.
     let cancelled = false
-    api.listSlides(record.parentId, record.id)
+    api.listSlides(record.parentId, record.id, false, record.kind)
       .then((result) => {
         if (!cancelled) {
           const items = result.items || []
@@ -347,9 +356,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const designIsDirty = Object.keys(currentDesign).some(
     (key) => JSON.stringify(currentDesign[key]) !== JSON.stringify(savedActiveDesign[key]),
   )
+  const scoutingTendenciesDirty = record.kind === 'scoutPlay' && JSON.stringify(scoutingTendencies) !== JSON.stringify(savedScoutingTendencies)
   const isDirty = activeSlideId
-    ? designIsDirty || activeSlideTitle !== (activeSlide?.title || 'Adjustment')
-    : name !== savedName || gameType !== savedGameType || designIsDirty
+    ? designIsDirty || activeSlideTitle !== (activeSlide?.title || 'Adjustment') || scoutingTendenciesDirty
+    : name !== savedName || gameType !== savedGameType || designIsDirty || scoutingTendenciesDirty
 
   const canUndoDrawing =
     isDirty && drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
@@ -483,12 +493,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       // Adjustment slides and the base play use separate endpoints and title fields.
       if (activeSlideId) {
         const title = activeSlideTitle.trim() || activeSlide?.title || 'Adjustment'
-        const updated = await api.updateSlide(record.parentId, record.id, activeSlideId, { ...designPayload, title })
+        const updated = await api.updateSlide(record.parentId, record.id, activeSlideId, { ...designPayload, title }, record.kind)
         setSlides((current) => current.map((slide) => (slide.id === activeSlideId ? { ...slide, ...updated } : slide)))
         setActiveSlideTitle(title)
         setSlideDraftTitles((current) => ({ ...current, [activeSlideId]: title }))
       } else {
-        const payload = { ...designPayload, name, gameType, _etag: etagRef.current }
+        const payload = { ...designPayload, name, gameType, _etag: etagRef.current, ...(record.kind === 'scoutPlay' && { scoutingTendencies }) }
         if (record.kind === 'play') {
           const updated = await api.updatePlay(record.parentId, record.id, payload)
           etagRef.current = updated._etag
@@ -510,6 +520,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         setSavedFieldZone(fieldZone)
         setSavedPerspective(perspective)
         setSavedTheme(theme)
+        if (record.kind === 'scoutPlay') setSavedScoutingTendencies(scoutingTendencies)
+      }
+      if (activeSlideId && scoutingTendenciesDirty) {
+        const updated = await api.updateScoutPlay(record.parentId, record.id, { scoutingTendencies, _etag: etagRef.current })
+        etagRef.current = updated._etag
+        setSavedScoutingTendencies(scoutingTendencies)
       }
       delete slideDraftsRef.current[activeSlideId || 'base']
       return true
@@ -554,8 +570,13 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             : await api.updateScoutPlay(record.parentId, record.id, versionedPayload)
           etagRef.current = updated._etag
         } else {
-          await api.updateSlide(record.parentId, record.id, slideId, { ...payload, title: draftTitle || 'Adjustment' })
+          await api.updateSlide(record.parentId, record.id, slideId, { ...payload, title: draftTitle || 'Adjustment' }, record.kind)
         }
+      }
+      if (scoutingTendenciesDirty) {
+        const updated = await api.updateScoutPlay(record.parentId, record.id, { scoutingTendencies, _etag: etagRef.current })
+        etagRef.current = updated._etag
+        setSavedScoutingTendencies(scoutingTendencies)
       }
       slideDraftsRef.current = {}
       return true
@@ -585,6 +606,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   // Discard the active draft and restore its last saved design.
   function handleCancel() {
     delete slideDraftsRef.current[activeSlideId || 'base']
+    setScoutingTendencies(savedScoutingTendencies)
     if (activeSlideId && activeSlide) {
       restoreDesign(adjustmentDesign(activeSlide, savedBaseDesign))
       setActiveSlideTitle(activeSlide.title || 'Adjustment')
@@ -599,7 +621,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
   // Create an adjustment from the current design and retain the current draft.
   async function handleAddAdjustment() {
-    if (readOnly || record.kind !== 'play' || slides.length >= MAX_ADJUSTMENT_SLIDES || slidesLoading || slidesLoadError) return
+    if (readOnly || !['play', 'scoutPlay'].includes(record.kind) || slides.length >= MAX_ADJUSTMENT_SLIDES || slidesLoading || slidesLoadError) return
     setSaving(true)
     setError(null)
     const currentDraft = captureCurrentDraft()
@@ -623,7 +645,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         theme,
         showAssignments,
         title,
-      })
+      }, record.kind)
       setSlides((current) => [...current, created])
       setSlideDraftTitles((current) => ({ ...current, [created.id]: created.title || title }))
       setActiveSlideId(created.id)
@@ -642,7 +664,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setRemovingSlideId(slide.id)
     setError(null)
     try {
-      await api.deleteSlide(record.parentId, record.id, slide.id)
+      await api.deleteSlide(record.parentId, record.id, slide.id, record.kind)
       setSlides((current) => current.filter((item) => item.id !== slide.id))
       setSlideDraftTitles((current) => {
         const next = { ...current }
@@ -1447,7 +1469,16 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const selectedZone = zones.find((zone) => zone.id === selectedZoneId)
   const zoneAppearanceVisible = Boolean(selectedZone && activeTool === 'select')
   const isEmpty = markers.length === 0 && allDrawings.length === 0 && textAnnotations.length === 0 && zones.length === 0
-  const assignmentsAvailable = Boolean(assignmentTeam(record.parentCategory))
+  const assignmentsAvailable = record.kind === 'play' && Boolean(assignmentTeam(record.parentCategory))
+
+  function changeScoutingTendency(index, key, value) {
+    setScoutingTendencies((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row))
+  }
+
+  function handleScoutingTendenciesUndockedChange(undocked) {
+    setScoutingTendenciesUndocked(undocked)
+    setScoutingTendenciesOpen(true)
+  }
 
   // Toggle the player-assignment panel.
   function navigateAssignments() {
@@ -1511,7 +1542,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   return (
-    <section className={`play-designer${record.kind === 'play' ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
+    <section className={`play-designer${['play', 'scoutPlay'].includes(record.kind) ? ' has-adjustment-tabs' : ''}${readOnly ? ' is-read-only' : ''}`}>
       {parentSettingsBreadcrumbTarget && onEditParentSettings && createPortal(
         <button
           type="button"
@@ -1544,6 +1575,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       {printOpen && (
         <PrintPreviewDialog
           play={{
+            kind: record.kind,
             name: activeSlideId ? activeSlideTitle : name,
             markers,
             drawings,
@@ -1557,6 +1589,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             category,
             parentCategory: record.parentCategory,
             showAssignments,
+            scoutingTendencies,
           }}
           parentCollectionName={record.parentCollectionName}
           onClose={() => setPrintOpen(false)}
@@ -1766,9 +1799,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   <button
                     type="button"
                     role="menuitemradio"
-                    aria-checked={!assignmentsOpen}
+                    aria-checked={record.kind === 'scoutPlay' ? !scoutingTendenciesOpen : !assignmentsOpen}
                     onClick={() => {
                       setAssignmentsOpen(false)
+                      setScoutingTendenciesOpen(false)
                       setMenuOpen(false)
                     }}
                   >
@@ -1776,11 +1810,23 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                     <span>Design View</span>
                     <Check size={16} className="play-designer-view-check" aria-hidden="true" />
                   </button>
-                  <button
+                  {record.kind === 'scoutPlay' ? <button
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={scoutingTendenciesOpen}
+                    onClick={() => {
+                      setAssignmentsOpen(false)
+                      setScoutingTendenciesOpen(true)
+                      setMenuOpen(false)
+                    }}
+                  >
+                    <ClipboardList size={16} className="data-grid-option-icon" aria-hidden="true" />
+                    <span>Tendencies View</span>
+                    <Check size={16} className="play-designer-view-check" aria-hidden="true" />
+                  </button> : <button
                     type="button"
                     role="menuitemradio"
                     aria-checked={assignmentsOpen}
-                    disabled={!assignmentsAvailable}
                     onClick={() => {
                       setAssignmentsOpen(true)
                       setMenuOpen(false)
@@ -1789,7 +1835,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                     <ClipboardList size={16} className="data-grid-option-icon" aria-hidden="true" />
                     <span>Assignments View</span>
                     <Check size={16} className="play-designer-view-check" aria-hidden="true" />
-                  </button>
+                  </button>}
                 </div>
                 <div className="data-grid-menu-actions" role="group" aria-label="Actions">
                   <div className="account-menu-section-label">Actions</div>
@@ -2544,7 +2590,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       </div>
       </div>
       <div className="play-designer-details">
-      {record.kind === 'play' && (
+      {['play', 'scoutPlay'].includes(record.kind) && (
         <>
           <div
             className={`play-designer-slides${themeClass}`}
@@ -2642,6 +2688,22 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 {assignmentsUndocked && <ExternalLink size={16} aria-hidden="true" />}
               </button>
             )}
+            {record.kind === 'scoutPlay' && (
+              <button
+                type="button"
+                className="play-designer-scouting-toggle"
+                ref={scoutingTendenciesAnchorRef}
+                aria-controls={scoutingTendenciesId}
+                aria-expanded={scoutingTendenciesOpen}
+                aria-label={scoutingTendenciesOpen ? 'Close Scouting Tendencies' : 'Open Scouting Tendencies'}
+                title={scoutingTendenciesOpen ? 'Close Scouting Tendencies' : 'Open Scouting Tendencies'}
+                onClick={() => setScoutingTendenciesOpen((current) => !current)}
+              >
+                <ClipboardList size={16} aria-hidden="true" />
+                <span>Scouting Tendencies</span>
+                {scoutingTendenciesUndocked && <ExternalLink size={16} aria-hidden="true" />}
+              </button>
+            )}
           </div>
         </>
       )}
@@ -2663,6 +2725,22 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           onOpenChange={setAssignmentsOpen}
           onChange={(markerId, value) => setMarkers((current) => updatePlayerAssignment(current, markerId, value))}
           onAlignmentChange={(markerId, value) => setMarkers((current) => updatePlayerAlignment(current, markerId, value))}
+        />
+      )}
+      {record.kind === 'scoutPlay' && (
+        <ScoutingTendencies
+          id={scoutingTendenciesId}
+          sectionRef={scoutingTendenciesRef}
+          anchorRef={scoutingTendenciesAnchorRef}
+          fieldHeight={fieldPxSize.height}
+          open={scoutingTendenciesOpen}
+          rows={scoutingTendencies}
+          readOnly={readOnly}
+          saving={saving}
+          undocked={scoutingTendenciesUndocked}
+          onUndockedChange={handleScoutingTendenciesUndockedChange}
+          onOpenChange={setScoutingTendenciesOpen}
+          onChange={changeScoutingTendency}
         />
       )}
       </div>

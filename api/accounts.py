@@ -444,12 +444,16 @@ def summary(storage, workspace, role):
     subscription = dict(workspace["subscription"])
     writable = can_edit(workspace)
     permissions = effective_permissions(workspace, role)
+    scouting_tendencies = workspace.get("scoutingTendencies", {})
+    if isinstance(scouting_tendencies, str):
+        scouting_tendencies = {"offense.formation": scouting_tendencies}
     if not writable and (subscription["status"] in {"active", "past_due"} or (subscription["status"] == "trialing" and subscription.get("trialStartedAt"))):
         subscription["status"] = "expired"
     public = {"id": workspace["id"], "name": workspace["name"], "kind": workspace["kind"], "role": role,
               "alphaEnabled": workspace.get("alphaEnabled") is True,
               "defaults": workspace.get("defaults", {}),
-              "suggestionLists": workspace.get("suggestionLists", {"location": []}), "subscription": subscription,
+              "suggestionLists": workspace.get("suggestionLists", {"location": []}),
+              "scoutingTendencies": scouting_tendencies, "subscription": subscription,
               "permissions": sorted(permission.value for permission in permissions),
               "capabilities": {"edit": Permission.PLAY_WRITE in permissions,
                                "delete": Permission.PLAY_DELETE in permissions,
@@ -509,6 +513,21 @@ def validate_suggestion_lists(payload):
             raise AccountError("VALIDATION_ERROR", f"{field.title()} suggestions must be text no longer than 120 characters")
         allowed[field] = list(dict.fromkeys(value.strip() for value in values if value.strip()))
     return allowed
+
+
+def validate_scouting_tendencies(value):
+    template_ids = {
+        "offense.formation", "offense.down-distance", "offense.field-position", "offense.game-situation", "offense.concepts",
+        "defense.fronts", "defense.down-distance", "defense.field-position", "defense.game-situation", "defense.coverages-pressures",
+        "special-teams.situations", "special-teams.formations", "special-teams.direction-placement", "special-teams.returns", "special-teams.fakes-specials",
+    }
+    if isinstance(value, str):
+        value = {"offense.formation": value}
+    if not isinstance(value, dict) or set(value) - template_ids:
+        raise AccountError("VALIDATION_ERROR", "Scouting tendencies contain an unsupported template")
+    if any(not isinstance(text, str) or len(text) > 10000 for text in value.values()):
+        raise AccountError("VALIDATION_ERROR", "Scouting tendencies must be text no longer than 10000 characters")
+    return value
 
 
 def pending_invites(storage, workspace_id):
@@ -729,6 +748,12 @@ def account_route(storage, identity, workspace, role, path, method, payload):
                 workspace["defaults"].update(validate_preferences(payload["defaults"]))
             if "suggestionLists" in payload:
                 workspace.setdefault("suggestionLists", {}).update(validate_suggestion_lists(payload["suggestionLists"]))
+            if "scoutingTendencies" in payload:
+                scouting_tendencies = workspace.get("scoutingTendencies", {})
+                if isinstance(scouting_tendencies, str):
+                    scouting_tendencies = {"offense.formation": scouting_tendencies}
+                scouting_tendencies.update(validate_scouting_tendencies(payload["scoutingTendencies"]))
+                workspace["scoutingTendencies"] = scouting_tendencies
             storage.save("workspaces", workspace)
             return summary(storage, workspace, role), 200
     if path == ["workspace", "ownership", "transfer"] and method == "POST":

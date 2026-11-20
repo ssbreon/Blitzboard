@@ -9,6 +9,7 @@ import { EVENT_TYPE_ICONS, ScheduleEventDialog } from './TeamSchedule'
 import { PracticeSheet } from './PracticeSheet'
 import { GAME_UNITS, gamePreparation, generatedPracticeScriptPayload, linkableGamePlanActivities, linkedPracticeEventIds, playEntryCount } from '../utils/gamePlanWorkspace'
 import { findPlayTemplate } from '../utils/formations'
+import { scoutingTendencyRows, scoutingTemplatesForUnit } from '../utils/scoutingTemplates'
 import './GamePlanWorkspace.css'
 import './PracticeSheet.css'
 
@@ -41,7 +42,7 @@ export function GamePlanUnitFilter({ selectedUnits, onToggle }) {
   })}</div>
 }
 
-export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
+export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, scoutingTendencies = {}, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [revision, setRevision] = useState(0)
@@ -51,6 +52,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkIds, setLinkIds] = useState(new Set())
   const [reportUnit, setReportUnit] = useState(null)
+  const [reportTemplate, setReportTemplate] = useState('')
   const [selectedUnits, setSelectedUnits] = useState([])
 
   useEffect(() => {
@@ -82,6 +84,8 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   })
   const scriptedPlayEntries = (eventId) => activeItems(prep.scripts).filter((script) => linkedPracticeEventIds(script).includes(eventId)).reduce((total, script) => total + playEntryCount(script), 0)
   const selectedUnit = selectedUnits.length === 1 ? selectedUnits[0] : 'Offense'
+  const reportTemplates = scoutingTemplatesForUnit(reportUnit)
+  const selectedReportTemplate = reportTemplates.some((template) => template.id === reportTemplate) ? reportTemplate : reportTemplates[0]?.id || ''
   const cardFor = (item) => cards.find((card) => card.id === item.gameCardId)
 
   function addItem(kind, practiceEventId) {
@@ -198,9 +202,12 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
         <section className="gp-section gp-linked-section"><header><p className="gp-eyebrow">Linked Events</p>{!readOnly && <button type="button" className="secondary-button" onClick={() => setLinkOpen(true)}><Link size={16} />Link Event</button>}</header>{prep.activities.length ? <div className="gp-activities">{[...prep.activities].sort(byEventStart).map((event) => <article className="gp-event-card gp-linked-event-card" key={event.id}><button type="button" className="gp-linked-event-open" onClick={() => openActivity(event)}><EventTypeIcon type={event.eventType} size={20} /><span className="gp-event-copy"><small>{dateLabel(event.eventDate)} · {timeLabel(event.startTime)}</small><strong>{event.name}</strong>{event.eventType === 'Practice' && <span>{scriptedPlayEntries(event.id)} scripted play entries</span>}</span></button>{!readOnly && <ToolButton icon={Unlink} label={`Unlink ${event.name}`} disabled={busy} onClick={() => mutate(() => api.updateScheduleEvent(event.id, { gamePlanIds: event.gamePlanIds.filter((id) => id !== game.id) }))} />}</article>)}</div> : <p className="gp-empty">No events linked to this Game Plan.</p>}</section>
         </aside>
       </div>}
-    {reportUnit !== null && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setReportUnit(null) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="new-scouting-report-title" onSubmit={(event) => { event.preventDefault(); onNewReport(reportUnit, 'scoutingReports'); setReportUnit(null) }}>
+    {reportUnit !== null && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setReportUnit(null) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="new-scouting-report-title" onSubmit={(event) => { event.preventDefault(); onNewReport(reportUnit, 'scoutingReports', selectedReportTemplate, scoutingTendencyRows(selectedReportTemplate, scoutingTendencies)); setReportUnit(null) }}>
       <header className="schedule-dialog-header"><div><ScanSearch size={20} aria-hidden="true" /><h2 id="new-scouting-report-title">New Scouting Report</h2></div><DialogCloseButton onClick={() => setReportUnit(null)} /></header>
-      <div className="schedule-dialog-body"><label className="schedule-field"><span>Unit</span><select autoFocus value={reportUnit} onChange={(event) => setReportUnit(event.target.value)}>{GAME_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label></div>
+      <div className="schedule-dialog-body">
+        <label className="schedule-field"><span>Unit</span><select autoFocus value={reportUnit} onChange={(event) => { const unit = event.target.value; setReportUnit(unit); setReportTemplate(scoutingTemplatesForUnit(unit)[0]?.id || '') }}>{GAME_UNITS.map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label className="schedule-field"><span>Scouting Template</span><select value={selectedReportTemplate} onChange={(event) => setReportTemplate(event.target.value)} required>{reportTemplates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label>
+      </div>
       <footer className="schedule-dialog-actions"><button type="button" className="secondary-button" onClick={() => setReportUnit(null)}>Cancel</button><button type="submit" className="primary-button">Continue</button></footer>
     </form></div>}
     {linkOpen && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) closeLinkDialog() }}><form className="schedule-dialog practice-sheet-attachment-dialog" role="dialog" aria-modal="true" aria-labelledby="link-game-plan-event-title" aria-busy={busy} onSubmit={(event) => { event.preventDefault(); const activities = availableEvents.filter((item) => linkIds.has(item.id)); if (activities.length) mutate(async () => { await Promise.all(activities.map((activity) => api.updateScheduleEvent(activity.id, { gamePlanIds: [...(activity.gamePlanIds || []), game.id] }))); closeLinkDialog() }) }}>

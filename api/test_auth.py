@@ -1313,6 +1313,31 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"suggestionLists": {"unknown": ["Value"]}}, team["id"]).status_code, 400)
         self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"suggestionLists": {"location": ["x" * 121]}}, team["id"]).status_code, 400)
 
+    def test_workspace_scouting_tendencies_are_persisted_and_validated(self):
+        team = self.team_fixture()
+        tendencies = {
+            "offense.formation": "Run strength: pin and pull",
+            "defense.fronts": "Odd front to the field",
+        }
+        saved = call_api("PATCH", "workspace", "local-coach", {"scoutingTendencies": tendencies}, team["id"])
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(response_json(saved)["scoutingTendencies"], tendencies)
+        self.assertEqual(response_json(call_api("GET", "workspace", "coach-b", workspace_id=team["id"]))["scoutingTendencies"], tendencies)
+        self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"scoutingTendencies": {"unknown.template": "Value"}}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"scoutingTendencies": {"offense.formation": 42}}, team["id"]).status_code, 400)
+        self.assertEqual(call_api("PATCH", "workspace", "local-coach", {"scoutingTendencies": {"offense.formation": "x" * 10001}}, team["id"]).status_code, 400)
+
+    def test_workspace_legacy_scouting_tendencies_map_to_offense_formation(self):
+        team = self.team_fixture()
+        function_app.storage.get("workspaces", team["id"])["scoutingTendencies"] = "Legacy scouting notes"
+        response = call_api("GET", "workspace", "local-coach", workspace_id=team["id"])
+        self.assertEqual(response_json(response)["scoutingTendencies"], {"offense.formation": "Legacy scouting notes"})
+        updated = call_api("PATCH", "workspace", "local-coach", {"scoutingTendencies": {"defense.fronts": "Odd front"}}, team["id"])
+        self.assertEqual(response_json(updated)["scoutingTendencies"], {
+            "offense.formation": "Legacy scouting notes",
+            "defense.fronts": "Odd front",
+        })
+
     def test_admin_membership_and_invitation_roles_fail_closed(self):
         team = self.team_fixture("admin")
         for root in ("playbooks", "game-plans", "schedule-events", "search", "exports", "workspace/members"):
@@ -1896,6 +1921,29 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(limited_response.status_code, 409)
         self.assertEqual(response_json(limited_response)["error"]["code"], "SLIDE_LIMIT_REACHED")
         self.assertEqual(len(response_json(call_api("GET", slides_path, "coach-a"))["items"]), 3)
+
+    def test_scout_play_slides_are_scoped_limited_and_deleted_with_report(self):
+        game = response_json(call_api("POST", "game-plans", "coach-a", {"name": "Game"}))
+        report = response_json(call_api("POST", f"game-plans/{game['id']}/scout-plays", "coach-a", {"name": "Offense Report", "unit": "Offense"}))
+        other_report = response_json(call_api("POST", f"game-plans/{game['id']}/scout-plays", "coach-a", {"name": "Defense Report", "unit": "Defense"}))
+        slides_path = f"game-plans/{game['id']}/scout-plays/{report['id']}/slides"
+
+        for index in range(3):
+            created = call_api("POST", slides_path, "coach-a", {"title": f"Adjustment {index + 1}"})
+            self.assertEqual(created.status_code, 201)
+        slides = response_json(call_api("GET", slides_path, "coach-a"))["items"]
+        self.assertEqual(len(slides), 3)
+        self.assertEqual(slides[0]["parentId"], report["id"])
+        self.assertEqual(call_api("POST", slides_path, "coach-a", {"title": "Adjustment 4"}).status_code, 409)
+        self.assertEqual(response_json(call_api("GET", f"game-plans/{game['id']}/scout-plays/{other_report['id']}/slides", "coach-a"))["items"], [])
+        self.assertEqual(call_api("GET", f"game-plans/{game['id']}/scout-plays/{other_report['id']}/slides/{slides[0]['id']}", "coach-a").status_code, 404)
+        summary_request = FakeRequest("GET", f"game-plans/{game['id']}/scout-plays", "coach-a")
+        summary_request.params = {"summary": "true"}
+        summary = response_json(function_app.api(summary_request))["items"]
+        self.assertNotIn("scoutingTendencies", next(item for item in summary if item["id"] == report["id"]))
+
+        self.assertEqual(call_api("DELETE", f"game-plans/{game['id']}/scout-plays/{report['id']}", "coach-a").status_code, 204)
+        self.assertIsNone(function_app.storage.get("slides", slides[0]["id"]))
 
 
 if __name__ == "__main__":

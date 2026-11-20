@@ -245,7 +245,7 @@ class Storage:
             self.container.replace_item(item="usage", body=ledger, etag=ledger["_etag"], match_condition=MatchConditions.IfNotModified)
 
     def delete_tree(self, entity_type, item_id):
-        child_type = {"playbooks": "plays", "plays": "slides", "gamePlans": "scoutPlays"}.get(entity_type)
+        child_type = {"playbooks": "plays", "plays": "slides", "gamePlans": "scoutPlays", "scoutPlays": "slides"}.get(entity_type)
         if child_type:
             for child in self.list(child_type, parent_id=item_id, workspace_id=request_workspace.get()["id"]):
                 self.delete_tree(child_type, child["id"])
@@ -503,7 +503,7 @@ def list_playbook_rows(parent_id, name_prefix, summary=False):
                               fields=("id", "parentId", "title", "workspaceId", "ownerId"), parent_ids=adjustments)
         for slide in slides:
             adjustments[slide["parentId"]].append(slide.get("title") or "Adjustment")
-    omitted = {"markers", "drawings", "textAnnotations", "zones", "createdAt", "theme", "_rid", "_self", "_ts", "_attachments"}
+    omitted = {"markers", "drawings", "textAnnotations", "zones", "scoutingTendencies", "createdAt", "theme", "_rid", "_self", "_ts", "_attachments"}
     return [{**{key: value for key, value in row.items() if key not in omitted},
              **({"adjustments": adjustments[row["id"]]} if row.get("rowType") != "grouping" else {})} for row in rows]
 
@@ -932,9 +932,37 @@ def dispatch(req, user, workspace, role):
                 if method == "PATCH":
                     return update_record(entity_type, item_id, body(req))
                 if method == "DELETE":
-                    storage.delete(entity_type, item_id)
+                    storage.delete_tree(entity_type, item_id)
                     renumber_pages(entity_type, paged_siblings(entity_type, game_plan_id))
                     return func.HttpResponse(status_code=204)
+            if len(path) >= 5 and path[4] == "slides":
+                item_id = path[3]
+                record = storage.get(entity_type, item_id)
+                if record is None or record.get("parentId") != game_plan_id or not accounts.belongs(record, workspace):
+                    return not_found("Scout play", item_id)
+                if len(path) == 5:
+                    if method == "GET":
+                        slides = storage.list("slides", item_id, owner_id=owner_id)
+                        if req.params.get("summary") == "true":
+                            slides = [{"id": slide["id"], "title": slide.get("title") or "Adjustment"} for slide in slides]
+                        return response({"items": slides})
+                    if method == "POST":
+                        slides = storage.list("slides", item_id, owner_id=owner_id)
+                        if len(slides) >= 3:
+                            return response({"error": {"code": "SLIDE_LIMIT_REACHED", "message": "A play can have at most 3 adjustment slides"}}, 409)
+                        return create_record("slides", body(req), owner_id, item_id)
+                if len(path) == 6:
+                    slide_id = path[5]
+                    slide = storage.get("slides", slide_id)
+                    if slide is None or slide.get("parentId") != item_id or not accounts.belongs(slide, workspace):
+                        return not_found("Slide", slide_id)
+                    if method == "GET":
+                        return response(slide)
+                    if method == "PATCH":
+                        return update_record("slides", slide_id, body(req))
+                    if method == "DELETE":
+                        storage.delete("slides", slide_id)
+                        return func.HttpResponse(status_code=204)
 
     if len(path) >= 2 and path[0] == "playbooks":
         playbook_id = path[1]

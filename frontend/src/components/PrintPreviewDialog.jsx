@@ -4,7 +4,7 @@ import { Printer } from 'lucide-react'
 import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 import { defaultPlayPerspective } from '../utils/playGeometry'
-import { assignmentPlayers, assignmentPrintPages } from '../utils/playerAssignments'
+import { appendPrintContentPages, printContentOptions } from '../utils/printContent'
 
 const DPI = 96
 const PAGE_MARGIN_IN = 0.5
@@ -89,6 +89,7 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
   const [perPage, setPerPage] = useState(1)
   const [includeGroupings, setIncludeGroupings] = useState(true)
   const [includeAssignments, setIncludeAssignments] = useState(true)
+  const [includeTendencies, setIncludeTendencies] = useState(true)
   const [scale, setScale] = useState(1)
   const [teamLogo, setTeamLogo] = useState(null)
   const stageRef = useRef(null)
@@ -115,13 +116,12 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
   const teamLogoUrl = titlePage && collection?.kind === 'playbook' && teamLogo?.collectionId === collection.id
     ? teamLogo.url
     : null
-  const assignmentsCategory = (item) => item.parentCategory || item.unit || collection?.category
-  const hasAssignments = items.some((item) => assignmentPlayers(item.markers, assignmentsCategory(item))
-    .some((marker) => typeof marker.assignment === 'string' && marker.assignment.trim()))
-  const printPages = buildPrintPages(items, perPage, Boolean(collection?.kind === 'playbook' && includeGroupings))
-    .flatMap((page) => page.type !== 'plays' || !includeAssignments ? [page] : [page, ...page.plays.flatMap((item) =>
-      assignmentPrintPages(item.markers, assignmentsCategory(item), sheet).map((rows) => ({ type: 'assignments', play: item, rows })),
-    )])
+  const { hasAssignments, hasTendencies } = printContentOptions(items, collection)
+  const printPages = appendPrintContentPages(
+    buildPrintPages(items, perPage, Boolean(collection?.kind === 'playbook' && includeGroupings)),
+    collection,
+    { includeAssignments, includeTendencies, sheet },
+  )
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -248,7 +248,13 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
               {hasAssignments && (
                 <label className="dialog-field dialog-checkbox">
                   <input type="checkbox" checked={includeAssignments} onChange={(event) => setIncludeAssignments(event.target.checked)} />
-                  <span>Include assignments</span>
+                  <span>Include Assignments</span>
+                </label>
+              )}
+              {hasTendencies && (
+                <label className="dialog-field dialog-checkbox">
+                  <input type="checkbox" checked={includeTendencies} onChange={(event) => setIncludeTendencies(event.target.checked)} />
+                  <span>Include Tendencies</span>
                 </label>
               )}
             </div>
@@ -288,6 +294,23 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
                               <tr key={row.id}>
                                 <th scope="row">{row.label}{row.continued && <span className="print-assignment-continued"> (cont.)</span>}</th>
                                 <td>{row.text}</td>
+                              </tr>
+                            ))}</tbody>
+                          </table>
+                        </div>,
+                      )
+                    : page.type === 'tendencies'
+                    ? renderPage(
+                        `tendencies-${index}`,
+                        <div className="print-assignments">
+                          {showTitle && <h1 className="print-sheet-title">{page.play.name}</h1>}
+                          <table className="print-assignments-table print-tendencies-table">
+                            <caption>Scouting Tendencies</caption>
+                            <thead><tr><th scope="col">Tendency</th><th scope="col">Notes</th></tr></thead>
+                            <tbody>{page.rows.map((row, rowIndex) => (
+                              <tr key={row.id || rowIndex}>
+                                <th scope="row">{row.tendency}</th>
+                                <td>{row.notes || ''}</td>
                               </tr>
                             ))}</tbody>
                           </table>

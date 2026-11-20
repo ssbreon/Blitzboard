@@ -4,11 +4,12 @@
  * All Rights Reserved
  */
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRightLeft, Copy, CreditCard, List, LoaderCircle, Mail, Save, SlidersHorizontal, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
+import { ArrowRightLeft, Copy, CreditCard, List, LoaderCircle, Mail, Save, SlidersHorizontal, Target, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 import { PLAY_THEMES } from '../utils/themes'
+import { SCOUTING_TEMPLATE_GROUPS } from '../utils/scoutingTemplates'
 
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
@@ -16,6 +17,7 @@ const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', 
 const SETTINGS_TABS = [
   { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
   { id: 'suggestions', label: 'Suggestion Lists', icon: List },
+  { id: 'scouting', label: 'Scouting', icon: Target },
 ]
 const SUGGESTION_FIELDS = [
   { id: 'location', label: 'Location' },
@@ -25,6 +27,11 @@ const SUGGESTION_FIELDS = [
   { id: 'defFront', label: 'DEF Front' },
   { id: 'defCoverage', label: 'DEF Coverage' },
 ]
+const SCOUTING_TEMPLATE_COUNT = SCOUTING_TEMPLATE_GROUPS.reduce((count, group) => count + group.templates.length, 0)
+const DEFAULT_SCOUTING_TEMPLATE = SCOUTING_TEMPLATE_GROUPS[0].templates[0].id
+const normalizeScoutingTendencies = (value) => typeof value === 'string'
+  ? { [DEFAULT_SCOUTING_TEMPLATE]: value }
+  : value && typeof value === 'object' && !Array.isArray(value) ? value : {}
 const TEAM_TABS = [{ id: 'workspace', label: 'Workspace' }, { id: 'staff', label: 'Staff' }, { id: 'invitations', label: 'Invitations' }]
 const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
 const PLAN_LABELS = { free: 'Free', individual: 'Individual', team: 'Team' }
@@ -46,9 +53,12 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [billingTab, setBillingTab] = useState('membership')
   const [settingsTab, setSettingsTab] = useState('preferences')
   const [suggestionField, setSuggestionField] = useState('location')
+  const [scoutingTemplate, setScoutingTemplate] = useState(DEFAULT_SCOUTING_TEMPLATE)
   const [teamTab, setTeamTab] = useState('workspace')
   const [suggestionTexts, setSuggestionTexts] = useState(() => Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, (workspace.suggestionLists?.[id] || []).join('\n')])))
   const [savedSuggestionTexts, setSavedSuggestionTexts] = useState(suggestionTexts)
+  const [scoutingTendencies, setScoutingTendencies] = useState(() => normalizeScoutingTendencies(workspace.scoutingTendencies))
+  const [savedScoutingTendencies, setSavedScoutingTendencies] = useState(scoutingTendencies)
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreview, setLogoPreview] = useState(null)
   const [hasStoredLogo, setHasStoredLogo] = useState(false)
@@ -62,7 +72,8 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const formDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
   const selectedSuggestionField = SUGGESTION_FIELDS.find(({ id }) => id === suggestionField)?.label || 'Field'
   const suggestionDirty = view === 'settings' && JSON.stringify(suggestionTexts) !== JSON.stringify(savedSuggestionTexts)
-  const dirty = formDirty || suggestionDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
+  const scoutingDirty = view === 'settings' && JSON.stringify(scoutingTendencies) !== JSON.stringify(savedScoutingTendencies)
+  const dirty = formDirty || suggestionDirty || scoutingDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
   const teamEditable = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.settings'))
@@ -135,16 +146,23 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           onUserUpdated({ ...user, preferences })
           setSavedForm(form)
         }
-        if (suggestionDirty) {
-          const suggestionLists = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [
-            id,
-            [...new Set((suggestionTexts[id] || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean))],
-          ]))
-          const updated = await api.updateWorkspace({ suggestionLists })
+        if (suggestionDirty || scoutingDirty) {
+          const workspaceUpdates = {}
+          if (suggestionDirty) {
+            workspaceUpdates.suggestionLists = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [
+              id,
+              [...new Set((suggestionTexts[id] || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean))],
+            ]))
+          }
+          if (scoutingDirty) workspaceUpdates.scoutingTendencies = scoutingTendencies
+          const updated = await api.updateWorkspace(workspaceUpdates)
           onWorkspaceUpdated(updated)
-          const normalizedTexts = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, suggestionLists[id].join('\n')]))
-          setSuggestionTexts(normalizedTexts)
-          setSavedSuggestionTexts(normalizedTexts)
+          if (suggestionDirty) {
+            const normalizedTexts = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, workspaceUpdates.suggestionLists[id].join('\n')]))
+            setSuggestionTexts(normalizedTexts)
+            setSavedSuggestionTexts(normalizedTexts)
+          }
+          if (scoutingDirty) setSavedScoutingTendencies(scoutingTendencies)
         }
       } else if (view === 'team') {
         const { name, ...defaults } = form
@@ -312,7 +330,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   </>
 
   const content = <main
-    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
+    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'preferences' ? ' account-preferences-dialog' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'settings' && settingsTab === 'scouting' ? ' account-scouting-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
     role={isAccountDialog ? 'dialog' : undefined}
     aria-modal={isAccountDialog ? 'true' : undefined}
     aria-labelledby={isAccountDialog ? 'account-view-title' : undefined}
@@ -376,11 +394,26 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
                 }} disabled={!canManageSuggestions} />
               </label>
             </div>
+            <div id="account-settings-panel-scouting" className="account-settings-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-scouting" hidden={settingsTab !== 'scouting'}>
+              <label className="dialog-field account-settings-suggestion-fields"><span>Scouting Template</span>
+                <select className="account-settings-suggestion-select" size={SCOUTING_TEMPLATE_COUNT} value={scoutingTemplate} onChange={(event) => setScoutingTemplate(event.target.value)} disabled={!canManageSuggestions}>
+                  {SCOUTING_TEMPLATE_GROUPS.map(({ id, label, templates }) => <optgroup key={id} label={label}>
+                    {templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}
+                  </optgroup>)}
+                </select>
+              </label>
+              <label className="dialog-field account-settings-suggestion-editor"><span>Scouting Tendencies</span>
+                <textarea rows="8" value={scoutingTendencies[scoutingTemplate] || ''} onChange={(event) => {
+                  setScoutingTendencies((current) => ({ ...current, [scoutingTemplate]: event.target.value }))
+                  setNotice('')
+                }} disabled={!canManageSuggestions} />
+              </label>
+            </div>
           </>}
         </fieldset>
         <div className="account-form-actions">
           <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-          <button type="submit" className="dialog-create primary-button" disabled={saving || (view === 'settings' && settingsTab === 'suggestions' && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
+          <button type="submit" className="dialog-create primary-button" disabled={saving || (view === 'settings' && ['suggestions', 'scouting'].includes(settingsTab) && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </form>
     </>}

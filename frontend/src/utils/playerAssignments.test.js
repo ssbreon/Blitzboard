@@ -111,6 +111,15 @@ test('designer renders only its unit assignments, respects visibility and preven
     assert.ok(assigned.includes('&lt;script&gt;not executable&lt;/script&gt;'))
     const aligned = render({ initialMarkers: updatePlayerAlignment(markers, 'receiver', 'Slot left') })
     assert.ok(aligned.includes('Slot left</textarea>'))
+    const scouting = render({ kind: 'scoutPlay', initialScoutingTendencies: [{ id: 'formation-1', tendency: 'Trips Right', notes: '' }] })
+    assert.ok(scouting.includes('play-designer-slides'))
+    assert.ok(scouting.includes('play-designer has-adjustment-tabs'))
+    assert.ok(scouting.includes('class="play-designer-scouting-toggle"'))
+    assert.ok(scouting.includes('aria-label="Open Scouting Tendencies"'))
+    assert.ok(scouting.includes('scope="col">Tendency</th>'))
+    assert.ok(scouting.includes('scope="col">Notes</th>'))
+    assert.ok(scouting.includes('>Trips Right</textarea>'))
+    assert.ok(!scouting.includes('Player Assignments'))
   } finally {
     await server.close()
   }
