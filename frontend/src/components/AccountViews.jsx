@@ -4,7 +4,7 @@
  * All Rights Reserved
  */
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRightLeft, Copy, CreditCard, LoaderCircle, Mail, Save, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
+import { ArrowRightLeft, Copy, CreditCard, List, LoaderCircle, Mail, Save, SlidersHorizontal, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
@@ -13,7 +13,10 @@ import { PLAY_THEMES } from '../utils/themes'
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
 const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
-const SETTINGS_TABS = [{ id: 'preferences', label: 'Preferences' }, { id: 'suggestions', label: 'Suggestion Lists' }]
+const SETTINGS_TABS = [
+  { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+  { id: 'suggestions', label: 'Suggestion Lists', icon: List },
+]
 const SUGGESTION_FIELDS = [
   { id: 'location', label: 'Location' },
   { id: 'period', label: 'Period' },
@@ -309,7 +312,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   </>
 
   const content = <main
-    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
+    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
     role={isAccountDialog ? 'dialog' : undefined}
     aria-modal={isAccountDialog ? 'true' : undefined}
     aria-labelledby={isAccountDialog ? 'account-view-title' : undefined}
@@ -336,17 +339,17 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     {notice && <p className="account-notice" role="status">{notice}</p>}
 
     {['profile', 'settings'].includes(view) && <>
-      {view === 'settings' && <div className="account-billing-tabs" role="tablist" aria-label="Settings sections" onKeyDown={handleSettingsTabKeyDown}>
-        {SETTINGS_TABS.map((tab) => <button
-          key={tab.id}
-          id={`account-settings-tab-${tab.id}`}
+      {view === 'settings' && <div className="account-billing-tabs account-settings-tabs" role="tablist" aria-label="Settings sections" onKeyDown={handleSettingsTabKeyDown}>
+        {SETTINGS_TABS.map(({ id, label, icon: Icon }) => <button
+          key={id}
+          id={`account-settings-tab-${id}`}
           type="button"
           role="tab"
-          aria-selected={settingsTab === tab.id}
-          aria-controls={`account-settings-panel-${tab.id}`}
-          tabIndex={settingsTab === tab.id ? 0 : -1}
-          onClick={() => setSettingsTab(tab.id)}
-        >{tab.label}</button>)}
+          aria-selected={settingsTab === id}
+          aria-controls={`account-settings-panel-${id}`}
+          tabIndex={settingsTab === id ? 0 : -1}
+          onClick={() => setSettingsTab(id)}
+        ><Icon size={16} aria-hidden="true" />{label}</button>)}
       </div>}
       <form className="account-form" onSubmit={save}>
         <fieldset disabled={saving}>
@@ -361,10 +364,12 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
               {preferences}
             </div>
             <div id="account-settings-panel-suggestions" className="account-settings-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-suggestions" hidden={settingsTab !== 'suggestions'}>
-              <label className="dialog-field"><span>Field</span>
-                <select value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>{SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}</select>
+              <label className="dialog-field account-settings-suggestion-fields"><span>Field</span>
+                <select className="account-settings-suggestion-select" size={SUGGESTION_FIELDS.length} value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>
+                  {SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+                </select>
               </label>
-              <label className="dialog-field"><span>Suggestions for {selectedSuggestionField}</span>
+              <label className="dialog-field account-settings-suggestion-editor"><span>Suggestions for {selectedSuggestionField}</span>
                 <textarea rows="8" value={suggestionTexts[suggestionField] || ''} onChange={(event) => {
                   setSuggestionTexts((current) => ({ ...current, [suggestionField]: event.target.value }))
                   setNotice('')

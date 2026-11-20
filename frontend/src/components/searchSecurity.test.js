@@ -62,6 +62,7 @@ test('account management controls use effective permissions rather than role lab
       workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, subscription: { kind: 'team' } },
     }))
     assert.ok(settings.includes('Suggestion Lists'))
+    assert.ok(settings.includes('class="account-settings-suggestion-select" size="6"'))
     assert.ok(settings.includes('<option value="location" selected="">Location</option>'))
     assert.ok(settings.includes('<option value="period">Period</option>'))
     assert.ok(settings.includes('<option value="offFormation">OFF Formation</option>'))

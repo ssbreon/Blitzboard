@@ -2639,6 +2639,7 @@ html.is-drilling-through * {
 .account-menu-section-label {
   padding: 6px 12px;
   font-size: 10px;
+  font-weight:700;
   text-transform: uppercase;
   text-align: left;
   overflow-wrap: anywhere;
@@ -2680,6 +2681,16 @@ html.is-drilling-through * {
   border-radius: 8px;
   background: var(--form-bg);
   box-shadow: var(--shadow);
+}
+
+.account-form-dialog.account-suggestions-dialog {
+  box-sizing: border-box;
+  flex-basis: 640px;
+  width: min(640px, calc(100vw - 32px));
+}
+
+.account-suggestions-dialog .account-form {
+  max-width: none;
 }
 
 .team-invitation-dialog {
@@ -2848,8 +2859,84 @@ html.is-drilling-through * {
   resize: vertical;
 }
 
-.account-settings-suggestions > .dialog-field + .dialog-field {
-  margin-top: 12px;
+#account-settings-panel-preferences:not([hidden]) {
+  display: grid;
+  gap: 18px;
+}
+
+.account-settings-suggestions {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(0, 1.4fr);
+  align-items: start;
+  gap: 0;
+}
+
+.account-settings-suggestions[hidden] {
+  display: none;
+}
+
+#account-settings-panel-suggestions {
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--column-header-border);
+  border-radius: 6px;
+}
+
+#account-settings-panel-suggestions .dialog-field > span {
+  white-space: nowrap;
+}
+
+#account-settings-panel-suggestions .account-settings-suggestion-editor > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-settings-suggestion-fields {
+  padding-right: 2px;
+}
+
+.account-settings-suggestion-select {
+  height: 204px;
+  padding: 4px;
+}
+
+.account-settings-suggestion-select option {
+  padding: 5px 6px;
+}
+
+.account-settings-suggestion-select option:checked {
+  background: var(--navy-light);
+  color: #fff;
+}
+
+.account-settings-suggestion-editor {
+  min-width: 0;
+  margin: 0;
+  padding-left: 2px;
+}
+
+.account-settings-suggestion-editor textarea {
+  height: 204px;
+  resize: none;
+}
+
+@media (max-width: 560px) {
+  .account-settings-suggestions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account-settings-suggestion-fields {
+    padding-right: 0;
+    padding-bottom: 2px;
+    border-right: 0;
+    border-bottom: 2px solid var(--column-header-border);
+  }
+
+  .account-settings-suggestion-editor {
+    padding-top: 2px;
+    padding-left: 0;
+  }
 }
 
 .team-logo-picker {
@@ -2990,6 +3077,13 @@ html.is-drilling-through * {
   cursor: pointer;
   border-top-left-radius: 6px;
   border-top-right-radius: 6px;
+}
+
+.account-settings-tabs [role='tab'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .account-billing-tabs [role='tab']:hover {
