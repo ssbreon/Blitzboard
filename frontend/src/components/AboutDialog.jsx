@@ -30,6 +30,9 @@ export function AboutDialog({ onClose }) {
         <p>For help with Blitzboard Studio, email our technical support team.</p>
         <a href="mailto:breontechllc@hotmail.com">breontechllc@hotmail.com</a>
       </section>
+      <footer className="dialog-actions">
+        <button type="button" className="dialog-create" onClick={onClose}>Close</button>
+      </footer>
     </section>
   </div>
 }
