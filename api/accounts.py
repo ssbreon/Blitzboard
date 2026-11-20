@@ -507,7 +507,7 @@ def validate_preferences(payload):
 
 
 def validate_suggestion_lists(payload):
-    fields = {"location", "period", "offFormation", "offPlay", "defFront", "defCoverage"}
+    fields = {"location", "period", "offFormation", "offPlay", "defFront", "defStunt", "defCoverage"}
     if not isinstance(payload, dict) or set(payload) - fields:
         raise AccountError("VALIDATION_ERROR", "Suggestion lists contain an unsupported field")
     allowed = {}

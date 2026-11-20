@@ -4452,7 +4452,7 @@ html.is-drilling-through * {
 }
 
 .data-grid-toolbar-dropdown {
-  width: 360px;
+  width: 440px;
   min-width: 0;
   max-width: calc(100vw - 32px);
   padding: 0;

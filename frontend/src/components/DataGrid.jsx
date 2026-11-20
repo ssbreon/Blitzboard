@@ -26,7 +26,7 @@ function renderGridCell(column, row) {
   )
 }
 
-export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, openHintKey, hidePager = false, hideToolbar = false, hideToolbarMenu = false, onReorder, canReorderRows, className = '' }) {
+export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType, categoryOptions, filterRows, statusFilter = false, reloadToken = 0, fetchRows, onNew, newLabel = 'New', onSecondaryNew, secondaryNewLabel = 'New', menuItems = [], viewMenuItems = [], toolbarContent, rowActions, rowClassName, onRowDoubleClick, onRowClick, items, compact = false, busy = false, rowActionLabel, showPage = false, pageLabel = 'Page', suppressOpenHint = false, openHintKey, hidePager = false, hideToolbar = false, hideToolbarMenu = false, onReorder, canReorderRows, className = '' }) {
   const breadcrumbCache = useContext(BreadcrumbCacheContext)
   const openHintStorageKey = openHintKey ? `blitzboard:data-grid-open-hint:${openHintKey}` : null
   const [fetchedRows, setRows] = useState([])
@@ -319,6 +319,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
       <span className="data-grid-menu-action-label">{item.label}</span>
     </button>
   ))
+  const showMenuPanes = statusFilter || viewMenuItems.length > 0
 
   return (
     <section className={`data-grid${compact ? ' data-grid-compact' : ''}${className ? ` ${className}` : ''}`} aria-label={title}>
@@ -390,12 +391,18 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
             </svg>
           </button>
           {menuOpen && (
-            <div className={`toolbar-dropdown${statusFilter ? ' data-grid-toolbar-dropdown' : ''}`} role="menu">
-              {statusFilter ? (
+            <div className={`toolbar-dropdown${showMenuPanes ? ' data-grid-toolbar-dropdown' : ''}`} role="menu">
+              {showMenuPanes ? (
                 <div className="data-grid-menu-panes">
-                  <div className="data-grid-status-filter" role="group" aria-label="Filter by status">
+                  <div className="data-grid-status-filter" role="group" aria-label={viewMenuItems.length ? 'Grid views' : 'Filter by status'}>
                     <div className="account-menu-section-label">View</div>
-                    {[{ label: 'Active', icon: ThumbsUp }, { label: 'Archived', icon: Archive }].map(({ label, icon: Icon }) => (
+                    {viewMenuItems.length ? viewMenuItems.map(({ label, icon: Icon, checked, onClick }) => (
+                      <button key={label} type="button" role="menuitemradio" aria-checked={checked} onClick={() => { onClick(); setMenuOpen(false) }}>
+                        {Icon && <Icon size={16} className="data-grid-option-icon" aria-hidden="true" />}
+                        <span>{label}</span>
+                        <Check size={16} className="data-grid-status-check" aria-hidden="true" />
+                      </button>
+                    )) : [{ label: 'Active', icon: ThumbsUp }, { label: 'Archived', icon: Archive }].map(({ label, icon: Icon }) => (
                       <button
                         key={label}
                         type="button"
@@ -471,6 +478,11 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                         toggleGrouping(row.id)
                       }
                     } : undefined}
+                    onFocus={(event) => {
+                      if (!event.target.matches('input, select, textarea') || event.target.closest('[data-grid-no-select]')) return
+                      setSelectedRowIds(new Set([row.id]))
+                      setSelectionAnchorId(row.id)
+                    }}
                     onClick={(event) => {
                       selectRow(event, row)
                       if (onRowClick && row.rowType !== 'grouping' && !event.target.closest?.('button, a, input, select, textarea, [role="button"], [data-grid-no-select]')) {

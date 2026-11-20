@@ -63,7 +63,7 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.deepEqual(getCategoryBadgeStyle('Game - Away'), getCategoryBadgeStyle('Game'))
     assert.deepEqual(getCategoryBadgeStyle('Team Meal'), getCategoryBadgeStyle('Team Meeting'))
     assert.ok(renderToStaticMarkup(createElement(CategoryBadge, { value: 'Game - Away' })).includes('>Game - Away</span>'))
-    assert.equal(scoutPlayName({ offFormation: 'ACE HAIL', offPlay: 'GAMECOCKS LEFT', defFront: '4-2-5', defCoverage: 'C2' }), 'ACE HAIL GAMECOCKS LEFT vs 4-2-5 C2')
+    assert.equal(scoutPlayName({ offFormation: 'ACE HAIL', offPlay: 'GAMECOCKS LEFT', defFront: '4-2-5', defStunt: 'TEX', defCoverage: 'C2' }), 'ACE HAIL GAMECOCKS LEFT vs 4-2-5 TEX C2')
     assert.equal(scoutPlayName({ offFormation: 'ACE HAIL' }), 'ACE HAIL')
     assert.deepEqual(ACTIVITY_GROUPS, ['Team', 'QB', 'RB', 'WR', 'OL', 'DB', 'LB', 'DLINE'])
     assert.equal(practiceSheetDateLabel('2026-11-18'), new Date('2026-11-18T00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }))
@@ -74,13 +74,21 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     const scoutPlayGrid = renderToStaticMarkup(createElement(PracticeScriptPlayGrid, {
       api: {}, playbookId: 'script', title: 'Scout Plays', fetchRows: () => Promise.resolve([]), reloadToken: null,
       canEdit: true, suggestionLists: {
-        offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'],
+        offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defStunt: ['TEX'], defCoverage: ['Cover 3'],
       },
     }))
-    for (const [field, value] of Object.entries({ offFormation: 'Trips Right', offPlay: '24 Zone', defFront: 'Even Front', defCoverage: 'Cover 3' })) {
+    for (const [field, value] of Object.entries({ offFormation: 'Trips Right', offPlay: '24 Zone', defFront: 'Even Front', defStunt: 'TEX', defCoverage: 'Cover 3' })) {
       assert.ok(scoutPlayGrid.includes(`id="scout-${field}-suggestions"`))
       assert.ok(scoutPlayGrid.includes(`<option value="${value}"></option>`))
     }
+    assert.ok(scoutPlayGrid.indexOf('DEF Front') < scoutPlayGrid.indexOf('DEF Stunt'))
+    assert.ok(scoutPlayGrid.indexOf('DEF Stunt') < scoutPlayGrid.indexOf('DEF Coverage'))
+    const printViewStart = scoutPlayGrid.indexOf('class="practice-script-print-view"')
+    const printViewEnd = scoutPlayGrid.indexOf('</div>', printViewStart)
+    const printViewMarkup = scoutPlayGrid.slice(printViewStart, printViewEnd)
+    assert.ok(printViewMarkup.includes('<h2>Scout Plays</h2>'))
+    assert.ok(printViewMarkup.includes('<th scope="col">DEF Stunt</th>'))
+    assert.ok(!printViewMarkup.includes('Play Thumbnail'))
     assert.equal(summarizePracticeActivities([{ group: 'QB', name: 'Team Period', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }, { group: 'QB', name: 'Dropback' }]), 'Team: Dynamic\nQB: Team Period (Smith), Dropback')
     assert.equal(summarizePracticeActivities([]), '—')
     assert.deepEqual(groupPracticeActivities([{ group: 'QB', name: 'Dropback', coach: 'Smith' }, { group: 'Team', name: 'Dynamic' }]), [

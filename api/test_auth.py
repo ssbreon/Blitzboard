@@ -1295,6 +1295,7 @@ class AuthenticationTests(unittest.TestCase):
             "offFormation": [" Trips Right "],
             "offPlay": [" 24 Zone "],
             "defFront": ["Even Front"],
+            "defStunt": ["TEX"],
             "defCoverage": ["Cover 3"],
         }}
         saved = call_api("PATCH", "workspace", "local-coach", payload, team["id"])
@@ -1305,6 +1306,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(response_json(saved)["suggestionLists"]["offFormation"], ["Trips Right"])
         self.assertEqual(response_json(saved)["suggestionLists"]["offPlay"], ["24 Zone"])
         self.assertEqual(response_json(saved)["suggestionLists"]["defFront"], ["Even Front"])
+        self.assertEqual(response_json(saved)["suggestionLists"]["defStunt"], ["TEX"])
         self.assertEqual(response_json(saved)["suggestionLists"]["defCoverage"], ["Cover 3"])
         self.assertEqual(function_app.storage.get("workspaces", team["id"])["suggestionLists"]["location"], expected)
         self.assertEqual(response_json(call_api("GET", "workspace", "coach-b", workspace_id=team["id"]))["suggestionLists"]["location"], expected)

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { PencilRuler, Plus, Trash2 } from 'lucide-react'
+import { List, PencilRuler, Play, Plus, Trash2 } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
 import { LoadingIndicator } from './LoadingIndicator'
@@ -12,6 +12,7 @@ const SCRIPT_FIELDS = [
   { key: 'offFormation', label: 'OFF Formation', legacy: 'formation' },
   { key: 'offPlay', label: 'OFF Play', legacy: 'name' },
   { key: 'defFront', label: 'DEF Front', legacy: 'front' },
+  { key: 'defStunt', label: 'DEF Stunt' },
   { key: 'defCoverage', label: 'DEF Coverage', legacy: 'cov' },
   { key: 'notes', label: 'Notes' },
 ]
@@ -19,13 +20,15 @@ const SUGGESTION_LIST_FIELDS = {
   offFormation: 'offFormation',
   offPlay: 'offPlay',
   defFront: 'defFront',
+  defStunt: 'defStunt',
   defCoverage: 'defCoverage',
 }
 const HASHES = ['L', 'R', 'M']
 // Read a script field, falling back to its legacy property name when needed.
 const readField = (row, key) => row[key] ?? (SCRIPT_FIELDS.find((field) => field.key === key)?.legacy ? row[SCRIPT_FIELDS.find((field) => field.key === key).legacy] : '') ?? ''
 // Load, edit, reorder, and render scout plays in a practice-script grid.
-export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, reloadToken, busy, canEdit, suggestionLists = {}, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
+export function PracticeScriptPlayGrid({ api, playbookId, title, printTitle = title, fetchRows, reloadToken, busy, canEdit, suggestionLists = {}, onReorder, onOpenPlay, onCreatePlay, onNewGrouping, rowActions, menuItems = [] }) {
+  const [scriptView, setScriptView] = useState('design')
   const [rows, setRows] = useState([])
   const [loadedToken, setLoadedToken] = useState(null)
   const [error, setError] = useState(null)
@@ -52,6 +55,7 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       offFormation: '',
       offPlay: '',
       defFront: '',
+      defStunt: '',
       defCoverage: '',
       notes: '',
     }
@@ -144,6 +148,11 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       ? <button type="button" className="practice-script-create-play" onClick={() => onCreatePlay?.(row, row.groupingId)}><PencilRuler size={16} aria-hidden="true" />Design Play</button>
       : <button type="button" className="practice-script-play-thumbnail" title={`Open ${row.name}`} aria-label={`Open ${row.name}`} onClick={() => { void openSavedPlay(row) }}><PlayFieldView play={{ ...row, name: readField(row, 'offPlay') || row.name, template: row.offFormation || row.template }} thumbnail /></button> },
   ]
+  const visibleColumns = scriptView === 'script-only' ? columns.filter((column) => column.key !== 'thumbnail') : columns
+  const effectiveMenuItems = menuItems.map((item) => ({
+    ...item,
+    onClick: scriptView === 'script-only' && item.onScriptOnlyClick ? item.onScriptOnlyClick : item.onClick,
+  }))
 
   // Build actions appropriate to grouping, draft, and saved-play rows.
   function getRowActions(row) {
@@ -162,15 +171,24 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
 
   if (loading) return <LoadingIndicator compact label={`Loading ${title.toLowerCase()}...`} />
 
-  return <section className="practice-script-play-grid" aria-label={`${title} plays`}>
+  return <section className={`practice-script-play-grid${scriptView === 'script-only' ? ' practice-script-only-view' : ''}`} aria-label={`${title} plays`}>
     <ErrorDialog error={error} message="We couldn't load this practice script. Please retry." />
     {Object.values(SUGGESTION_LIST_FIELDS).map((field) => <datalist id={`scout-${field}-suggestions`} key={field}>
       {(suggestionLists[field] || []).map((value) => <option key={value} value={value} />)}
     </datalist>)}
+    <div className="practice-script-print-view" aria-hidden="true">
+      <h2>{printTitle}</h2>
+      <table>
+        <thead><tr><th scope="col">#</th>{SCRIPT_FIELDS.map(({ key, label }) => <th key={key} scope="col">{label}</th>)}</tr></thead>
+        <tbody>{rows.filter((row) => !row._gridDeleted).map((row, index) => row.rowType === 'grouping'
+          ? <tr className="practice-script-print-grouping" key={row.id}><th colSpan={SCRIPT_FIELDS.length + 1}>{row.name}{row.description ? `: ${row.description}` : ''}</th></tr>
+          : <tr key={row.id}><td>{row.page || index + 1}</td>{SCRIPT_FIELDS.map(({ key }) => <td key={key}>{readField(row, key)}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
     <DataGrid
       title={title}
       className="editable-data-grid"
-      columns={columns}
+      columns={visibleColumns}
       items={rows}
       showPage
       pageLabel="#"
@@ -183,7 +201,11 @@ export function PracticeScriptPlayGrid({ api, playbookId, title, fetchRows, relo
       onReorder={canEdit ? reorder : undefined}
       onRowDoubleClick={(row) => { if (!row.isPracticeScriptDraft) void openSavedPlay(row) }}
       rowActions={getRowActions}
-      menuItems={menuItems}
+      menuItems={effectiveMenuItems}
+      viewMenuItems={[
+        { label: 'Play Design View', icon: PencilRuler, checked: scriptView === 'design', onClick: () => setScriptView('design') },
+        { label: 'Script-Only View', icon: List, checked: scriptView === 'script-only', onClick: () => setScriptView('script-only') },
+      ]}
     />
   </section>
 }

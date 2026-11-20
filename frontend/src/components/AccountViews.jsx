@@ -30,6 +30,7 @@ const SUGGESTION_FIELDS = [
   { id: 'offFormation', label: 'OFF Formation' },
   { id: 'offPlay', label: 'OFF Play' },
   { id: 'defFront', label: 'DEF Front' },
+  { id: 'defStunt', label: 'DEF Stunt' },
   { id: 'defCoverage', label: 'DEF Coverage' },
 ]
 const SCOUTING_TEMPLATE_COUNT = SCOUTING_TEMPLATE_GROUPS.reduce((count, group) => count + group.templates.length, 0)

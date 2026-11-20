@@ -61,7 +61,7 @@ export function scoutPlayName(row) {
   const offense = [row.offFormation, row.offPlay]
     .map((value) => value?.trim())
     .filter(Boolean)
-  const defense = [row.defFront, row.defCoverage]
+  const defense = [row.defFront, row.defStunt, row.defCoverage]
     .map((value) => value?.trim())
     .filter(Boolean)
   const nameParts = [...offense]

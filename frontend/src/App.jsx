@@ -1004,6 +1004,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         api={api}
         playbookId={parentRecord.id}
         title={title}
+        printTitle={`${parentRecord.name} - Scout Plays`}
         suggestionLists={suggestionLists}
         fetchRows={fetchRows}
         reloadToken={reloadToken}
@@ -1016,7 +1017,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         rowActions={rowActions}
         menuItems={[
           ...(onSlideshow ? [{ label: 'Slideshow', icon: Presentation, onClick: onSlideshow }] : []),
-          { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll },
+          { label: `Print ${parentLabel}...`, icon: Printer, onClick: onPrintAll, onScriptOnlyClick: () => window.print() },
         ]}
       /> : <DataGrid
         key={isGamePlan ? `game-${parentRecord.id}-${selectedUnit}` : `collection-${parentRecord.id}`}
@@ -1488,6 +1489,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
               offFormation: practiceScriptDraft.offFormation,
               offPlay: practiceScriptDraft.offPlay,
               defFront: practiceScriptDraft.defFront,
+              defStunt: practiceScriptDraft.defStunt,
               defCoverage: practiceScriptDraft.defCoverage,
               notes: practiceScriptDraft.notes,
             }),
@@ -1931,6 +1933,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         defaultPerspective={defaultPlayPerspective(newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'Offense' : newDialog?.category || parent?.category)}
         categoryOptions={playCategoriesForCollection(newDialog?.unit || newDialog?.category || parent?.category)}
         showPlayerLabelOptions={newDialog?.target === 'play'}
+        suggestionLists={workspace.suggestionLists || {}}
+        suggestionCategory={newDialog?.target === 'play' ? newDialog?.unit || newDialog?.category || parent?.category : undefined}
       />
       {practiceScoutRequest && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setPracticeScoutRequest(null) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="practice-scout-game-title" onSubmit={submitPracticeScoutRequest}>
         <header className="schedule-dialog-header"><div><ScanSearch size={20} aria-hidden="true" /><h2 id="practice-scout-game-title">Create Scout Play</h2></div><DialogCloseButton onClick={() => setPracticeScoutRequest(null)} /></header>

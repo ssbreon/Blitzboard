@@ -77,7 +77,7 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(teamSettings.includes('<option value="4v4_flag">4v4 Flag</option>'))
     const settings = renderToStaticMarkup(createElement(AccountViews, {
       view: 'settings', user: { userId: 'owner', preferences: { timezone: 'UTC' } }, api: {},
-      workspace: { name: 'Alpha', kind: 'individual', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, scoutingTendencies: { 'offense.formation': 'Run strength: pin and pull' }, subscription: { kind: 'individual' } },
+      workspace: { name: 'Alpha', kind: 'individual', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defStunt: ['TEX'], defCoverage: ['Cover 3'] }, scoutingTendencies: { 'offense.formation': 'Run strength: pin and pull' }, subscription: { kind: 'individual' } },
     }))
     assert.ok(settings.includes('Suggestion Lists'))
     assert.ok(settings.includes('Scouting'))
@@ -91,17 +91,63 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(settings.includes('<optgroup label="SPECIAL TEAMS">'))
     assert.ok(settings.includes('<option value="offense.formation" selected="">Formation</option>'))
     assert.ok(settings.includes('Run strength: pin and pull'))
-    assert.ok(settings.includes('class="account-settings-suggestion-select" size="6"'))
+    assert.ok(settings.includes('class="account-settings-suggestion-select" size="7"'))
     assert.ok(settings.includes('<option value="location" selected="">Location</option>'))
     assert.ok(settings.includes('<option value="period">Period</option>'))
     assert.ok(settings.includes('<option value="offFormation">OFF Formation</option>'))
     assert.ok(settings.includes('<option value="offPlay">OFF Play</option>'))
     assert.ok(settings.includes('<option value="defFront">DEF Front</option>'))
+    assert.ok(settings.includes('<option value="defStunt">DEF Stunt</option>'))
     assert.ok(settings.includes('<option value="defCoverage">DEF Coverage</option>'))
     assert.ok(settings.includes('Marcal Paper Field\nKish Bank Field'))
     const { NewPlayDialog } = await server.ssrLoadModule('/src/components/NewPlayDialog.jsx')
     const newPlay = renderToStaticMarkup(createElement(NewPlayDialog, { open: true, defaultGameType: '7v7' }))
     assert.ok(newPlay.includes('<option value="7v7" selected="">7v7</option>'))
+    assert.match(newPlay, /<input[^>]*type="text"[^>]*value=""/)
+    assert.ok(!newPlay.includes('value="New Play"'))
+    const offensePlay = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, suggestionCategory: 'Offense', suggestionLists: { offFormation: ['Ace', 'Trips Right'], offPlay: ['Toss Right', 'Power'], defFront: ['Even Front'] },
+    }))
+    assert.ok(offensePlay.includes('list="new-play-name-suggestions"'))
+    assert.ok(offensePlay.includes('<datalist id="new-play-name-suggestions"><option value="Ace"></option><option value="Trips Right"></option></datalist>'))
+    assert.ok(!offensePlay.includes('value="Ace Toss Right"'))
+    assert.ok(!offensePlay.includes('value="Even Front"'))
+    const offenseFallback = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, suggestionCategory: 'Offense', suggestionLists: { offFormation: ['Trips Right'] },
+    }))
+    assert.ok(offenseFallback.includes('<option value="Trips Right"></option></datalist>'))
+    const selectedFormation = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Ace', suggestionCategory: 'Offense', suggestionLists: { offFormation: ['Ace', 'Trips Right'], offPlay: ['Toss Right', 'Power'] },
+    }))
+    assert.ok(selectedFormation.includes('<datalist id="new-play-name-suggestions"><option value="Ace Toss Right"></option><option value="Ace Power"></option></datalist>'))
+    assert.ok(!selectedFormation.includes('value="Trips Right Toss Right"'))
+    const manuallyTypedFormation = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Wing ', suggestionCategory: 'Offense', suggestionLists: { offFormation: ['Ace'], offPlay: ['Toss Right'] },
+    }))
+    assert.ok(manuallyTypedFormation.includes('<datalist id="new-play-name-suggestions"><option value="Wing Toss Right"></option></datalist>'))
+    const defensePlay = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, suggestionCategory: 'Defense', suggestionLists: { offFormation: ['Trips Right'], defFront: ['Even Front'] },
+    }))
+    assert.ok(defensePlay.includes('<datalist id="new-play-name-suggestions"><option value="Even Front"></option></datalist>'))
+    assert.ok(!defensePlay.includes('value="Trips Right"'))
+    const defenseFrontSelected = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Odd', suggestionCategory: 'Defense', suggestionLists: { defFront: ['Odd', 'Even Front'], defStunt: ['TEX', 'SLANT'], defCoverage: ['Cover 3', 'Cover 2'] },
+    }))
+    assert.ok(defenseFrontSelected.includes('<datalist id="new-play-name-suggestions"><option value="Odd TEX"></option><option value="Odd SLANT"></option></datalist>'))
+    assert.ok(!defenseFrontSelected.includes('value="Odd TEX Cover 3"'))
+    const defenseStuntSelected = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Odd TEX', suggestionCategory: 'Defense', suggestionLists: { defFront: ['Odd'], defStunt: ['TEX', 'SLANT'], defCoverage: ['Cover 3', 'Cover 2'] },
+    }))
+    assert.ok(defenseStuntSelected.includes('<datalist id="new-play-name-suggestions"><option value="Odd TEX Cover 3"></option><option value="Odd TEX Cover 2"></option></datalist>'))
+    assert.ok(!defenseStuntSelected.includes('value="Odd SLANT Cover 3"'))
+    const manuallyTypedDefenseFront = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Mint ', suggestionCategory: 'Defense', suggestionLists: { defFront: ['Odd'], defStunt: ['TEX'], defCoverage: ['Cover 3'] },
+    }))
+    assert.ok(manuallyTypedDefenseFront.includes('<datalist id="new-play-name-suggestions"><option value="Mint TEX"></option></datalist>'))
+    const manuallyTypedDefenseStunt = renderToStaticMarkup(createElement(NewPlayDialog, {
+      open: true, initialName: 'Odd TEX ', suggestionCategory: 'Defense', suggestionLists: { defFront: ['Odd'], defStunt: ['TEX'], defCoverage: ['Cover 3'] },
+    }))
+    assert.ok(manuallyTypedDefenseStunt.includes('<datalist id="new-play-name-suggestions"><option value="Odd TEX Cover 3"></option></datalist>'))
     const renderProfile = (emailVerified) => renderToStaticMarkup(createElement(AccountViews, {
       view: 'profile', user: { userId: 'coach', name: 'Coach', email: 'coach@example.com', emailVerified, preferences: {} },
       api: {}, workspace: { name: 'Individual', kind: 'individual', role: 'owner', permissions: [], defaults: {}, subscription: {} },

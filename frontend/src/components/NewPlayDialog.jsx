@@ -20,7 +20,11 @@ const DEFAULT_PLAYER_LABEL_OPTION = PLAYER_LABEL_OPTIONS[0]
 const DEFAULT_PLAY_NAME = 'New Play'
 export const FIELD_ORIENTATIONS = ['High School', 'NCAA', 'NFL']
 
-export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultGameType = DEFAULT_GAME_TYPE, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true }) {
+function suggestionValues(values = []) {
+  return [...new Set(values.filter((value) => typeof value === 'string').map((value) => value.trim()).filter(Boolean))]
+}
+
+export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = '', defaultGameType = DEFAULT_GAME_TYPE, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true, suggestionLists = {}, suggestionCategory }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName)
   const [gameType, setGameType] = useState(defaultGameType)
@@ -31,6 +35,42 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
   const [fieldZone, setFieldZone] = useState(DEFAULT_FIELD_ZONE)
   const [fieldOrientation, setFieldOrientation] = useState(defaultFieldOrientation)
   const [themeId, setThemeId] = useState(defaultTheme)
+  const offenseFormations = suggestionValues(suggestionLists.offFormation)
+  const offensePlays = suggestionValues(suggestionLists.offPlay)
+  const defenseFronts = suggestionValues(suggestionLists.defFront)
+  const defenseStunts = suggestionValues(suggestionLists.defStunt)
+  const defenseCoverages = suggestionValues(suggestionLists.defCoverage)
+  const trimmedName = name.trim()
+  const exactFormation = offenseFormations.find((formation) => formation.toLowerCase() === trimmedName.toLowerCase())
+  const prefixedFormation = [...offenseFormations].sort((left, right) => right.length - left.length).find((formation) => trimmedName.toLowerCase().startsWith(`${formation.toLowerCase()} `))
+  const formationPrefix = exactFormation || prefixedFormation || (/\s$/.test(name) ? trimmedName : '')
+  const isCompleteOffensePlay = offenseFormations.some((formation) => offensePlays.some((play) => `${formation} ${play}`.toLowerCase() === trimmedName.toLowerCase()))
+  const normalizedName = trimmedName.toLowerCase()
+  const configuredFront = [...defenseFronts].sort((left, right) => right.length - left.length).find((front) => normalizedName === front.toLowerCase() || normalizedName.startsWith(`${front.toLowerCase()} `))
+  const hasPartialConfiguredFront = !configuredFront && defenseFronts.some((front) => front.toLowerCase().startsWith(`${normalizedName} `))
+  const manualFront = !configuredFront && !hasPartialConfiguredFront && /\s/.test(name) ? trimmedName.split(/\s+/)[0] : ''
+  const defenseFront = configuredFront || manualFront
+  const frontText = defenseFront ? name.slice(0, defenseFront.length).trim() : ''
+  const afterFront = defenseFront ? name.slice(frontText.length).trimStart() : ''
+  const normalizedAfterFront = afterFront.trim().toLowerCase()
+  const configuredStunt = [...defenseStunts].sort((left, right) => right.length - left.length).find((stunt) => normalizedAfterFront === stunt.toLowerCase() || normalizedAfterFront.startsWith(`${stunt.toLowerCase()} `))
+  const manuallyCompletedStunt = !configuredStunt && afterFront && /\s$/.test(name) ? afterFront.trim() : ''
+  const defenseStunt = configuredStunt || manuallyCompletedStunt
+  const stuntText = defenseStunt ? afterFront.slice(0, defenseStunt.length).trim() : ''
+  const isCompleteDefensePlay = defenseFronts.some((front) => defenseStunts.some((stunt) => defenseCoverages.some((coverage) => `${front} ${stunt} ${coverage}`.toLowerCase() === normalizedName)))
+  const nameSuggestions = suggestionCategory === 'Offense'
+    ? isCompleteOffensePlay ? []
+      : formationPrefix
+        ? offensePlays.map((play) => `${formationPrefix} ${play}`).filter((suggestion) => suggestion.toLowerCase().startsWith(name.toLowerCase()))
+        : offenseFormations.filter((formation) => formation.toLowerCase().startsWith(trimmedName.toLowerCase()))
+    : suggestionCategory === 'Defense'
+      ? isCompleteDefensePlay ? []
+        : !defenseFront || hasPartialConfiguredFront
+          ? defenseFronts.filter((front) => front.toLowerCase().startsWith(trimmedName.toLowerCase()))
+          : !defenseStunt
+            ? defenseStunts.map((stunt) => `${frontText} ${stunt}`).filter((suggestion) => suggestion.toLowerCase().startsWith(name.toLowerCase()))
+            : defenseCoverages.map((coverage) => `${frontText} ${stuntText} ${coverage}`).filter((suggestion) => suggestion.toLowerCase().startsWith(name.toLowerCase()))
+      : []
   const perspective = SPECIAL_TEAMS_PLAY_CATEGORIES.includes(category) ? defaultPlayPerspective(category) : defaultPerspective
   const availableTemplates = getTemplatesForGameType(gameType, category)
   const availableTemplateIds = new Set(availableTemplates.map((option) => option.id))
@@ -113,7 +153,8 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
               <>
                 <label className="dialog-field">
                   <span>Name</span>
-                  <input type="text" value={name} onChange={(event) => setName(event.target.value)} autoFocus required />
+                  <input type="text" value={name} onChange={(event) => setName(event.target.value)} autoFocus required list={nameSuggestions.length ? 'new-play-name-suggestions' : undefined} />
+                  {nameSuggestions.length > 0 && <datalist id="new-play-name-suggestions">{nameSuggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}</datalist>}
                 </label>
                 <label className="dialog-field">
                   <span>Category</span>
