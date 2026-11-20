@@ -5924,6 +5924,11 @@ html.is-drilling-through * {
   overflow: hidden;
 }
 
+.gp-event-card.gp-schedule-event {
+  background: #d5d8dd;
+  color: var(--navy);
+}
+
 .schedule-event-content {
   box-sizing: border-box;
   display: flex;
@@ -6006,7 +6011,8 @@ html.is-drilling-through * {
   font-weight: 650;
 }
 
-.schedule-event-practice {
+.schedule-event-practice,
+.gp-event-card.schedule-event-practice {
   background: #eaf8ee;
   border-color: #176b39;
   color: #176b39;
@@ -6020,7 +6026,9 @@ html.is-drilling-through * {
 }
 
 .schedule-event-film-review,
-.schedule-event-other {
+.schedule-event-other,
+.gp-event-card.schedule-event-film-review,
+.gp-event-card.schedule-event-other {
   background: #eaf3ff;
   border-color: var(--navy);
   color: var(--navy);
@@ -6035,7 +6043,9 @@ html.is-drilling-through * {
 }
 
 .schedule-event-team-meal,
-.schedule-event-team-meeting {
+.schedule-event-team-meeting,
+.gp-event-card.schedule-event-team-meal,
+.gp-event-card.schedule-event-team-meeting {
   border-color: var(--navy);
 }
 
