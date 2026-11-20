@@ -51,18 +51,38 @@ test('account management controls use effective permissions rather than role lab
     }))
     const denied = render('owner', [])
     assert.ok(!denied.includes('account-team-tab-invitations'))
+    assert.ok(!denied.includes('account-team-tab-defaults'))
+    assert.ok(!denied.includes('account-team-tab-suggestions'))
+    assert.ok(!denied.includes('account-team-tab-scouting'))
     assert.ok(denied.includes('<fieldset disabled=""'))
     const granted = render('coach', ['workspace.settings', 'member.invite'])
     assert.ok(granted.includes('account-team-tab-invitations'))
+    assert.ok(!granted.includes('account-team-panel-suggestions'))
+    assert.ok(!granted.includes('account-team-panel-scouting'))
+    assert.ok(!granted.includes('account-team-panel-defaults'))
     assert.ok(granted.includes('account-invite-form'))
     assert.ok(!granted.includes('<fieldset disabled=""'))
     assert.ok(!granted.includes('value="admin"'))
+    const teamSettings = renderToStaticMarkup(createElement(AccountViews, {
+      view: 'settings', user: { userId: 'owner', preferences: {} }, api: {},
+      workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, subscription: { kind: 'team' } },
+    }))
+    assert.ok(teamSettings.includes('account-settings-tab-defaults'))
+    assert.ok(teamSettings.includes('account-settings-tab-suggestions'))
+    assert.ok(teamSettings.includes('account-settings-tab-scouting'))
+    assert.ok(teamSettings.includes('Default Game Type'))
+    assert.ok(teamSettings.includes('Suggestion Lists'))
+    assert.ok(teamSettings.includes('Scouting'))
+    assert.ok(teamSettings.includes('<option value="11v11" selected="">11v11</option>'))
+    assert.ok(teamSettings.includes('<option value="4v4_flag">4v4 Flag</option>'))
     const settings = renderToStaticMarkup(createElement(AccountViews, {
       view: 'settings', user: { userId: 'owner', preferences: { timezone: 'UTC' } }, api: {},
-      workspace: { name: 'Alpha', kind: 'team', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, scoutingTendencies: { 'offense.formation': 'Run strength: pin and pull' }, subscription: { kind: 'team' } },
+      workspace: { name: 'Alpha', kind: 'individual', role: 'owner', permissions: ['workspace.settings'], defaults: {}, suggestionLists: { location: ['Marcal Paper Field', 'Kish Bank Field'], period: ['Warmups', 'Team Period'], offFormation: ['Trips Right'], offPlay: ['24 Zone'], defFront: ['Even Front'], defCoverage: ['Cover 3'] }, scoutingTendencies: { 'offense.formation': 'Run strength: pin and pull' }, subscription: { kind: 'individual' } },
     }))
     assert.ok(settings.includes('Suggestion Lists'))
     assert.ok(settings.includes('Scouting'))
+    assert.ok(!settings.includes('account-settings-tab-defaults'))
+    assert.ok(!settings.includes('Timezone'))
     assert.ok(settings.includes('Scouting Tendencies'))
     assert.ok(settings.includes('Scouting Template'))
     assert.ok(settings.includes('class="account-settings-suggestion-select" size="15"'))
@@ -79,11 +99,16 @@ test('account management controls use effective permissions rather than role lab
     assert.ok(settings.includes('<option value="defFront">DEF Front</option>'))
     assert.ok(settings.includes('<option value="defCoverage">DEF Coverage</option>'))
     assert.ok(settings.includes('Marcal Paper Field\nKish Bank Field'))
+    const { NewPlayDialog } = await server.ssrLoadModule('/src/components/NewPlayDialog.jsx')
+    const newPlay = renderToStaticMarkup(createElement(NewPlayDialog, { open: true, defaultGameType: '7v7' }))
+    assert.ok(newPlay.includes('<option value="7v7" selected="">7v7</option>'))
     const renderProfile = (emailVerified) => renderToStaticMarkup(createElement(AccountViews, {
       view: 'profile', user: { userId: 'coach', name: 'Coach', email: 'coach@example.com', emailVerified, preferences: {} },
       api: {}, workspace: { name: 'Individual', kind: 'individual', role: 'owner', permissions: [], defaults: {}, subscription: {} },
     }))
     assert.ok(renderProfile(true).includes('value="Verified"'))
+    assert.ok(renderProfile(true).includes('account-profile-tab-defaults'))
+    assert.ok(renderProfile(true).includes('My Defaults'))
     assert.ok(renderProfile(false).includes('value="Not verified"'))
     assert.ok(renderProfile(false).includes('value="coach@example.com"'))
   } finally {

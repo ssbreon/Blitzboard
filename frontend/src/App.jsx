@@ -1118,7 +1118,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
   const writable = workspace.capabilities.edit
   const showAffiliateRecommendations = workspace.subscription.kind === 'free' && !parent && !designer && !slideshow && !cardPlaybook
-  const defaults = { ...workspace.defaults, ...authUser.preferences }
+  const defaults = workspace.kind === 'team'
+    ? { ...authUser.preferences, ...workspace.defaults }
+    : authUser.preferences
   const fetchPlaybooks = useCallback(({ namePrefix }) => viewApi.listPlaybooks(undefined, namePrefix, true).then((result) => result.items), [viewApi])
   const parentId = parent?.id
   const fetchPlays = useCallback(async ({ namePrefix }) => withAdjustmentTitles(viewApi, parentId, (await viewApi.listPlaybookRows(parentId, namePrefix, true)).items), [viewApi, parentId])
@@ -1916,13 +1918,14 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       <ErrorDialog error={statusError} message="We couldn't complete that action. Please try again." />
 
       <NewPlayDialog
-        key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${newDialog?.initialName || ''}:${newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : ''}:${defaults.theme}:${defaults.fieldOrientation}`}
+        key={`${workspace.id}:${parent?.category}:${newDialog?.category}:${newDialog?.unit}:${newDialog?.initialName || ''}:${newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : ''}:${defaults.gameType}:${defaults.theme}:${defaults.fieldOrientation}`}
         open={newDialog?.target === 'play' || newDialog?.target === 'scoutPlay'}
         titleLabel={newDialog?.scoutingReport ? 'New Scouting Report' : newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'New Scout Play' : 'New Play'}
         titleIcon={newDialog?.target === 'scoutPlay' ? ScanSearch : PlayDiagramIcon}
         initialName={newDialog?.initialName || (newDialog?.scoutingReport ? scoutingReportDefaultName(parent, newDialog.unit) : undefined)}
         onCancel={() => setNewDialog(null)}
         onCreate={handleCreatePlay}
+        defaultGameType={defaults.gameType}
         defaultTheme={defaults.theme}
         defaultFieldOrientation={defaults.fieldOrientation}
         defaultPerspective={defaultPlayPerspective(newDialog?.target === 'scoutPlay' || newDialog?.practiceScript ? 'Offense' : newDialog?.category || parent?.category)}

@@ -452,6 +452,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                 )}
                 {pageRows.map((row) => {
                   const RowIconForRow = getRowIcon?.(row) || RowIcon
+                  const availableRowActions = rowActions ? rowMenuItems(row) : []
                   return (
                   <tr
                     key={row.id}
@@ -548,7 +549,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     </>}
                     {rowActions && (
                       <td className="data-grid-actions-cell">
-                        {row.rowType !== 'grouping' && <div className="row-actions">
+                        {row.rowType !== 'grouping' && availableRowActions.length > 0 && <div className="row-actions">
                           <button
                             type="button"
                             className="row-actions-button"

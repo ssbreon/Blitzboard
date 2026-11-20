@@ -4,20 +4,25 @@
  * All Rights Reserved
  */
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRightLeft, Copy, CreditCard, List, LoaderCircle, Mail, Save, SlidersHorizontal, Target, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
+import { ArrowRightLeft, Building2, Copy, CreditCard, List, LoaderCircle, Mail, SlidersHorizontal, Target, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
 import { PLAY_THEMES } from '../utils/themes'
+import { DEFAULT_GAME_TYPE, gameTypeLabel, PLAY_TEMPLATES } from '../utils/formations'
 import { SCOUTING_TEMPLATE_GROUPS } from '../utils/scoutingTemplates'
 
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
 const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
 const SETTINGS_TABS = [
-  { id: 'preferences', label: 'Preferences', icon: SlidersHorizontal },
+  { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'suggestions', label: 'Suggestion Lists', icon: List },
   { id: 'scouting', label: 'Scouting', icon: Target },
+]
+const PROFILE_TABS = [
+  { id: 'profile', label: 'Profile', icon: UserRound },
+  { id: 'defaults', label: 'My Defaults', icon: SlidersHorizontal },
 ]
 const SUGGESTION_FIELDS = [
   { id: 'location', label: 'Location' },
@@ -32,7 +37,11 @@ const DEFAULT_SCOUTING_TEMPLATE = SCOUTING_TEMPLATE_GROUPS[0].templates[0].id
 const normalizeScoutingTendencies = (value) => typeof value === 'string'
   ? { [DEFAULT_SCOUTING_TEMPLATE]: value }
   : value && typeof value === 'object' && !Array.isArray(value) ? value : {}
-const TEAM_TABS = [{ id: 'workspace', label: 'Workspace' }, { id: 'staff', label: 'Staff' }, { id: 'invitations', label: 'Invitations' }]
+const TEAM_TABS = [
+  { id: 'workspace', label: 'Workspace', icon: Building2 },
+  { id: 'staff', label: 'Staff', icon: UserRound },
+  { id: 'invitations', label: 'Invitations', icon: Mail },
+]
 const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
 const PLAN_LABELS = { free: 'Free', individual: 'Individual', team: 'Team' }
 const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
@@ -41,9 +50,12 @@ const date = (value, timeZone) => value ? new Date(value).toLocaleDateString(und
 export function AccountViews({ view, user, workspace, api, onUserUpdated, onWorkspaceUpdated, onGuardChange, onDismiss, onSaved }) {
   const [form, setForm] = useState(() => view === 'profile'
     ? { name: user.name || '', coachingTitle: user.coachingTitle || '' }
-    : view === 'team' ? { name: workspace.name, ...workspace.defaults }
-      : { theme: 'color', fieldOrientation: 'High School', timezone: 'UTC', ...user.preferences })
+    : view === 'team' ? { name: workspace.name }
+      : view === 'settings' ? { ...workspace.defaults }
+        : { theme: 'color', fieldOrientation: 'High School', timezone: 'UTC', ...user.preferences })
   const [savedForm, setSavedForm] = useState(form)
+  const [myDefaults, setMyDefaults] = useState(() => ({ theme: 'color', fieldOrientation: 'High School', gameType: DEFAULT_GAME_TYPE, ...user.preferences }))
+  const [savedMyDefaults, setSavedMyDefaults] = useState(myDefaults)
   const [members, setMembers] = useState([])
   const [invitations, setInvitations] = useState([])
   const [inviteEmail, setInviteEmail] = useState('')
@@ -51,7 +63,8 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [deliveryMode, setDeliveryMode] = useState(null)
   const [billing, setBilling] = useState(null)
   const [billingTab, setBillingTab] = useState('membership')
-  const [settingsTab, setSettingsTab] = useState('preferences')
+  const [settingsTab, setSettingsTab] = useState(workspace.kind === 'team' ? 'defaults' : 'suggestions')
+  const [profileTab, setProfileTab] = useState('profile')
   const [suggestionField, setSuggestionField] = useState('location')
   const [scoutingTemplate, setScoutingTemplate] = useState(DEFAULT_SCOUTING_TEMPLATE)
   const [teamTab, setTeamTab] = useState('workspace')
@@ -71,16 +84,19 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   const [notice, setNotice] = useState('')
   const formDirty = JSON.stringify(form) !== JSON.stringify(savedForm)
   const selectedSuggestionField = SUGGESTION_FIELDS.find(({ id }) => id === suggestionField)?.label || 'Field'
+  const myDefaultsDirty = view === 'profile' && JSON.stringify(myDefaults) !== JSON.stringify(savedMyDefaults)
   const suggestionDirty = view === 'settings' && JSON.stringify(suggestionTexts) !== JSON.stringify(savedSuggestionTexts)
   const scoutingDirty = view === 'settings' && JSON.stringify(scoutingTendencies) !== JSON.stringify(savedScoutingTendencies)
-  const dirty = formDirty || suggestionDirty || scoutingDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
+  const dirty = formDirty || myDefaultsDirty || suggestionDirty || scoutingDirty || (view === 'team' && Boolean(logoFile || logoRemoved))
   const isAccountDialog = ['settings', 'profile', 'billing', 'team'].includes(view)
   const HeadingIcon = ICONS[view]
-  const teamEditable = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.settings'))
-  const canManageSuggestions = Boolean(workspace.permissions?.includes('workspace.settings'))
+  const canManageWorkspaceSettings = Boolean(workspace.permissions?.includes('workspace.settings'))
+  const teamEditable = workspace.kind === 'team' && canManageWorkspaceSettings
+  const canManageSuggestions = canManageWorkspaceSettings
   const canInvite = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.invite'))
   const canRemove = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('member.remove'))
   const canTransfer = workspace.kind === 'team' && Boolean(workspace.permissions?.includes('workspace.transfer_ownership'))
+  const settingsTabs = workspace.kind === 'team' ? SETTINGS_TABS : SETTINGS_TABS.filter((tab) => tab.id !== 'defaults')
   const ownerCount = members.filter((member) => member.role === 'owner').length
   const subscriptionPlan = workspace.subscription.kind || workspace.kind
 
@@ -126,6 +142,27 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     return () => { active = false }
   }, [api, view, canInvite])
 
+  function buildWorkspaceSettingsUpdates() {
+    const updates = {}
+    if (suggestionDirty) {
+      updates.suggestionLists = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [
+        id,
+        [...new Set((suggestionTexts[id] || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean))],
+      ]))
+    }
+    if (scoutingDirty) updates.scoutingTendencies = scoutingTendencies
+    return updates
+  }
+
+  function markWorkspaceSettingsSaved(updates) {
+    if (suggestionDirty) {
+      const normalizedTexts = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, updates.suggestionLists[id].join('\n')]))
+      setSuggestionTexts(normalizedTexts)
+      setSavedSuggestionTexts(normalizedTexts)
+    }
+    if (scoutingDirty) setSavedScoutingTendencies(scoutingTendencies)
+  }
+
   async function save(event) {
     event?.preventDefault()
     if (isAccountDialog && view === 'team' && inviteEmail) return false
@@ -138,35 +175,22 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     setNotice('')
     try {
       if (view === 'profile') {
-        const updated = await api.updateProfile(form)
-        onUserUpdated({ ...user, ...updated })
+        const updatedUser = { ...user }
+        if (formDirty) Object.assign(updatedUser, await api.updateProfile(form))
+        if (myDefaultsDirty) updatedUser.preferences = await api.updatePreferences(myDefaults)
+        if (formDirty || myDefaultsDirty) onUserUpdated(updatedUser)
+        if (myDefaultsDirty) setSavedMyDefaults(myDefaults)
       } else if (view === 'settings') {
-        if (formDirty) {
-          const preferences = await api.updatePreferences(form)
-          onUserUpdated({ ...user, preferences })
-          setSavedForm(form)
-        }
-        if (suggestionDirty || scoutingDirty) {
-          const workspaceUpdates = {}
-          if (suggestionDirty) {
-            workspaceUpdates.suggestionLists = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [
-              id,
-              [...new Set((suggestionTexts[id] || '').split(/\r?\n/).map((value) => value.trim()).filter(Boolean))],
-            ]))
-          }
-          if (scoutingDirty) workspaceUpdates.scoutingTendencies = scoutingTendencies
+        const workspaceUpdates = buildWorkspaceSettingsUpdates()
+        if (formDirty) workspaceUpdates.defaults = form
+        if (Object.keys(workspaceUpdates).length) {
           const updated = await api.updateWorkspace(workspaceUpdates)
           onWorkspaceUpdated(updated)
-          if (suggestionDirty) {
-            const normalizedTexts = Object.fromEntries(SUGGESTION_FIELDS.map(({ id }) => [id, workspaceUpdates.suggestionLists[id].join('\n')]))
-            setSuggestionTexts(normalizedTexts)
-            setSavedSuggestionTexts(normalizedTexts)
-          }
-          if (scoutingDirty) setSavedScoutingTendencies(scoutingTendencies)
+          if (formDirty) setSavedForm(form)
+          markWorkspaceSettingsSaved(workspaceUpdates)
         }
       } else if (view === 'team') {
-        const { name, ...defaults } = form
-        onWorkspaceUpdated(await api.updateWorkspace({ name, defaults }))
+        onWorkspaceUpdated(await api.updateWorkspace({ name: form.name }))
         if (logoFile) {
           await api.uploadWorkspaceLogo(logoFile)
           setHasStoredLogo(true)
@@ -241,11 +265,22 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   function handleSettingsTabKeyDown(event) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
-    const currentIndex = SETTINGS_TABS.findIndex((tab) => tab.id === settingsTab)
+    const currentIndex = settingsTabs.findIndex((tab) => tab.id === settingsTab)
     const nextIndex = event.key === 'Home' ? 0
-      : event.key === 'End' ? SETTINGS_TABS.length - 1
-        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + SETTINGS_TABS.length) % SETTINGS_TABS.length
-    setSettingsTab(SETTINGS_TABS[nextIndex].id)
+      : event.key === 'End' ? settingsTabs.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + settingsTabs.length) % settingsTabs.length
+    setSettingsTab(settingsTabs[nextIndex].id)
+    event.currentTarget.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
+  }
+
+  function handleProfileTabKeyDown(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    const currentIndex = PROFILE_TABS.findIndex((tab) => tab.id === profileTab)
+    const nextIndex = event.key === 'Home' ? 0
+      : event.key === 'End' ? PROFILE_TABS.length - 1
+        : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + PROFILE_TABS.length) % PROFILE_TABS.length
+    setProfileTab(PROFILE_TABS[nextIndex].id)
     event.currentTarget.querySelectorAll('[role="tab"]')[nextIndex]?.focus()
   }
 
@@ -313,7 +348,12 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     }
   }
 
-  const preferences = <>
+  const workspaceDefaultsFields = <>
+    <label className="dialog-field"><span>Default Game Type</span>
+      <select value={form.gameType || DEFAULT_GAME_TYPE} onChange={(event) => change('gameType', event.target.value)}>
+        {Object.keys(PLAY_TEMPLATES).map((gameType) => <option key={gameType} value={gameType}>{gameTypeLabel(gameType)}</option>)}
+      </select>
+    </label>
     <label className="dialog-field"><span>Default field standard</span>
       <select value={form.fieldOrientation || 'High School'} onChange={(event) => change('fieldOrientation', event.target.value)}>
         <option value="High School">High School</option><option value="NCAA">NCAA</option><option value="NFL">NFL</option>
@@ -324,13 +364,58 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
         {PLAY_THEMES.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}
       </select>
     </label>
-    {view === 'settings' && <label className="dialog-field"><span>Timezone</span>
-      <input required value={form.timezone} onChange={(event) => change('timezone', event.target.value)} />
-    </label>}
+  </>
+
+  const myDefaultsFields = <>
+    <label className="dialog-field"><span>Default Game Type</span>
+      <select value={myDefaults.gameType || DEFAULT_GAME_TYPE} onChange={(event) => setMyDefaults((current) => ({ ...current, gameType: event.target.value }))}>
+        {Object.keys(PLAY_TEMPLATES).map((gameType) => <option key={gameType} value={gameType}>{gameTypeLabel(gameType)}</option>)}
+      </select>
+    </label>
+    <label className="dialog-field"><span>Default field standard</span>
+      <select value={myDefaults.fieldOrientation || 'High School'} onChange={(event) => setMyDefaults((current) => ({ ...current, fieldOrientation: event.target.value }))}>
+        <option value="High School">High School</option><option value="NCAA">NCAA</option><option value="NFL">NFL</option>
+      </select>
+    </label>
+    <label className="dialog-field"><span>Default diagram theme</span>
+      <select value={myDefaults.theme || 'color'} onChange={(event) => setMyDefaults((current) => ({ ...current, theme: event.target.value }))}>
+        {PLAY_THEMES.map((theme) => <option key={theme.id} value={theme.id}>{theme.label}</option>)}
+      </select>
+    </label>
+  </>
+
+  const suggestionFields = <>
+    <label className="dialog-field account-settings-suggestion-fields"><span>Field</span>
+      <select className="account-settings-suggestion-select" size={SUGGESTION_FIELDS.length} value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>
+        {SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+      </select>
+    </label>
+    <label className="dialog-field account-settings-suggestion-editor"><span>Suggestions for {selectedSuggestionField}</span>
+      <textarea rows="8" value={suggestionTexts[suggestionField] || ''} onChange={(event) => {
+        setSuggestionTexts((current) => ({ ...current, [suggestionField]: event.target.value }))
+        setNotice('')
+      }} disabled={!canManageSuggestions} />
+    </label>
+  </>
+
+  const scoutingFields = <>
+    <label className="dialog-field account-settings-suggestion-fields"><span>Scouting Template</span>
+      <select className="account-settings-suggestion-select" size={SCOUTING_TEMPLATE_COUNT} value={scoutingTemplate} onChange={(event) => setScoutingTemplate(event.target.value)} disabled={!canManageSuggestions}>
+        {SCOUTING_TEMPLATE_GROUPS.map(({ id, label, templates }) => <optgroup key={id} label={label}>
+          {templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}
+        </optgroup>)}
+      </select>
+    </label>
+    <label className="dialog-field account-settings-suggestion-editor"><span>Scouting Tendencies</span>
+      <textarea rows="8" value={scoutingTendencies[scoutingTemplate] || ''} onChange={(event) => {
+        setScoutingTendencies((current) => ({ ...current, [scoutingTemplate]: event.target.value }))
+        setNotice('')
+      }} disabled={!canManageSuggestions} />
+    </label>
   </>
 
   const content = <main
-    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'preferences' ? ' account-preferences-dialog' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'settings' && settingsTab === 'scouting' ? ' account-scouting-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
+    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'defaults' ? ' account-preferences-dialog' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'settings' && settingsTab === 'scouting' ? ' account-scouting-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
     role={isAccountDialog ? 'dialog' : undefined}
     aria-modal={isAccountDialog ? 'true' : undefined}
     aria-labelledby={isAccountDialog ? 'account-view-title' : undefined}
@@ -357,8 +442,20 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     {notice && <p className="account-notice" role="status">{notice}</p>}
 
     {['profile', 'settings'].includes(view) && <>
+      {view === 'profile' && <div className="account-billing-tabs account-settings-tabs" role="tablist" aria-label="Profile sections" onKeyDown={handleProfileTabKeyDown}>
+        {PROFILE_TABS.map(({ id, label, icon: Icon }) => <button
+          key={id}
+          id={`account-profile-tab-${id}`}
+          type="button"
+          role="tab"
+          aria-selected={profileTab === id}
+          aria-controls={`account-profile-panel-${id}`}
+          tabIndex={profileTab === id ? 0 : -1}
+          onClick={() => setProfileTab(id)}
+        ><Icon size={16} aria-hidden="true" />{label}</button>)}
+      </div>}
       {view === 'settings' && <div className="account-billing-tabs account-settings-tabs" role="tablist" aria-label="Settings sections" onKeyDown={handleSettingsTabKeyDown}>
-        {SETTINGS_TABS.map(({ id, label, icon: Icon }) => <button
+        {settingsTabs.map(({ id, label, icon: Icon }) => <button
           key={id}
           id={`account-settings-tab-${id}`}
           type="button"
@@ -370,65 +467,48 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
         ><Icon size={16} aria-hidden="true" />{label}</button>)}
       </div>}
       <form className="account-form" onSubmit={save}>
-        <fieldset disabled={saving}>
+        <fieldset disabled={saving || (view === 'settings' && !canManageWorkspaceSettings)}>
           {view === 'profile' && <>
+            <div id="account-profile-panel-profile" role="tabpanel" aria-labelledby="account-profile-tab-profile" hidden={profileTab !== 'profile'}>
             <label className="dialog-field"><span>Display name</span><input required maxLength={120} value={form.name} onChange={(event) => change('name', event.target.value)} /></label>
             <label className="dialog-field"><span>Coaching title</span><input maxLength={120} value={form.coachingTitle} onChange={(event) => change('coachingTitle', event.target.value)} /></label>
             <label className="dialog-field"><span>Email</span><input value={user.email || ''} placeholder="Not configured" readOnly /></label>
             <label className="dialog-field"><span>Email verification</span><input value={user.email ? (user.emailVerified ? 'Verified' : 'Not verified') : 'Unavailable'} readOnly /></label>
+            </div>
+            <div id="account-profile-panel-defaults" role="tabpanel" aria-labelledby="account-profile-tab-defaults" hidden={profileTab !== 'defaults'}>
+              {myDefaultsFields}
+            </div>
           </>}
           {view === 'settings' && <>
-            <div id="account-settings-panel-preferences" role="tabpanel" aria-labelledby="account-settings-tab-preferences" hidden={settingsTab !== 'preferences'}>
-              {preferences}
-            </div>
+            {workspace.kind === 'team' && <div id="account-settings-panel-defaults" role="tabpanel" aria-labelledby="account-settings-tab-defaults" hidden={settingsTab !== 'defaults'}>
+              {workspaceDefaultsFields}
+            </div>}
             <div id="account-settings-panel-suggestions" className="account-settings-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-suggestions" hidden={settingsTab !== 'suggestions'}>
-              <label className="dialog-field account-settings-suggestion-fields"><span>Field</span>
-                <select className="account-settings-suggestion-select" size={SUGGESTION_FIELDS.length} value={suggestionField} onChange={(event) => setSuggestionField(event.target.value)} disabled={!canManageSuggestions}>
-                  {SUGGESTION_FIELDS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
-                </select>
-              </label>
-              <label className="dialog-field account-settings-suggestion-editor"><span>Suggestions for {selectedSuggestionField}</span>
-                <textarea rows="8" value={suggestionTexts[suggestionField] || ''} onChange={(event) => {
-                  setSuggestionTexts((current) => ({ ...current, [suggestionField]: event.target.value }))
-                  setNotice('')
-                }} disabled={!canManageSuggestions} />
-              </label>
+              {suggestionFields}
             </div>
             <div id="account-settings-panel-scouting" className="account-settings-suggestions" role="tabpanel" aria-labelledby="account-settings-tab-scouting" hidden={settingsTab !== 'scouting'}>
-              <label className="dialog-field account-settings-suggestion-fields"><span>Scouting Template</span>
-                <select className="account-settings-suggestion-select" size={SCOUTING_TEMPLATE_COUNT} value={scoutingTemplate} onChange={(event) => setScoutingTemplate(event.target.value)} disabled={!canManageSuggestions}>
-                  {SCOUTING_TEMPLATE_GROUPS.map(({ id, label, templates }) => <optgroup key={id} label={label}>
-                    {templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}
-                  </optgroup>)}
-                </select>
-              </label>
-              <label className="dialog-field account-settings-suggestion-editor"><span>Scouting Tendencies</span>
-                <textarea rows="8" value={scoutingTendencies[scoutingTemplate] || ''} onChange={(event) => {
-                  setScoutingTendencies((current) => ({ ...current, [scoutingTemplate]: event.target.value }))
-                  setNotice('')
-                }} disabled={!canManageSuggestions} />
-              </label>
+              {scoutingFields}
             </div>
           </>}
         </fieldset>
         <div className="account-form-actions">
           <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-          <button type="submit" className="dialog-create primary-button" disabled={saving || (view === 'settings' && ['suggestions', 'scouting'].includes(settingsTab) && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
+          <button type="submit" className="dialog-create primary-button" disabled={saving || (view === 'settings' && !canManageWorkspaceSettings)}>{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </form>
     </>}
 
-    {view === 'team' && <div className="account-billing-tabs" role="tablist" aria-label="Team sections" onKeyDown={handleTeamTabKeyDown}>
-      {TEAM_TABS.filter((tab) => tab.id !== 'invitations' || canInvite).map((tab) => <button
-        key={tab.id}
-        id={`account-team-tab-${tab.id}`}
+    {view === 'team' && <div className="account-billing-tabs account-team-tabs" role="tablist" aria-label="Team sections" onKeyDown={handleTeamTabKeyDown}>
+      {TEAM_TABS.filter((tab) => tab.id !== 'invitations' || canInvite).map(({ id, label, icon: Icon }) => <button
+        key={id}
+        id={`account-team-tab-${id}`}
         type="button"
         role="tab"
-        aria-selected={teamTab === tab.id}
-        aria-controls={`account-team-panel-${tab.id}`}
-        tabIndex={teamTab === tab.id ? 0 : -1}
-        onClick={() => setTeamTab(tab.id)}
-      >{tab.label}</button>)}
+        aria-selected={teamTab === id}
+        aria-controls={`account-team-panel-${id}`}
+        tabIndex={teamTab === id ? 0 : -1}
+        onClick={() => setTeamTab(id)}
+      ><Icon size={16} aria-hidden="true" />{label}</button>)}
     </div>}
     {view === 'team' && <div className="account-team-panels">
       <div id="account-team-panel-workspace" className={`account-team-panel${teamTab === 'workspace' ? ' active' : ''}`} role="tabpanel" aria-labelledby="account-team-tab-workspace" aria-hidden={teamTab !== 'workspace'} inert={teamTab !== 'workspace'} tabIndex={teamTab === 'workspace' ? 0 : -1}>
@@ -453,38 +533,51 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
               {(logoPreview || hasStoredLogo) && <button type="button" className="dialog-cancel" disabled={saving || !teamEditable} onClick={removeTeamLogo}><Trash2 size={16} aria-hidden="true" />Remove logo</button>}
             </div>
             <p className="team-logo-help">PNG, JPEG, or WebP. Maximum 2 MB; images are optimized to 2048 pixels.</p>
-            {preferences}
           </fieldset>
         </form>
       </div>
       <div id="account-team-panel-staff" className={`account-team-panel${teamTab === 'staff' ? ' active' : ''}`} role="tabpanel" aria-labelledby="account-team-tab-staff" aria-hidden={teamTab !== 'staff'} inert={teamTab !== 'staff'} tabIndex={teamTab === 'staff' ? 0 : -1}>
         <section className="account-section" aria-label="Team staff">
           <p className="account-team-summary">{workspace.seatsUsed} / {workspace.seatLimit} seats reserved or active</p>
-          {!loading && <div className="account-table-wrap"><table className="account-table data-grid-table"><thead><tr><th className="data-grid-type-header" scope="col" aria-label="Type" /><th>Name</th><th>Title</th><th>Role</th><th><span className="sr-only">Actions</span></th></tr></thead>
-            <tbody>{members.map((member) => <tr key={member.userId}><td className="data-grid-type-cell" aria-label="Staff member" title="Staff member"><UserRound size={17} strokeWidth={2} aria-hidden="true" /></td><td>{member.name}</td><td>{member.coachingTitle || ''}</td><td>
-              {canTransfer && member.role === 'owner' && member.userId === user.userId && ownerCount > 1 ? <select aria-label={`Role for ${member.name}`} value="owner" disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
-                <option value="owner">Owner</option><option value="coach">Coach</option>
-              </select> : <span className="account-role">{member.role}</span>}
-            </td><td><div className="account-member-actions">
-              {canTransfer && member.role === 'coach' && <button type="button" className="account-member-transfer" title={`Transfer ownership to ${member.name}`} aria-label={`Transfer ownership to ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'transfer')}><ArrowRightLeft size={15} aria-hidden="true" /><span>Transfer</span></button>}
-              {canRemove && member.role !== 'owner' && <button type="button" className="account-icon-button" title={`Remove ${member.name}`} aria-label={`Remove ${member.name}`} disabled={saving} onClick={() => memberAction(member, 'remove')}><Trash2 size={16} /></button>}
-            </div></td></tr>)}</tbody>
-          </table></div>}
+          {!loading && <DataGrid
+            title="Staff"
+            rowIcon={UserRound}
+            rowType="Staff member"
+            compact
+            className="account-team-data-grid"
+            items={members.map((member) => ({ ...member, id: member.userId }))}
+            busy={saving}
+            columns={[
+              { key: 'name', header: 'Name' },
+              { key: 'coachingTitle', header: 'Title', render: (title) => title || '' },
+              { key: 'role', header: 'Role', render: (role, member) => canTransfer && member.role === 'owner' && member.userId === user.userId && ownerCount > 1
+                ? <select aria-label={`Role for ${member.name}`} value="owner" disabled={saving} onChange={(event) => memberAction(member, 'role', event.target.value)}>
+                  <option value="owner">Owner</option><option value="coach">Coach</option>
+                </select>
+                : <span className="account-role">{role}</span> },
+            ]}
+            rowActionLabel={(member) => `Staff actions for ${member.name}`}
+            rowActions={(member) => [
+              ...(canTransfer && member.role === 'coach' ? [{ key: 'transfer', label: 'Transfer', icon: ArrowRightLeft, onClick: (row) => memberAction(row, 'transfer') }] : []),
+              ...(canRemove && member.role !== 'owner' ? [{ key: 'remove', label: 'Remove', icon: Trash2, destructive: true, onClick: (row) => memberAction(row, 'remove') }] : []),
+            ]}
+          />}
         </section>
       </div>
       {canInvite && <div id="account-team-panel-invitations" className={`account-team-panel${teamTab === 'invitations' ? ' active' : ''}`} role="tabpanel" aria-labelledby="account-team-tab-invitations" aria-hidden={teamTab !== 'invitations'} inert={teamTab !== 'invitations'} tabIndex={teamTab === 'invitations' ? 0 : -1}>
         <section className="account-section" aria-label="Team invitations">
           {canInvite && <form className="account-invite-form" onSubmit={(event) => { event.preventDefault(); inviteAction('send') }}>
             <label className="dialog-field"><span>Email</span><input type="email" required maxLength={254} value={inviteEmail} disabled={saving} onChange={(event) => setInviteEmail(event.target.value)} /></label>
-            <button type="submit" className="dialog-create" disabled={saving || workspace.seatsUsed >= workspace.seatLimit}><Mail size={16} aria-hidden="true" />Invite</button>
+            <button type="submit" className="dialog-create primary-button" disabled={saving || workspace.seatsUsed >= workspace.seatLimit}><Mail size={16} aria-hidden="true" />Invite</button>
           </form>}
           {deliveryMode === 'capture' && <p className="account-team-summary">Captured locally</p>}
           {deliveryMode === 'manual' && <p className="account-team-summary">Manual delivery</p>}
-          {!loading && <div className="account-invitations"><DataGrid
+          {!loading && <div className="account-invitations account-team-data-grid-wrap"><DataGrid
             title="Invitations"
             rowIcon={Mail}
             rowType="Email invitation"
             compact
+            className="account-team-data-grid"
             items={invitations}
             busy={saving}
             columns={[
@@ -574,7 +667,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     </div>}
     {view === 'team' && isAccountDialog && <div className="account-form-actions">
       <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-      <button type="button" className="dialog-create primary-button" disabled={saving || Boolean(inviteEmail)} onClick={() => save()}>{saving ? 'Saving...' : 'OK'}</button>
+      <button type="button" className="dialog-create primary-button" disabled={saving || Boolean(inviteEmail)} onClick={() => save()}>{saving ? 'Saving...' : 'Save'}</button>
     </div>}
     {view === 'billing' && isAccountDialog && <div className="account-form-actions">
       <button type="button" className="dialog-create primary-button" onClick={() => onDismiss?.()}>Close</button>

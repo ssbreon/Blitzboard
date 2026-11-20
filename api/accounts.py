@@ -87,7 +87,8 @@ LIMIT_SETTINGS = {
     "scoutPlays": "CONTENT_LIMIT_SCOUT_PLAYS",
 }
 PRICES = {"free": {"month": 0, "year": 0}, "individual": {"month": 999, "year": 9990}, "team": {"month": 2999, "year": 29990}}
-DEFAULT_PREFERENCES = {"theme": "color", "fieldOrientation": "High School", "timezone": "UTC"}
+SUPPORTED_GAME_TYPES = frozenset({"11v11", "7v7", "4v4_flag"})
+DEFAULT_PREFERENCES = {"theme": "color", "fieldOrientation": "High School", "gameType": "11v11", "timezone": "UTC"}
 
 
 def load_limits(environ=None):
@@ -482,6 +483,10 @@ def enter_workspace(storage, workspace):
 
 def validate_preferences(payload):
     allowed = {}
+    if "gameType" in payload:
+        if payload["gameType"] not in SUPPORTED_GAME_TYPES:
+            raise AccountError("VALIDATION_ERROR", "Unknown game type")
+        allowed["gameType"] = payload["gameType"]
     if "theme" in payload:
         if payload["theme"] not in {"color", "printerFriendly", "blackboard"}:
             raise AccountError("VALIDATION_ERROR", "Unknown diagram theme")

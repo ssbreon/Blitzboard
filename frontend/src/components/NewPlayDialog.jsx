@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { applyPlayerLabelOption, buildMarkersFromTemplate, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
+import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_GAME_TYPE, gameTypeLabel, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
 import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONES, fieldWindowForPlay, fitMarkersToWindow, isGreenZoneOnlyCategory, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
@@ -20,14 +20,10 @@ const DEFAULT_PLAYER_LABEL_OPTION = PLAYER_LABEL_OPTIONS[0]
 const DEFAULT_PLAY_NAME = 'New Play'
 export const FIELD_ORIENTATIONS = ['High School', 'NCAA', 'NFL']
 
-function gameTypeLabel(gameType) {
-  return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
-}
-
-export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true }) {
+export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel, onCreate, initialName = DEFAULT_PLAY_NAME, defaultGameType = DEFAULT_GAME_TYPE, defaultTheme = DEFAULT_THEME_ID, defaultFieldOrientation = FIELD_ORIENTATIONS[0], defaultPerspective = PLAY_PERSPECTIVES[0], categoryOptions = PLAY_CATEGORIES, showPlayerLabelOptions = true }) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState(initialName)
-  const [gameType, setGameType] = useState('')
+  const [gameType, setGameType] = useState(defaultGameType)
   const [templateId, setTemplateId] = useState('')
   const [category, setCategory] = useState('')
   const [fieldDecoration, setFieldDecoration] = useState(DEFAULT_FIELD_DECORATION)
@@ -78,7 +74,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
     onCreate(trimmed, gameType, templateId, themeId, category, fieldDecoration, fieldOrientation, fieldZone, playerLabelOption, perspective)
     setStep(1)
     setName(initialName)
-    setGameType('')
+    setGameType(defaultGameType)
     setTemplateId('')
     setCategory('')
     setFieldDecoration(DEFAULT_FIELD_DECORATION)
@@ -91,7 +87,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
   function handleCancel() {
     setStep(1)
     setName(initialName)
-    setGameType('')
+    setGameType(defaultGameType)
     setTemplateId('')
     setCategory('')
     setFieldDecoration(DEFAULT_FIELD_DECORATION)

@@ -1645,10 +1645,12 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(call_api("POST", "playbooks", "local-coach", ["not", "an", "object"]).status_code, 400)
 
     def test_preferences_use_supported_field_standards(self):
-        result = call_api("PATCH", "me/preferences", "local-coach", {"theme": "printerFriendly", "fieldOrientation": "NCAA", "timezone": "America/New_York"})
+        result = call_api("PATCH", "me/preferences", "local-coach", {"theme": "printerFriendly", "fieldOrientation": "NCAA", "gameType": "7v7", "timezone": "America/New_York"})
         self.assertEqual(result.status_code, 200)
         self.assertEqual(response_json(result)["fieldOrientation"], "NCAA")
+        self.assertEqual(response_json(result)["gameType"], "7v7")
         self.assertEqual(call_api("PATCH", "me/preferences", "local-coach", {"fieldOrientation": "vertical"}).status_code, 400)
+        self.assertEqual(call_api("PATCH", "me/preferences", "local-coach", {"gameType": "12v12"}).status_code, 400)
 
     def test_only_owner_can_start_billing_actions(self):
         team = self.team_fixture()

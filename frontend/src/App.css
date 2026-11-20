@@ -2700,6 +2700,8 @@ html.is-drilling-through * {
 .account-team-dialog {
   flex: 0 1 680px;
   width: min(680px, calc(100vw - 32px));
+  height: min(720px, calc(100vh - 32px));
+  box-sizing: border-box;
 }
 
 .account-title-loading {
@@ -2820,11 +2822,17 @@ html.is-drilling-through * {
   resize: vertical;
 }
 
-#account-settings-panel-preferences:not([hidden]) {
+#account-settings-panel-defaults:not([hidden]) {
   display: grid;
   gap: 18px;
   box-sizing: border-box;
   min-height: 253px;
+}
+
+#account-profile-panel-profile:not([hidden]),
+#account-profile-panel-defaults:not([hidden]) {
+  display: grid;
+  gap: 18px;
 }
 
 .account-settings-suggestions {
@@ -2892,7 +2900,7 @@ html.is-drilling-through * {
 }
 
 @media (max-width: 560px) {
-  #account-settings-panel-preferences:not([hidden]) {
+  #account-settings-panel-defaults:not([hidden]) {
     min-height: 486px;
   }
 
@@ -3058,9 +3066,11 @@ html.is-drilling-through * {
   border-top-right-radius: 6px;
 }
 
-.account-settings-tabs [role='tab'] {
+.account-settings-tabs [role='tab'],
+.account-team-tabs [role='tab'] {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   gap: 6px;
@@ -3104,6 +3114,19 @@ html.is-drilling-through * {
   padding-top: 0;
 }
 
+.account-team-panel.active {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.account-team-panel.active > .account-section {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .account-team-summary {
   margin: 0 0 16px;
   padding: 8px 12px;
@@ -3118,17 +3141,41 @@ html.is-drilling-through * {
 
 .account-team-panels {
   display: grid;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
 }
 
 .account-team-panels > .account-team-panel {
   grid-area: 1 / 1;
+  min-height: 0;
   min-width: 0;
   visibility: hidden;
 }
 
 .account-team-panels > .account-team-panel.active {
   visibility: visible;
+}
+
+.account-team-data-grid-wrap {
+  display: flex;
+  min-height: 0;
+}
+
+.account-team-dialog .account-team-data-grid {
+  flex: 1;
+  min-height: 0;
+}
+
+.account-team-dialog .account-team-data-grid .data-grid-table-wrap {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  border: 1px solid var(--grid-chrome);
+  border-top: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  background: var(--gray-gutter);
 }
 
 .account-count {

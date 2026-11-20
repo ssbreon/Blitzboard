@@ -1879,6 +1879,10 @@ export const ALL_PLAY_TEMPLATES = Object.values(PLAY_TEMPLATES).flatMap((familie
 export const DEFAULT_GAME_TYPE = '11v11'
 export const DEFAULT_PLAY_TEMPLATE = PLAY_TEMPLATES[DEFAULT_GAME_TYPE].pro_set[0]
 
+export function gameTypeLabel(gameType) {
+  return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
+}
+
 const SPECIAL_TEAMS_TEMPLATE_CATEGORIES = new Set([
   'Kickoff',
   'Kickoff Return',
