@@ -31,7 +31,7 @@ export function AboutDialog({ onClose }) {
         <a href="mailto:breontechllc@hotmail.com">breontechllc@hotmail.com</a>
       </section>
       <footer className="dialog-actions">
-        <button type="button" className="dialog-create" onClick={onClose}>Close</button>
+        <button type="button" className="dialog-create primary-button" onClick={onClose}>Close</button>
       </footer>
     </section>
   </div>

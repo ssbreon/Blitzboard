@@ -67,8 +67,8 @@ export function NewCollectionDialog({ title, titleIcon: TitleIcon, onCancel, onC
         </label>
         <ErrorDialog error={error} message="We couldn't create this playbook. Your changes are still here so you can try again." />
         <div className="dialog-actions">
-          <button type="button" className="dialog-cancel" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="dialog-create" disabled={submitting}>Create</button>
+          <button type="button" className="dialog-cancel secondary-button" onClick={onCancel}>Cancel</button>
+          <button type="submit" className="dialog-create primary-button" disabled={submitting}>Create</button>
         </div>
       </form>
     </div>

@@ -236,47 +236,8 @@ button:active:not(:disabled):not([role^='menuitem']) {
   }
 }
 
-.play-designer-cancel {
-  font: inherit;
-  font-size: 15px;
-  padding: 8px 20px;
-  border-radius: 6px;
-  border: 1px solid var(--secondary-button-border);
-  background: var(--secondary-button);
-  color: var(--text-h);
-  cursor: pointer;
-  white-space: nowrap;
-
-  &:hover:not(:disabled) {
-    border-color: var(--accent-border);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-}
-
 .play-designer-save {
-  font: inherit;
-  font-size: 15px;
-  padding: 8px 20px;
-  border-radius: 6px;
-  border: 1px solid var(--primary-button);
-  background: var(--primary-button);
-  color: #fff;
-  cursor: pointer;
-  white-space: nowrap;
   min-width: 100px;
-
-  &:hover:not(:disabled) {
-    opacity: 0.9;
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
 }
 
 .plays-drillthrough-view {
@@ -456,27 +417,6 @@ html.is-drilling-through * {
       border-color: var(--accent-border);
     }
 
-  }
-
-  .play-designer-cancel,
-  .play-designer-save {
-    height: 36px;
-    padding: 0 18px;
-    font-size: 14px;
-  }
-
-  .play-designer-cancel {
-
-    &:hover:not(:disabled) {
-      background: rgba(0, 0, 0, 0.05);
-      border-color: #aeb4bb;
-    }
-
-  }
-
-  .play-designer-cancel:disabled,
-  .play-designer-save:disabled {
-    opacity: 0.45;
   }
 
   .data-grid-error {
@@ -3744,7 +3684,7 @@ html.is-drilling-through * {
   display: none;
 }
 
-.breadcrumb-bar button:not(.play-designer-save):not(.play-designer-cancel):not(.breadcrumb-settings) {
+.breadcrumb-bar button:not(.primary-button):not(.secondary-button):not(.breadcrumb-settings) {
   box-shadow: none;
   cursor: pointer;
 }
@@ -5387,9 +5327,8 @@ html.is-drilling-through * {
   flex-wrap: wrap;
 }
 
-.toolbar-new-button,
-.schedule-primary-button,
-.schedule-secondary-button,
+.primary-button,
+.secondary-button,
 .schedule-delete-button,
 .schedule-icon-button,
 .schedule-view-switch button {
@@ -5410,8 +5349,7 @@ html.is-drilling-through * {
   cursor: pointer;
 }
 
-.toolbar-new-button,
-.schedule-primary-button {
+.primary-button {
   border-color: var(--primary-button);
   background: var(--primary-button);
   color: white;
@@ -5431,9 +5369,8 @@ html.is-drilling-through * {
 }
 
 .dialog-create:hover:not(:disabled),
-.toolbar-new-button:hover:not(:disabled),
-.schedule-primary-button:hover:not(:disabled),
-.schedule-secondary-button:hover:not(:disabled),
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled),
 .schedule-delete-button:hover:not(:disabled),
 .schedule-icon-button:hover:not(:disabled),
 .schedule-view-switch button:hover:not(:disabled) {
@@ -5441,9 +5378,8 @@ html.is-drilling-through * {
   filter: brightness(0.97);
 }
 
-.toolbar-new-button:disabled,
-.schedule-primary-button:disabled,
-.schedule-secondary-button:disabled,
+.primary-button:disabled,
+.secondary-button:disabled,
 .schedule-delete-button:disabled,
 .schedule-icon-button:disabled {
   opacity: 0.55;
@@ -7189,7 +7125,7 @@ html.is-drilling-through * {
   gap: 5px;
 }
 
-.schedule-selected-installs > .schedule-primary-button {
+.schedule-selected-installs > .primary-button {
   min-height: 42px;
 }
 
@@ -7236,7 +7172,7 @@ html.is-drilling-through * {
   margin-bottom: 8px;
 }
 
-.schedule-section-heading .schedule-primary-button {
+.schedule-section-heading .primary-button {
   min-height: 34px;
 }
 
@@ -7424,7 +7360,7 @@ html.is-drilling-through * {
     min-width: 0;
   }
 
-  .schedule-subtoolbar-actions > .toolbar-new-button {
+  .schedule-subtoolbar-actions > .primary-button {
     align-self: end;
   }
 
@@ -7597,7 +7533,7 @@ html.is-drilling-through * {
     grid-row: 2;
   }
 
-  .schedule-selected-installs > .schedule-primary-button {
+  .schedule-selected-installs > .primary-button {
     grid-column: 1 / -1;
   }
 

@@ -90,7 +90,7 @@ export function ErrorDialogProvider({ children }) {
             <pre>{details}</pre>
           </div>
           <div className="dialog-actions">
-            <button ref={buttonRef} type="button" className="dialog-create" onClick={dismiss}>OK</button>
+            <button ref={buttonRef} type="button" className="dialog-create primary-button" onClick={dismiss}>OK</button>
           </div>
         </section>
       </div>, document.body,

@@ -325,10 +325,10 @@ export function PrintPreviewDialog({ api, play, plays, collection, parentCollect
             </div>
           </div>
           <div className="print-dialog-chrome dialog-actions print-dialog-actions">
-            <button type="button" className="dialog-cancel" onClick={onClose}>
+            <button type="button" className="dialog-cancel secondary-button" onClick={onClose}>
               Close
             </button>
-            <button type="button" className="dialog-create" onClick={() => window.print()}>
+            <button type="button" className="dialog-create primary-button" onClick={() => window.print()}>
               Print
             </button>
           </div>

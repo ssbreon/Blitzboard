@@ -41,7 +41,7 @@ export function DeleteConfirmationDialog({ message, onCancel, onConfirm }) {
         <p id="delete-confirmation-message">{message}</p>
         <ErrorDialog error={error} message="We couldn't finish deleting the selected items. Please check the list before trying again." />
         <div className="dialog-actions">
-          <button type="button" className="dialog-cancel" autoFocus disabled={deleting} onClick={onCancel}>Cancel</button>
+          <button type="button" className="dialog-cancel secondary-button" autoFocus disabled={deleting} onClick={onCancel}>Cancel</button>
           <button
             type="button"
             className="dialog-delete"

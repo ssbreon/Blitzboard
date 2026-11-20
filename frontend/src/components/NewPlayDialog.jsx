@@ -213,11 +213,11 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
           </div>
         </div>
         <div className="dialog-actions new-play-actions">
-          <button type="button" className="dialog-cancel" onClick={handleCancel}>Cancel</button>
+          <button type="button" className="dialog-cancel secondary-button" onClick={handleCancel}>Cancel</button>
           {step === 2 && (
-            <button type="button" className="dialog-cancel" onClick={() => setStep(1)}>Back</button>
+            <button type="button" className="dialog-cancel secondary-button" onClick={() => setStep(1)}>Back</button>
           )}
-          <button type="submit" className="dialog-create">{step === 1 ? 'Next' : 'Create'}</button>
+          <button type="submit" className="dialog-create primary-button">{step === 1 ? 'Next' : 'Create'}</button>
         </div>
       </form>
     </div>

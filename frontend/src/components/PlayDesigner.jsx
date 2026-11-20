@@ -1611,10 +1611,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               </select>
             </label>
             <div className="dialog-actions">
-              <button type="button" className="dialog-cancel" onClick={() => setSettingsOpen(false)}>
+              <button type="button" className="dialog-cancel secondary-button" onClick={() => setSettingsOpen(false)}>
                 Cancel
               </button>
-              <button type="submit" className="dialog-create">
+              <button type="submit" className="dialog-create primary-button">
                 Apply
               </button>
             </div>
@@ -1631,10 +1631,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               <input type="text" value={adjustmentTitleDraft} maxLength={80} autoFocus required onChange={(event) => setAdjustmentTitleDraft(event.target.value)} />
             </label>
             <div className="dialog-actions">
-              <button type="button" className="dialog-cancel" onClick={() => setEditingSlideId(null)}>
+              <button type="button" className="dialog-cancel secondary-button" onClick={() => setEditingSlideId(null)}>
                 Cancel
               </button>
-              <button type="submit" className="dialog-create">
+              <button type="submit" className="dialog-create primary-button">
                 Apply
               </button>
             </div>
@@ -1831,10 +1831,10 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           )}
         </div>
         <div className="play-designer-toolbar-actions">
-          <button type="button" className="play-designer-cancel" onClick={handleCancel} disabled={saving || !isDirty}>
+          <button type="button" className="play-designer-cancel secondary-button" onClick={handleCancel} disabled={saving || !isDirty}>
             Cancel
           </button>
-          <button type="button" className="play-designer-save" onClick={handleSave} disabled={readOnly || saving || !isDirty}>
+          <button type="button" className="play-designer-save primary-button" onClick={handleSave} disabled={readOnly || saving || !isDirty}>
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>

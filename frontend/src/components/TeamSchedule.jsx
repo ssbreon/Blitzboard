@@ -199,8 +199,8 @@ export function ScheduleEventDialog({ api, initialEvent, initialDate, canEdit, c
         </div>
         <footer className="schedule-dialog-actions">
           {initialEvent && canDelete && <button type="button" className="schedule-delete-button" onClick={onDelete} disabled={saving}><Trash2 size={16} /> Delete</button>}
-          <button type="button" className="schedule-secondary-button" onClick={onCancel} disabled={saving}>Cancel</button>
-          {canEdit && <button type="submit" className="schedule-primary-button" disabled={saving || loadingRelatedGames}>{saving ? 'Saving…' : 'Save Event'}</button>}
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={saving}>Cancel</button>
+          {canEdit && <button type="submit" className="primary-button" disabled={saving || loadingRelatedGames}>{saving ? 'Saving…' : 'Save Event'}</button>}
         </footer>
       </form>
     </div>
@@ -581,11 +581,11 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     <main className="team-schedule">
       <header className="schedule-toolbar">
         <div className="schedule-subtoolbar-actions">
-          <button type="button" className="toolbar-new-button" disabled={!canEdit} onClick={() => setDialog({ date: dateKey(calendarDate) })}><Plus size={18} /> New Event</button>
+          <button type="button" className="primary-button" disabled={!canEdit} onClick={() => setDialog({ date: dateKey(calendarDate) })}><Plus size={18} /> New Event</button>
           <label className="schedule-jump-picker" htmlFor="jump-to-date"><span>Jump to</span><input className="date-picker" id="jump-to-date" aria-label="Jump to date" type="date" value={dateKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(event.target.value)) }} /></label>
         </div>
         <div className="schedule-toolbar-controls">
-          <button type="button" className="schedule-secondary-button" onClick={() => { setCalendarDate(new Date()); setTodayPulse({}) }}>Today</button>
+          <button type="button" className="secondary-button" onClick={() => { setCalendarDate(new Date()); setTodayPulse({}) }}>Today</button>
           <button type="button" className="schedule-icon-button" aria-label="Previous period" onClick={() => moveCalendar(-1)}><ChevronLeft size={20} /></button>
           <label className="schedule-month-picker"><span className="sr-only">Choose month</span><input type="month" value={monthKey(calendarDate)} onChange={(event) => { if (event.target.value) setCalendarDate(parseDate(`${event.target.value}-01`)) }} /></label>
           <button type="button" className="schedule-icon-button" aria-label="Next period" onClick={() => moveCalendar(1)}><ChevronRight size={20} /></button>

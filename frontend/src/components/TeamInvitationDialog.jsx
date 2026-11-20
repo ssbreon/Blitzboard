@@ -12,8 +12,8 @@ export function TeamInvitationDialog({ user, saving, onAccept, onCancel }) {
         <p className="team-invitation-note">This invitation can only be accepted by the verified email address it was sent to.</p>
       </div>
       <div className="dialog-actions">
-        <button type="button" className="dialog-cancel" autoFocus disabled={saving} onClick={onCancel}>Cancel</button>
-        <button type="button" className="dialog-create" disabled={saving} onClick={onAccept}>{saving ? 'Accepting...' : 'Accept Invitation'}</button>
+        <button type="button" className="dialog-cancel secondary-button" autoFocus disabled={saving} onClick={onCancel}>Cancel</button>
+        <button type="button" className="dialog-create primary-button" disabled={saving} onClick={onAccept}>{saving ? 'Accepting...' : 'Accept Invitation'}</button>
       </div>
     </section>
   </div>

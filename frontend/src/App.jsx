@@ -205,8 +205,8 @@ function GameCardItemDialog({ game, card, initialName, practices = [], initialPr
       {card.tab === 'scout' && <label className="dialog-field"><span>Practice</span><select required value={practiceEventId} onChange={(event) => setPracticeEventId(event.target.value)}><option value="">Select a linked practice</option>{practices.map((practice) => <option key={practice.id} value={practice.id}>{practice.eventDate} - {practice.name}</option>)}</select></label>}
       <ErrorDialog error={error} message="We couldn't create this item. Please try again." />
       <div className="dialog-actions">
-        <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
-        <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Creating...' : 'Create'}</button>
+        <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={onCancel}>Cancel</button>
+        <button type="submit" className="dialog-create primary-button" disabled={saving || !name.trim()}>{saving ? 'Creating...' : 'Create'}</button>
       </div>
     </form>
   </div>
@@ -240,8 +240,8 @@ function GroupingDialog({ grouping, scoutGrouping = false, onCancel, onSave }) {
       <label className="dialog-field"><span>Description</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} /></label>
       <ErrorDialog error={error} message="We couldn't save this grouping. Please try again." />
       <div className="dialog-actions">
-        <button type="button" className="dialog-cancel" disabled={saving} onClick={onCancel}>Cancel</button>
-        <button type="submit" className="dialog-create" disabled={saving || !name.trim()}>{saving ? 'Saving...' : grouping ? 'Save' : 'Add'}</button>
+        <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={onCancel}>Cancel</button>
+        <button type="submit" className="dialog-create primary-button" disabled={saving || !name.trim()}>{saving ? 'Saving...' : grouping ? 'Save' : 'Add'}</button>
       </div>
     </form>
   </div>
@@ -461,8 +461,8 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
       </div>
       <ErrorDialog error={error} message="We couldn't load or add the plays. Please try again." />
       <div className="dialog-actions">
-        <button type="button" className="dialog-cancel" disabled={submitting} onClick={onCancel}>Cancel</button>
-        <button type="submit" className="dialog-create" disabled={submitting || !selectedIds.length}>{submitting ? 'Adding...' : 'Add Selected Plays'}</button>
+        <button type="button" className="dialog-cancel secondary-button" disabled={submitting} onClick={onCancel}>Cancel</button>
+        <button type="submit" className="dialog-create primary-button" disabled={submitting || !selectedIds.length}>{submitting ? 'Adding...' : 'Add Selected Plays'}</button>
       </div>
     </form>
   </div>
@@ -873,10 +873,10 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
             )}
             <ErrorDialog error={error} message="We couldn't save your settings. Your changes are still here so you can try again." />
             <div className="dialog-actions">
-              <button type="button" className="dialog-cancel" disabled={saving} onClick={closeSettings}>
+              <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={closeSettings}>
                 Cancel
               </button>
-              <button type="submit" className="dialog-create" disabled={readOnly || saving || busy || !draftName.trim() || (canEditResult && resultValidationError)}><Save size={16} aria-hidden="true" />
+              <button type="submit" className="dialog-create primary-button" disabled={readOnly || saving || busy || !draftName.trim() || (canEditResult && resultValidationError)}><Save size={16} aria-hidden="true" />
                 {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -951,7 +951,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
             </button>)}
             {!selectedInstallCards.length && <p className="schedule-muted">No plays selected.</p>}
           </div>
-          <button type="button" className="schedule-primary-button" disabled={readOnly || installSaving || !installDirty} onClick={saveInstall}>{installSaving ? 'Saving...' : 'Save Install'}</button>
+          <button type="button" className="primary-button" disabled={readOnly || installSaving || !installDirty} onClick={saveInstall}>{installSaving ? 'Saving...' : 'Save Install'}</button>
         </section>
         <ErrorDialog error={installError} message="We couldn't save the install. Please try again." />
       </section> : installMode ? <section className="schedule-install-library">
@@ -1928,11 +1928,10 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       {practiceScoutRequest && <div className="schedule-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setPracticeScoutRequest(null) }}><form className="schedule-dialog" role="dialog" aria-modal="true" aria-labelledby="practice-scout-game-title" onSubmit={submitPracticeScoutRequest}>
         <header className="schedule-dialog-header"><div><ScanSearch size={20} aria-hidden="true" /><h2 id="practice-scout-game-title">Create Scout Play</h2></div><DialogCloseButton onClick={() => setPracticeScoutRequest(null)} /></header>
         <div className="schedule-dialog-body"><p>Select the Game Plan that should own this Scout Play.</p><label className="schedule-field"><span>Game Plan</span><select autoFocus required value={selectedPracticeScoutGameId} onChange={(event) => setSelectedPracticeScoutGameId(event.target.value)} disabled={!practiceScoutGames.length}><option value="">{practiceScoutGames.length ? 'Select a Game Plan' : 'No active Game Plans available'}</option>{practiceScoutGames.map((game) => <option key={game.id} value={game.id}>{game.opponent || game.name} · {game.gameDate}</option>)}</select></label>{!practiceScoutGames.length && <p className="gp-empty">Create a Game Plan before adding a Scout Play to this practice.</p>}</div>
-        <footer className="schedule-dialog-actions"><button type="button" className="schedule-secondary-button" onClick={() => setPracticeScoutRequest(null)}>Cancel</button><button type="submit" className="schedule-primary-button" disabled={!selectedPracticeScoutGameId}>Continue</button></footer>
+        <footer className="schedule-dialog-actions"><button type="button" className="secondary-button" onClick={() => setPracticeScoutRequest(null)}>Cancel</button><button type="submit" className="primary-button" disabled={!selectedPracticeScoutGameId}>Continue</button></footer>
       </form></div>}
       {groupingDialog && <GroupingDialog key={groupingDialog.grouping?.id || 'new-grouping'} grouping={groupingDialog.grouping} scoutGrouping={groupingDialog.scoutGrouping} onCancel={() => setGroupingDialog(null)} onSave={handleSaveGrouping} />}
-      {newDialog?.target === 'gameCardItem' && <GameCardItemDialog card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
-        {newDialog?.target === 'gameCardItem' && <GameCardItemDialog game={parent} card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
+      {newDialog?.target === 'gameCardItem' && <GameCardItemDialog game={parent} card={newDialog.card} practices={newDialog.practices} initialPracticeEventId={newDialog.practiceEventId} initialName={gameCardItemDefaultName(parent, newDialog.card)} onCancel={() => setNewDialog(null)} onCreate={handleCreateGameCardItem} />}
       {showNewPlaybookDialog && (
         <NewCollectionDialog
           title="Add New Playbook"
@@ -2402,9 +2401,9 @@ function AppContent() {
       <DialogCloseButton onClick={() => setLeave(null)} disabled={savingLeave} />
       <p>Save your changes before leaving?</p>
       <div className="dialog-actions">
-        <button type="button" className="dialog-cancel" disabled={savingLeave} autoFocus onClick={() => setLeave(null)}>Cancel</button>
-        <button type="button" className="dialog-cancel" disabled={savingLeave} onClick={() => { setLeave(null); leave.action() }}>Discard</button>
-        <button type="button" className="dialog-create" disabled={savingLeave || !leave.canSave} onClick={saveAndLeave}><Save size={16} aria-hidden="true" />{savingLeave ? 'Saving...' : 'Save'}</button>
+        <button type="button" className="dialog-cancel secondary-button" disabled={savingLeave} autoFocus onClick={() => setLeave(null)}>Cancel</button>
+        <button type="button" className="dialog-cancel secondary-button" disabled={savingLeave} onClick={() => { setLeave(null); leave.action() }}>Discard</button>
+        <button type="button" className="dialog-create primary-button" disabled={savingLeave || !leave.canSave} onClick={saveAndLeave}><Save size={16} aria-hidden="true" />{savingLeave ? 'Saving...' : 'Save'}</button>
       </div>
     </section></div>}
   </>

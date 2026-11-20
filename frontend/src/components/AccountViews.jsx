@@ -379,8 +379,8 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
           </>}
         </fieldset>
         <div className="account-form-actions">
-          <button type="button" className="dialog-cancel" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-          <button type="submit" className="dialog-create" disabled={saving || (view === 'settings' && settingsTab === 'suggestions' && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
+          <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
+          <button type="submit" className="dialog-create primary-button" disabled={saving || (view === 'settings' && settingsTab === 'suggestions' && !canManageSuggestions && !formDirty)}><Save size={16} aria-hidden="true" />{saving ? 'Saving...' : 'Save'}</button>
         </div>
       </form>
     </>}
@@ -540,11 +540,11 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       </div>
     </div>}
     {view === 'team' && isAccountDialog && <div className="account-form-actions">
-      <button type="button" className="dialog-cancel" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
-      <button type="button" className="dialog-create" disabled={saving || Boolean(inviteEmail)} onClick={() => save()}>{saving ? 'Saving...' : 'OK'}</button>
+      <button type="button" className="dialog-cancel secondary-button" disabled={saving} onClick={() => onDismiss?.()}>Cancel</button>
+      <button type="button" className="dialog-create primary-button" disabled={saving || Boolean(inviteEmail)} onClick={() => save()}>{saving ? 'Saving...' : 'OK'}</button>
     </div>}
     {view === 'billing' && isAccountDialog && <div className="account-form-actions">
-      <button type="button" className="dialog-create" onClick={() => onDismiss?.()}>Close</button>
+      <button type="button" className="dialog-create primary-button" onClick={() => onDismiss?.()}>Close</button>
     </div>}
   </main>
 
