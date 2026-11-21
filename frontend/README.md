@@ -149,6 +149,29 @@ A verified-recipient challenge is still needed if the tenant doesn't emit an
 appropriate explicit verification claim. Local Entra invitation capture is
 available only to an Owner in the local alpha setup described above.
 
+### Entra Social Sign-In Expansion
+
+Keep Microsoft Entra External ID as the authentication broker as coach sign-in
+expands to approved social providers. Candidate providers are Microsoft, Google,
+and Apple; the final enabled-provider list and user-flow design must be approved
+and configured in the External ID tenant before a browser surface exposes those
+options. Separate development and production identities and redirects are required.
+
+The app will keep the existing PKCE redirect flow, API delegated scope, OIDC
+`email` scope, bearer-token acquisition, and provider logout behavior. The API
+continues to require trusted issuer, tenant, audience, scope, Object ID, expiry,
+and token-format claims. Stable internal identities derive from issuer, tenant,
+and Object ID, never email. Social sign-in does not create a personal workspace,
+grant alpha access, or replace workspace membership and invitation checks.
+
+Before a social provider can accept an invitation, the API token must expose a
+matching email plus a trusted explicit `email_verified: true` or `xms_edov: true`
+claim, or an approved verified-recipient rule must be implemented and tested.
+Providers without a usable verification claim remain login-only candidates or
+must stay disabled for workspace invitations. Provider setup must not place
+client secrets, credentials, or provider private keys in browser settings or
+source code.
+
 Start the emulators, Functions at port 7071 using the workspace virtual environment,
 and Vite at port 5173. Vite fails if that port is occupied instead of silently
 changing the registered callback. Visit `http://localhost:5173/`, select Continue
@@ -185,6 +208,13 @@ Entra setup does not provision Azure application infrastructure or authorize dep
 	This is local session handling, not production provider logout or token revocation.
 - Team name/defaults, roster roles/removal, seven-day invitations, resend/revoke,
 	reserved seats, and recipient-bound single-use acceptance.
+- Team Schedule in Week, Month, Quarter, Year, and Grid views, including schedule
+	range requests and event/Game Plan linking.
+- Practice Sheets and Practice Scripts with period editing, play grids, print
+	preparation, game-result handling, and Team Meal event support.
+- Scouting tendency controls and alignments in the play designer, account-level
+	suggestion lists, and improved responsive toolbar/context-menu behavior.
+- Team logos in the private team-logos Blob container, including print title-page use.
 - Encrypted email capture only: no invitations are sent to real recipients.
 - Annual local Owner fixtures, read-only lifecycle checks, usage/caps and billing summary.
 - Legacy playbooks stay in Individual; they are not moved to the local Team.
@@ -461,9 +491,11 @@ are production follow-ups, not guaranteed by the local tests.
 
 The chosen providers and product rules remain the implementation contract:
 
-- **Entra External ID:** email/password hosted signup/signin, MSAL, token/scope and
-	verified-email validation. Non-development API authentication still fails closed
-	with `AUTH_NOT_CONFIGURED`; no tenant integration is present yet.
+- **Entra External ID:** local tenant signup/signin, MSAL, token/scope and
+	verified-email validation are implemented behind `VITE_AUTH_MODE=entra` and
+	`AUTH_MODE=entra`. Social provider expansion remains tenant configuration and
+	browser/API test work; non-development authentication still fails closed when
+	provider settings are missing or invalid.
 - **Paddle Billing:** sandbox products/prices, verified checkout/webhooks, customer
 	portal and credit isolation, immediate prorated interval previews/changes and
 	confirmed refunds. Billing actions currently return `BILLING_NOT_CONNECTED`; mock

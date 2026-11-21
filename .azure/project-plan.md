@@ -2,6 +2,7 @@
 
 **Status**: Integrated
 **Created**: 2026-09-24
+**Updated**: 2026-11-21
 **Mode**: Azure project planning
 
 ## 1. Product Summary
@@ -12,9 +13,9 @@
 
 **Primary users**: Defensive coordinators and coaching staff managing owned playbooks with coordinator/owner, assistant/editor, and viewer access.
 
-**Scope**: Ship the first usable editor with 11v11, 7v7, and 4v4 field presets; base plays; named formation-adjustment slides; player symbols; routes, blitzes, zones, man indicators, alignments, responsibilities, annotations; drag/select/delete/clear; undo/redo; play library foundations; and print-ready PDF export for a play or complete playbook.
+**Scope**: Ship the first usable editor with 11v11, 7v7, and 4v4 field presets; base plays; named formation-adjustment slides; player symbols; routes, blitzes, zones, man indicators, alignments, responsibilities, annotations; drag/select/delete/clear; undo/redo; play library foundations; print-ready PDF export for a play or complete playbook; workspace accounts and permissions; team scheduling; practice sheets and scripts; global search; archive and restore; and team branding.
 
-**Deferred**: Scouting/video analysis and practice scheduling.
+**Deferred**: Production billing, automatic invitation email delivery, account lifecycle automation, and external social identity providers beyond the local Entra implementation.
 
 ## 2. Services
 
@@ -51,6 +52,16 @@ The API stores domain records in the `playboard` container, using `/partitionKey
 Authentication uses an external OIDC provider, with Microsoft Entra External ID and Google federation as the preferred deployment direction. Local development may use an explicit development identity behind a flag and local secret; production API routes must validate the external token and enforce ownership/role rules server-side. No plaintext passwords or Google credentials are stored.
 
 For the invite-only, payment-free alpha, Entra sign-in alone does not grant application access or create a personal Free workspace. An operator bootstraps an `alphaEnabled` Team workspace and its first Owner; Owners invite verified-email Coaches. Alpha access is stored and enforced server-side, independent of Paddle subscription status. Production alpha invitations support manual delivery: an Owner can retrieve a single pending invitation link through an authenticated, permission-checked endpoint; list responses never include production links, and Coaches cannot retrieve them. This requires a trusted HTTPS app URL and an explicit encryption key; no email is sent automatically. The local-only bootstrap CLI is not a production provisioning mechanism.
+
+### Entra coach sign-in expansion
+
+Microsoft Entra External ID remains the identity broker for coach sign-in. The next authentication phase will expand sign-in methods through tenant and user-flow configuration without changing the API token contract or introducing provider secrets into the browser. Candidate social methods are Microsoft, Google, and Apple; enabled providers, button order, and branding must match the approved External ID user-flow experience. Password sign-up, social sign-up, and social sign-in remain tenant-controlled product decisions, not routes that the app bypasses.
+
+Social identities must authenticate through the existing SPA redirect and PKCE flow, request the API delegated scope and the OIDC `email` scope, and produce the same trusted issuer, tenant, audience, scope, expiry, and Object ID claims required today. The API derives a stable internal ID from trusted issuer, tenant, and Object ID rather than email. Email remains display and recipient-matching data only. Entra does not return application access or workspace membership merely because a social account signed in.
+
+Invitation acceptance remains recipient-bound and fail closed. A token must provide a matching email plus an explicit, trusted `email_verified: true` or `xms_edov: true` claim unless a later reviewed verified-recipient challenge replaces that rule. Providers that do not supply or expose a compatible claim must not be enabled for invitations. A provider account may gain application access only through an existing alpha Team membership or a valid invitation.
+
+The implementation sequence is: configure separate social provider identities and redirect domains in a non-production tenant; add the providers to the External ID user flow; verify provider-specific claims and Object ID stability; add provider-aware sign-in tests and browser coverage; update CSP, redirect/logout settings, and deployment runbooks; then enable providers only in the environment approved for pilot or production. Provider setup must preserve a passwordless or password recovery path if tenant policy requires one. Never store provider client secrets or Google, Apple, or Microsoft credentials in the SPA or repository.
 
 ### Cloud development baseline (proposed; no resources provisioned)
 
@@ -99,6 +110,8 @@ For the invite-only, payment-free alpha, Entra sign-in alone does not grant appl
 4. Use the existing Cosmos DB for NoSQL adapter and versioned container schema with the local Cosmos emulator; configure a separate production database/container and authentication without touching local or development databases. Keep schema migrations explicit and do not seed production data.
 5. Wire sign-in/session handling, protected UI states, error/loading/empty states, PDF export for one play and a whole playbook, and responsive print styling.
 6. Validate frontend build/lint, API tests, authorization cases, storage behavior against the Cosmos DB emulator, export output, and desktop/mobile workflows.
+7. Expand Entra coach sign-in to approved social providers in separate dev and production tenants, validate provider claims and account stability, and run the invitation acceptance matrix.
+8. Integrate Paddle, Resend, and production account lifecycle operations only after the alpha access and provider rollout gates pass.
 
 ## 6. Design System & UI
 
