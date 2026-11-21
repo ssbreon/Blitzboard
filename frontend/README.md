@@ -219,10 +219,21 @@ Entra setup does not provision Azure application infrastructure or authorize dep
 - Annual local Owner fixtures, read-only lifecycle checks, usage/caps and billing summary.
 - Legacy playbooks stay in Individual; they are not moved to the local Team.
 
-Free limits are 5 playbooks, 15 games, 500 plays, and 500 scouting plays.
-Individual limits are 100 playbooks, 100 games, 5,000 plays, and 5,000 scouting plays.
-Team limits are 100 playbooks, 200 games, 10,000 plays, and 10,000 scouting plays.
-The twenty Team seats include the Owner and pending unexpired invitations.
+Subscription tier limits:
+
+| Tier | Playbooks | Games | Plays | Scouting Plays / Reports |
+|---|---:|---:|---:|---:|
+| Free | 5 | 15 | 500 | 500 |
+| Individual | 100 | 100 | 5,000 | 5,000 |
+| Team | Unlimited* | Unlimited* | Unlimited* | Unlimited* |
+
+Individual pricing is $9.99 per month or $99.90 per year. Team pricing is $29.99 per month or $299.90 per year. Paid plans include a 14-day trial; Free has no recurring charge.
+
+`* Unlimited` means no subscription plan-level record limit. Capacity remains subject to the maximum storage capacity supported by the database.
+
+Scouting Plays and Scouting Reports share one quota and usage count. They are listed together because creating either one consumes the same allowance.
+
+The twenty Team seats include both the Owner and any pending, unexpired invitations.
 
 ### Permission Policy
 
