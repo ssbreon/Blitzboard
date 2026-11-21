@@ -350,22 +350,24 @@ html.is-drilling-through * {
   font-size: 13px;
 }
 
-.account-plan-options {
+ .account-plan-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  max-width: 520px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .account-plan-options > div {
   display: grid;
-  gap: 4px;
-  padding: 12px;
+  align-content: start;
+  gap: 10px;
+  min-height: 112px;
+  padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 6px;
+  background: var(--form-bg);
 }
 
-.account-plan-options strong { color: var(--text-h); }
+.account-plan-options strong { display: flex; align-items: center; gap: 7px; color: var(--text-h); font-size: 16px; }
 .account-plan-options span { font-size: 13px; }
 
 @media (max-width: 800px) {
@@ -2624,6 +2626,12 @@ html.is-drilling-through * {
   box-shadow: var(--shadow);
 }
 
+.account-form-dialog.account-billing-dialog {
+  box-sizing: border-box;
+  flex-basis: 640px;
+  width: min(640px, calc(100vw - 32px));
+}
+
 .account-form-dialog.account-suggestions-dialog {
   box-sizing: border-box;
   flex-basis: 640px;
@@ -2744,22 +2752,32 @@ html.is-drilling-through * {
 }
 
 .account-dialog-context {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 12px 18px;
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border-radius: 6px;
+  align-self: stretch;
+  margin: 0 -24px;
+  width: auto;
+  box-sizing: border-box;
+  padding: 10px 24px;
+  border-radius: 0;
   background: color-mix(in srgb, var(--form-bg) 84%, var(--navy));
 }
 
+.account-form-dialog:not(.account-billing-dialog) .account-dialog-context {
+  margin-top: -16px;
+}
+
 .account-dialog-context > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
 .account-dialog-context dt {
-  margin-bottom: 4px;
+  margin: 0;
   color: var(--navy);
   font-size: 12px;
   font-weight: 600;
@@ -3066,6 +3084,13 @@ html.is-drilling-through * {
   border-top-right-radius: 6px;
 }
 
+.account-billing-dialog .account-billing-tabs [role='tab'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
 .account-settings-tabs [role='tab'],
 .account-team-tabs [role='tab'] {
   display: flex;
@@ -3257,17 +3282,146 @@ html.is-drilling-through * {
   cursor: wait;
 }
 
+.account-membership-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .account-details {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
   gap: 12px 20px;
+  margin: 0;
   font-size: 15px;
+}
+
+.account-membership-details {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--form-bg);
 }
 
 .account-details dd {
   margin: 0;
   color: var(--text-h);
   overflow-wrap: anywhere;
+}
+
+.account-membership-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid #356f41;
+  border-radius: 999px;
+  background: #eef7f0;
+  color: #235e32;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.account-membership-upgrade,
+.account-active-plan {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--form-bg);
+}
+
+.account-current-plan,
+.account-active-plan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-current-plan > div,
+.account-active-plan > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.account-current-plan span,
+.account-active-plan > div:first-child span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-current-plan > div > span,
+.account-active-plan > div:first-child > span {
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--navy);
+}
+
+.account-current-plan strong,
+.account-active-plan > div:first-child strong {
+  color: var(--text-h);
+  font-size: 20px;
+}
+
+.account-current-plan-meta {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.account-plan-picker {
+  padding: 14px;
+}
+
+.account-plan-picker-heading {
+  margin-bottom: 10px;
+}
+
+.account-plan-picker-heading h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 10px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.account-plan-picker-heading p {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.account-plan-prices {
+  display: grid;
+  gap: 3px;
+}
+
+.account-plan-prices b {
+  color: var(--text-h);
+}
+
+.account-billing-action {
+  align-self: flex-start;
+}
+
+.account-managed-membership {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--navy-light);
+  border-radius: 6px;
+  background: var(--form-bg);
+}
+
+.account-managed-membership p {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 13px;
 }
 
 .account-price-row {
@@ -3346,6 +3500,63 @@ html.is-drilling-through * {
   pointer-events: none;
 }
 
+@media (min-width: 721px) {
+  .account-form-dialog.account-billing-dialog {
+    gap: 0;
+    overflow-x: hidden;
+    padding: 20px 24px 24px;
+  }
+
+  .account-billing-dialog .account-dialog-context {
+    align-self: stretch;
+    margin: 0 -24px;
+    width: auto;
+    max-width: none;
+    padding: 8px 24px;
+  }
+
+  .account-billing-dialog .account-billing-tabs {
+    margin: 8px 0 4px;
+  }
+
+  .account-billing-dialog .account-membership-section {
+    gap: 12px;
+  }
+
+  .account-billing-dialog .account-membership-details {
+    gap: 8px 16px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .account-billing-dialog .account-current-plan,
+  .account-billing-dialog .account-active-plan {
+    padding: 10px 12px;
+  }
+
+  .account-billing-dialog .account-plan-picker {
+    padding: 10px 12px;
+  }
+
+  .account-billing-dialog .account-plan-picker-heading {
+    margin-bottom: 8px;
+  }
+
+  .account-billing-dialog .account-plan-picker-heading p {
+    display: none;
+  }
+
+  .account-billing-dialog .account-plan-options > div {
+    min-height: 82px;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .account-billing-dialog .account-billing-action {
+    min-height: 36px;
+  }
+}
+
 @media (max-width: 720px) {
   .app-bar {
     flex-wrap: wrap;
@@ -3365,9 +3576,16 @@ html.is-drilling-through * {
   .account-menu-section-label { padding: 6px 8px; }
   .play-layout-dropdown { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(620px, calc(100vw - 24px)); }
   .account-view { padding: 22px 16px 40px; }
+  .account-dialog-context,
+  .account-billing-dialog .account-dialog-context { margin: 0 -16px; width: auto; padding-inline: 16px; }
   .account-view h1 { font-size: 22px; }
   .account-invite-form { grid-template-columns: minmax(0, 1fr) 110px; }
   .account-invite-form > .dialog-field:first-child { grid-column: 1 / -1; }
+  .account-membership-details { grid-template-columns: minmax(110px, 1fr) minmax(0, 1.35fr); gap: 10px 12px; }
+  .account-plan-options { grid-template-columns: 1fr; }
+  .account-plan-options > div { min-height: 0; }
+  .account-active-plan { align-items: flex-start; flex-direction: column; }
+  .account-active-plan .account-price-row { width: 100%; padding: 8px 0 14px; }
 }
 
 .loading-indicator {

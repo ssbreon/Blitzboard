@@ -330,7 +330,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
       {user && <div className="app-bar-account" ref={menuRef} onKeyDown={menuKeys}>
         <div className="app-bar-identity">
           <span className="app-bar-user-name" title={user.name}>{user.name}</span>
-          {workspace && <span className="active-workspace-label"><span className="app-bar-workspace-name" title={workspace.name}>{workspace.name}</span></span>}
+          {workspace && <span className="active-workspace-label"><span className="app-bar-workspace-name" title={workspace.kind === 'individual' ? 'Personal' : workspace.name}>{workspace.kind === 'individual' ? 'Personal' : workspace.name}</span></span>}
         </div>
         <span className="app-bar-subscription-status" role="status" title={switchingSubscription ? 'Switching subscription...' : undefined}>
           {switchingSubscription && <><LoaderCircle size={14} aria-hidden="true" /><span className="sr-only">Switching subscription...</span></>}
@@ -349,11 +349,11 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
         {menuOpen && (
           <div className="account-menu" role="menu">
             <div className="account-menu-panes">
-              <div className="account-menu-subscriptions" role="group" aria-label="Subscriptions">
-                <div className="account-menu-section-label">Subscriptions</div>
+              <div className="account-menu-subscriptions" role="group" aria-label="Workspaces">
+                <div className="account-menu-section-label">WORKSPACES</div>
                 {user.workspaces?.map((item) => <button key={item.id} type="button" role="menuitemradio" aria-checked={workspace?.id === item.id} disabled={busy} onClick={() => { setMenuOpen(false); onWorkspaceChange(item.id) }}>
                   {item.kind === 'team' ? <Users className="menu-item-icon" aria-hidden="true" /> : <UserRound className="menu-item-icon" aria-hidden="true" />}
-                  <span className="workspace-menu-name">{item.name}</span>{workspace?.id === item.id && <Check size={16} aria-hidden="true" />}
+                  <span className="workspace-menu-name">{item.kind === 'individual' ? 'Personal' : item.name}</span>{workspace?.id === item.id && <Check size={16} aria-hidden="true" />}
                 </button>)}
               </div>
               <div className="account-menu-actions" role="group" aria-label="Account">

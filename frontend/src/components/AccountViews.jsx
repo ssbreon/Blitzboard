@@ -4,7 +4,7 @@
  * All Rights Reserved
  */
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRightLeft, Building2, Copy, CreditCard, List, LoaderCircle, Mail, SlidersHorizontal, Target, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
+import { ArrowRightLeft, Building2, Copy, CreditCard, Gauge, List, LoaderCircle, Mail, SlidersHorizontal, Target, Trash2, Upload, Users, UserRound, Settings } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
@@ -14,7 +14,7 @@ import { SCOUTING_TEMPLATE_GROUPS } from '../utils/scoutingTemplates'
 
 const TITLES = { profile: 'Profile', settings: 'Settings', team: 'Team', billing: 'Membership & Billing' }
 const ICONS = { profile: UserRound, settings: Settings, team: Users, billing: CreditCard }
-const BILLING_TABS = [{ id: 'membership', label: 'Membership' }, { id: 'usage', label: 'Workspace Usage' }]
+const BILLING_TABS = [{ id: 'membership', label: 'Membership', icon: CreditCard }, { id: 'usage', label: 'Workspace Usage', icon: Gauge }]
 const SETTINGS_TABS = [
   { id: 'defaults', label: 'Defaults', icon: SlidersHorizontal },
   { id: 'suggestions', label: 'Suggestion Lists', icon: List },
@@ -44,7 +44,7 @@ const TEAM_TABS = [
   { id: 'invitations', label: 'Invitations', icon: Mail },
 ]
 const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
-const PLAN_LABELS = { free: 'Free', individual: 'Individual', team: 'Team' }
+const PLAN_LABELS = { free: 'Free', individual: 'Personal', team: 'Team' }
 const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 const date = (value, timeZone) => value ? new Date(value).toLocaleDateString(undefined, timeZone ? { timeZone } : undefined) : 'Not started'
 
@@ -416,7 +416,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
   </>
 
   const content = <main
-    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'settings' && settingsTab === 'defaults' ? ' account-preferences-dialog' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'settings' && settingsTab === 'scouting' ? ' account-scouting-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
+    className={`account-view${isAccountDialog ? ' account-form-dialog dialog-panel' : ''}${view === 'billing' ? ' account-billing-dialog' : ''}${view === 'settings' && settingsTab === 'defaults' ? ' account-preferences-dialog' : ''}${view === 'settings' && settingsTab === 'suggestions' ? ' account-suggestions-dialog' : ''}${view === 'settings' && settingsTab === 'scouting' ? ' account-scouting-dialog' : ''}${view === 'team' ? ' account-team-dialog' : ''}`}
     role={isAccountDialog ? 'dialog' : undefined}
     aria-modal={isAccountDialog ? 'true' : undefined}
     aria-labelledby={isAccountDialog ? 'account-view-title' : undefined}
@@ -435,7 +435,7 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       : <header className="account-view-heading"><HeadingIcon size={24} aria-hidden="true" /><h1 id="account-view-title">{TITLES[view]}</h1></header>}
     {isAccountDialog
       ? <dl className="account-view-context account-dialog-context">
-          <div><dt>Current workspace</dt><dd>{workspace.name}</dd></div>
+          <div><dt>Current workspace</dt><dd>{workspace.kind === 'individual' ? 'Personal' : workspace.name}</dd></div>
           <div><dt>Your role</dt><dd className="account-role account-dialog-role">{workspace.role}</dd></div>
         </dl>
       : <div className="account-view-context"><span>{workspace.name}</span><span className="account-role">{workspace.role}</span></div>}
@@ -602,16 +602,19 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
     </div>}
 
     {view === 'billing' && <div className="account-billing-tabs" role="tablist" aria-label="Membership and billing" onKeyDown={handleBillingTabKeyDown}>
-      {BILLING_TABS.map((tab) => <button
-        key={tab.id}
-        id={`account-billing-tab-${tab.id}`}
-        type="button"
-        role="tab"
-        aria-selected={billingTab === tab.id}
-        aria-controls={`account-billing-panel-${tab.id}`}
-        tabIndex={billingTab === tab.id ? 0 : -1}
-        onClick={() => setBillingTab(tab.id)}
-      >{tab.label}</button>)}
+      {BILLING_TABS.map((tab) => {
+        const TabIcon = tab.icon
+        return <button
+          key={tab.id}
+          id={`account-billing-tab-${tab.id}`}
+          type="button"
+          role="tab"
+          aria-selected={billingTab === tab.id}
+          aria-controls={`account-billing-panel-${tab.id}`}
+          tabIndex={billingTab === tab.id ? 0 : -1}
+          onClick={() => setBillingTab(tab.id)}
+        ><TabIcon size={16} strokeWidth={1.8} aria-hidden="true" /><span>{tab.label}</span></button>
+      })}
     </div>}
     {view === 'billing' && !loading && billing && <div className="account-billing-panels">
       <div
@@ -623,29 +626,36 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
         inert={billingTab !== 'membership'}
         tabIndex={billingTab === 'membership' ? 0 : -1}
       >
-        <section className="account-section">
-          <dl className="account-details">
+        <section className="account-section account-membership-section">
+          <dl className="account-details account-membership-details">
             <dt>Membership type</dt><dd>{PLAN_LABELS[subscriptionPlan] || subscriptionPlan}</dd>
-            <dt>Status</dt><dd className="account-role">{workspace.subscription.status}</dd>
+            <dt>Status</dt><dd><span className="account-membership-status">{workspace.subscription.status}</span></dd>
             <dt>Billing interval</dt><dd>{subscriptionPlan === 'free' ? 'No recurring charge' : workspace.subscription.interval === 'year' ? 'Annual' : workspace.subscription.interval === 'month' ? 'Monthly' : 'Trial'}</dd>
             <dt>{workspace.subscription.status === 'trialing' ? 'Trial ends' : subscriptionPlan === 'free' ? 'Plan duration' : 'Paid through'}</dt><dd>{subscriptionPlan === 'free' ? 'Ongoing' : date(workspace.subscription.trialEndsAt || workspace.subscription.periodEndsAt, user.preferences?.timezone)}</dd>
             {workspace.deletionDueAt && <><dt>Content retained until</dt><dd>{date(workspace.deletionDueAt, user.preferences?.timezone)}</dd></>}
             {workspace.subscription.source === 'development_fixture' && <><dt>Billing source</dt><dd>Test subscription</dd></>}
             {workspace.kind === 'team' && <><dt>Seats</dt><dd>{workspace.seatsUsed} / {workspace.seatLimit}</dd></>}
           </dl>
-          {billing.managedByTeam ? <p>Managed by Team Owner</p> : subscriptionPlan === 'free' ? <>
-            <div className="account-price-row"><div><strong>Free</strong><span>Current plan</span></div></div>
-            <div className="account-plan-options">
-              {['team', 'individual'].map((planId) => <div key={planId}>
-                <strong>{PLAN_LABELS[planId]}</strong>
-                <span>{money(billing.plans[planId].month)} / month</span>
-                <span>{money(billing.plans[planId].year)} / year</span>
-              </div>)}
+          {billing.managedByTeam ? <div className="account-managed-membership"><strong>Managed by the Team Owner</strong><p>Only the Team Owner can change this workspace's membership.</p></div> : subscriptionPlan === 'free' ? <>
+            <div className="account-membership-upgrade">
+              <div className="account-current-plan"><div><span>Current plan</span><strong>Free</strong></div><span className="account-current-plan-meta">No recurring charge</span></div>
+              <div className="account-plan-picker">
+                <div className="account-plan-picker-heading"><h3>Choose a plan</h3><p>Upgrade to add more coaching capacity.</p></div>
+                <div className="account-plan-options">
+                  {['team', 'individual'].map((planId) => {
+                    const PlanIcon = planId === 'team' ? Users : UserRound
+                    return <div key={planId} className="account-plan-option">
+                    <strong><PlanIcon size={18} strokeWidth={1.8} aria-hidden="true" /><span>{PLAN_LABELS[planId]}</span></strong>
+                    <div className="account-plan-prices"><span><b>{money(billing.plans[planId].month)}</b> / month</span><span><b>{money(billing.plans[planId].year)}</b> / year</span></div>
+                  </div>
+                  })}
+                </div>
+              </div>
             </div>
-            <button type="button" className="dialog-create" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Upgrade Plan</button>
+            <button type="button" className="dialog-create account-billing-action" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Upgrade Plan</button>
           </> : <>
-            <div className="account-price-row"><div><strong>{money(billing.prices.month)}</strong><span>Monthly, tax included</span></div><div><strong>{money(billing.prices.year)}</strong><span>Annual, paid upfront, tax included</span></div></div>
-            <button type="button" className="dialog-create" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Manage Billing</button>
+            <div className="account-active-plan"><div><span>Current plan</span><strong>{PLAN_LABELS[subscriptionPlan] || subscriptionPlan}</strong></div><div className="account-price-row"><div><strong>{money(billing.prices.month)}</strong><span>Monthly, tax included</span></div><div><strong>{money(billing.prices.year)}</strong><span>Annual, paid upfront, tax included</span></div></div></div>
+            <button type="button" className="dialog-create account-billing-action" disabled={!billing.connected} title={billing.provider === 'mock' ? 'Billing is simulated locally' : 'Paddle is not connected'}><CreditCard size={16} aria-hidden="true" />Manage Billing</button>
           </>}
         </section>
       </div>
