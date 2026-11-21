@@ -10,7 +10,6 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from time import time
-from urllib.parse import urlparse
 from uuid import uuid4
 
 from azure.core import MatchConditions
@@ -34,12 +33,7 @@ DEV_USER_ID = os.getenv("DEV_USER_ID", "local-coach")
 DEV_USER_NAME = os.getenv("DEV_USER_NAME", "Local Coach")
 CONTENT_TYPES = ("playbooks", "plays", "playGroupings", "slides", "exports", "gamePlans", "scoutPlays", "scheduleEvents")
 STATUS_TYPES = {"playbooks", "gamePlans", "plays", "scoutPlays"}
-AFFILIATE_PARTNERS = (
-    {"id": "hudl", "name": "Hudl", "description": "Video tools for coaching teams.", "setting": "AFFILIATE_URL_HUDL"},
-    {"id": "gorout", "name": "GoRoute", "description": "Resources for building and managing a football program.", "setting": "AFFILIATE_URL_GOROUT"},
-    {"id": "teambuildr", "name": "TeamBuildr", "description": "Strength and conditioning planning tools.", "setting": "AFFILIATE_URL_TEAMBUILDR"},
-    {"id": "coachtube", "name": "CoachTube", "description": "Courses and clinics for coaches.", "setting": "AFFILIATE_URL_COACHTUBE"},
-)
+
 SEARCH_MAX_LENGTH = 256
 SEARCH_RESULT_LIMIT = 100
 SEARCH_REQUEST_LIMIT = 60
@@ -107,7 +101,7 @@ def schedule_range(req):
 
 class Storage:
     def __init__(self):
-        self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits", "affiliateClicks")}
+        self.memory = {entity: {} for entity in (*CONTENT_TYPES, "profiles", "workspaces", "memberships", "invitations", "outbox", "searchRateLimits")}
         self.usage = {}
         self.lock = threading.RLock()
         self.container = None
@@ -238,7 +232,7 @@ class Storage:
         ledger = self.usage_counts(workspace)
         current = ledger["counts"].get(entity_type, 0)
         limit = accounts.limits_for_workspace(workspace)[entity_type]
-        if delta > 0 and current >= limit:
+        if delta > 0 and limit is not None and current >= limit:
             raise accounts.AccountError("CONTENT_LIMIT_REACHED", f"This workspace has reached its {limit} {entity_type} limit", 409)
         ledger["counts"][entity_type] = max(0, current + delta)
         if self.container:
@@ -345,37 +339,6 @@ def cors_response(handler):
     return wrapped
 
 
-def affiliate_destination(partner_id):
-    partner = next((item for item in AFFILIATE_PARTNERS if item["id"] == partner_id), None)
-    if partner is None:
-        return None
-    destination = os.getenv(partner["setting"], "").strip()
-    parsed = urlparse(destination)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        return None
-    return destination
-
-
-def affiliate_redirect(partner_id):
-    destination = affiliate_destination(partner_id)
-    if destination is None:
-        return response({"error": {"code": "AFFILIATE_LINK_UNAVAILABLE", "message": "This recommendation is unavailable"}}, 404)
-    storage.save("affiliateClicks", {
-        "id": str(uuid4()), "partnerId": partner_id, "clickedAt": now(),
-    })
-    return func.HttpResponse(status_code=302, headers={
-        "Location": destination,
-        "Cache-Control": "no-store",
-        "Referrer-Policy": "no-referrer",
-    })
-
-
-def affiliate_recommendations(workspace):
-    if workspace["subscription"].get("kind") != "free":
-        return None
-    return [{"id": partner["id"], "name": partner["name"], "description": partner["description"],
-             "href": f"/api/go/{partner['id']}"}
-            for partner in AFFILIATE_PARTNERS if affiliate_destination(partner["id"]) is not None]
 
 
 def check_search_rate(user_id):
@@ -637,8 +600,6 @@ def validate_schedule_event(payload, partial=False):
 @cors_response
 def api(req: func.HttpRequest) -> func.HttpResponse:
     path = (req.route_params.get("path") or "").strip("/").split("/")
-    if len(path) == 2 and path[0] == "go" and req.method == "GET":
-        return affiliate_redirect(path[1])
     if req.method == "OPTIONS" or (path == ["health"] and req.method == "GET"):
         return dispatch(req, None, None, None)
     user, auth_error = authenticate_request(req)
@@ -699,11 +660,6 @@ def dispatch(req, user, workspace, role):
     if path == ["health"] and method == "GET":
         return response({"status": "ok", "service": "blitzboard-studio-api"})
 
-    if path == ["affiliate", "recommendations"] and method == "GET":
-        items = affiliate_recommendations(workspace)
-        if items is None:
-            return forbidden()
-        return response({"items": items})
 
     owner_id = user["userId"]
 

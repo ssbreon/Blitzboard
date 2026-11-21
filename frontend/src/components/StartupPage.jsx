@@ -8,9 +8,9 @@ import { ArrowRight, Check, UserRound, Users } from 'lucide-react'
 import { clearSiteData } from '../utils/clearSiteData'
 
 const PLANS = [
-  { id: 'free', name: 'Free', price: 'Free', annual: 'No recurring charge', seats: '1 coach', limits: ['5 playbooks', '15 games', '500 plays', '500 scouting plays'], detail: 'Includes coaching resource recommendations.' },
-  { id: 'individual', name: 'Personal', price: '$9.99', annual: '$99.90 / year, paid upfront', seats: '1 coach', limits: ['100 playbooks', '100 games', '5,000 plays', '5,000 scouting plays'], detail: '14-day trial. No recommendations or upgrade prompts.' },
-  { id: 'team', name: 'Team', price: '$29.99', annual: '$299.90 / year, paid upfront', seats: 'Up to 20 coaches', limits: ['100 playbooks', '200 games', '10,000 plays', '10,000 scouting plays'], detail: '14-day trial. Shared workspace, staff roles and invitations.' },
+  { id: 'free', name: 'Free', price: 'Free', annual: 'No recurring charge', seats: '1 coach', limits: ['5 playbooks', '15 games', '500 plays', '500 scouting plays / reports'], detail: 'Upgrade to expand your coaching workspace.' },
+  { id: 'individual', name: 'Personal', price: '$9.99', annual: '$99.90 / year, paid upfront', seats: '1 coach', limits: ['100 playbooks', '100 games', '5,000 plays', '5,000 scouting plays / reports'], detail: '14-day trial. More capacity for one coach.' },
+  { id: 'team', name: 'Team', price: '$29.99', annual: '$299.90 / year, paid upfront', seats: 'Up to 20 coaches', limits: ['Unlimited* playbooks', 'Unlimited* games', 'Unlimited* plays', 'Unlimited* scouting plays / reports'], detail: '14-day trial. Shared workspace, staff roles and invitations.' },
 ]
 
 export function StartupPage({ development = false, cloudAuth = false, invitation = false, onSignIn, busy = false }) {

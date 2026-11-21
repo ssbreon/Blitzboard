@@ -232,7 +232,7 @@ export function createApi(workspaceId, onMutationState, sharedCache) {
   updateMember: (id, role) => request(`/workspace/members/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ role }) }),
   removeMember: (id) => request(`/workspace/members/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   billing: () => request('/workspace/billing'),
-  affiliateRecommendations: () => request('/affiliate/recommendations'),
+
   search: (query) => request(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`),
   listPlaybooks: (category, namePrefix, summary = false) => request(`/playbooks${listQuery(category, namePrefix, summary)}`),
   createPlaybook: (payload) => request('/playbooks', { method: 'POST', body: JSON.stringify(payload) }),

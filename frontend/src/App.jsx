@@ -13,7 +13,7 @@ import { AboutDialog } from './components/AboutDialog'
 import { TeamInvitationDialog } from './components/TeamInvitationDialog'
 import { StartupPage } from './components/StartupPage'
 import { LoadingIndicator } from './components/LoadingIndicator'
-import { AffiliateRecommendations } from './components/AffiliateRecommendations'
+import { FreePlanUpgradeBanner } from './components/FreePlanUpgradeBanner'
 import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { GlobalSearch } from './components/GlobalSearch'
@@ -67,6 +67,7 @@ const GAME_CARD_VIEWS = [
   { id: 'special-teams-scout', unit: 'Special Teams', tab: 'scout', title: 'Special Teams - Practice Scripts', description: 'Practice scripts for our scout special teams' },
 ]
 const GAME_PLAN_UNITS = ['Offense', 'Defense', 'Special Teams']
+const hasQuotaCapacity = (usage, limit) => limit == null || usage < limit
 const GAME_SCOUT_PLAY_COLUMNS = [
   { key: 'name', header: 'Play Name' },
   { key: 'template', header: 'Formation', render: (value) => findPlayTemplate(value)?.label || value || '—' },
@@ -468,7 +469,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showAffiliateRecommendations = false, onAffiliateUpgrade, locationSuggestions = [], suggestionLists = {}, scoutingTendencies = {} }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showFreePlanUpgrade = false, onFreePlanUpgrade, upgradeBannerArea = 'gamePlan', locationSuggestions = [], suggestionLists = {}, scoutingTendencies = {} }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -884,7 +885,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         </div>
       )}
       {isGamePlan && !gameCard ? <>
-        {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={onAffiliateUpgrade} />}
+        {showFreePlanUpgrade && <FreePlanUpgradeBanner onUpgrade={onFreePlanUpgrade} area={upgradeBannerArea} />}
         <GamePlanWorkspace
         api={api} game={parentRecord} reloadToken={reloadToken} readOnly={readOnly} cards={GAME_CARD_VIEWS}
         canCreate={canAddGameCardItem} canDuplicate={canDuplicateGameCardItem} canDelete={canDeleteGameCardItem}
@@ -1118,7 +1119,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [deleteConfirmation, setDeleteConfirmation] = useState(null)
 
   const writable = workspace.capabilities.edit
-  const showAffiliateRecommendations = workspace.subscription.kind === 'free' && !parent && !designer && !slideshow && !cardPlaybook
+  const showFreePlanUpgrade = workspace.subscription.kind === 'free' && !parent && !designer && !slideshow && !cardPlaybook
   const defaults = workspace.kind === 'team'
     ? { ...authUser.preferences, ...workspace.defaults }
     : authUser.preferences
@@ -2068,8 +2069,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           scoutingTendencies={workspace.scoutingTendencies || {}}
           gamePlanUnit={gamePlanUnit}
           gamePlanTab={gamePlanTab}
-          showAffiliateRecommendations={workspace.subscription.kind === 'free'}
-          onAffiliateUpgrade={() => setAccountDialog('billing')}
+          showFreePlanUpgrade={workspace.subscription.kind === 'free'}
+          upgradeBannerArea="gamePlan"
+          onFreePlanUpgrade={() => setAccountDialog('billing')}
           breadcrumbSettingsTarget={breadcrumbSettingsTarget}
           openSettingsOnMount={parentSettingsRequestId === parent.id}
           onSettingsClosed={() => setParentSettingsRequestId(null)}
@@ -2090,13 +2092,13 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onPrintAll={() => handlePrintCollection('gamePlan', parent)}
           rowActions={playRowActions('scoutPlay', parent.id)}
           reloadToken={scoutPlaysReloadToken + playbooksReloadToken + cacheVersion}
-          onAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks ? (card, practices, practiceEventId) => setNewDialog({ target: 'gameCardItem', card, practices, practiceEventId }) : undefined}
+          onAddGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks) ? (card, practices, practiceEventId) => setNewDialog({ target: 'gameCardItem', card, practices, practiceEventId }) : undefined}
           onOpenGameCardItem={handleOpenGameCardItem}
           onSlideshow={(card, item) => handleOpenGameCardItem(card, item, true)}
           onDuplicateGameCardItem={handleDuplicateGameCardItem}
           onDeleteGameCardItem={handleDeleteGameCardItem}
-          canAddGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
-          canDuplicateGameCardItem={writable && workspace.usage.playbooks < workspace.limits.playbooks}
+          canAddGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks)}
+          canDuplicateGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks)}
           canDeleteGameCardItem={workspace.capabilities.delete}
           practiceId={practice?.source === 'game' ? practice.id : null}
           practiceBreadcrumbSettingsTarget={practice && !designer && !slideshow && !cardPlaybook ? breadcrumbSettingsTarget : null}
@@ -2113,7 +2115,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         <BreadcrumbView active={!parent}>
       {view === 'teamSchedule' && (
         <>
-          {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={() => setAccountDialog('billing')} />}
+          {showFreePlanUpgrade && <FreePlanUpgradeBanner onUpgrade={() => setAccountDialog('billing')} area="teamSchedule" />}
           <TeamSchedule
             key="teamSchedule"
             api={viewApi}
@@ -2121,7 +2123,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             onDisplayModeChange={setScheduleDisplayMode}
             canEdit={writable}
             canDelete={workspace.capabilities.delete}
-            canCreateGame={writable && workspace.usage.gamePlans < workspace.limits.gamePlans}
+            canCreateGame={writable && hasQuotaCapacity(workspace.usage.gamePlans, workspace.limits.gamePlans)}
             locationSuggestions={workspace.suggestionLists?.location || []}
             periodSuggestions={workspace.suggestionLists?.period || []}
             onCreateGame={handleCreateScheduleGame}
@@ -2136,7 +2138,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             onCreateScoutPlay={handleCreatePracticeScoutPlay}
             onOpenScoutPlay={handleOpenPracticeScoutPlay}
             onOpenScript={handleOpenSchedulePracticeScript}
-            onCreatePracticeScript={writable && workspace.usage.playbooks < workspace.limits.playbooks ? handleCreateSchedulePracticeScript : undefined}
+            onCreatePracticeScript={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks) ? handleCreateSchedulePracticeScript : undefined}
             onPrintPracticeAttachments={handlePrintPracticeAttachments}
             practiceSheetRevisionToken={practiceSheetRevisionToken}
           />
@@ -2145,7 +2147,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
 
       {view === 'playbooks' && (
         <>
-          {showAffiliateRecommendations && <AffiliateRecommendations api={api} onUpgrade={() => setAccountDialog('billing')} />}
+          {showFreePlanUpgrade && <FreePlanUpgradeBanner onUpgrade={() => setAccountDialog('billing')} area="playbooks" />}
           <DataGrid
             key="playbooks"
             reloadToken={playbooksReloadToken + cacheVersion}
@@ -2159,7 +2161,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             filterRows={(row) => !row.gameCardId}
             statusFilter
             fetchRows={fetchPlaybooks}
-            onNew={writable && workspace.usage.playbooks < workspace.limits.playbooks ? () => setShowNewPlaybookDialog(true) : undefined}
+            onNew={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks) ? () => setShowNewPlaybookDialog(true) : undefined}
             newLabel="New Playbook"
             rowActions={collectionRowActions('playbook')}
             onRowDoubleClick={(row) => { setGameCard(null); setParent({ ...row, kind: 'playbook' }) }}

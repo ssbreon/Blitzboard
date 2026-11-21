@@ -43,7 +43,7 @@ const TEAM_TABS = [
   { id: 'staff', label: 'Staff', icon: UserRound },
   { id: 'invitations', label: 'Invitations', icon: Mail },
 ]
-const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays' }
+const LABELS = { playbooks: 'Playbooks', gamePlans: 'Games', plays: 'Plays', scoutPlays: 'Scouting plays / reports' }
 const PLAN_LABELS = { free: 'Free', individual: 'Personal', team: 'Team' }
 const money = (cents) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100)
 const date = (value, timeZone) => value ? new Date(value).toLocaleDateString(undefined, timeZone ? { timeZone } : undefined) : 'Not started'
@@ -670,8 +670,10 @@ export function AccountViews({ view, user, workspace, api, onUserUpdated, onWork
       >
         <section className="account-section" aria-label="Workspace Usage">
           <div className="account-usage">{Object.entries(workspace.limits).map(([type, limit]) => <div key={type}>
-            <div><span>{LABELS[type]}</span><span>{workspace.usage[type].toLocaleString()} / {limit.toLocaleString()}</span></div>
-            <meter min={0} max={limit} value={Math.min(workspace.usage[type], limit)} aria-label={`${LABELS[type]} usage`} />
+            <div><span>{LABELS[type]}</span><span>{workspace.usage[type].toLocaleString()} / {limit == null ? 'Unlimited*' : limit.toLocaleString()}</span></div>
+            {limit == null
+              ? <div className="account-usage-unlimited" aria-label={`${LABELS[type]} usage`}>Unlimited capacity*</div>
+              : <meter min={0} max={limit} value={Math.min(workspace.usage[type], limit)} aria-label={`${LABELS[type]} usage`} />}
           </div>)}</div>
         </section>
       </div>

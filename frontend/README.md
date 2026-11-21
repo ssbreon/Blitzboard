@@ -217,6 +217,7 @@ Entra setup does not provision Azure application infrastructure or authorize dep
 - Team logos in the private team-logos Blob container, including print title-page use.
 - Encrypted email capture only: no invitations are sent to real recipients.
 - Annual local Owner fixtures, read-only lifecycle checks, usage/caps and billing summary.
+- Free-plan upgrade banner with current limits and Individual/Team upgrade benefits.
 - Legacy playbooks stay in Individual; they are not moved to the local Team.
 
 Subscription tier limits:
@@ -229,7 +230,7 @@ Subscription tier limits:
 
 Individual pricing is $9.99 per month or $99.90 per year. Team pricing is $29.99 per month or $299.90 per year. Paid plans include a 14-day trial; Free has no recurring charge.
 
-`* Unlimited` means no subscription plan-level record limit. Capacity remains subject to the maximum storage capacity supported by the database.
+`* Unlimited` means no subscription plan-level record limit. Capacity remains subject to the maximum storage capacity supported by the database. The Team upgrade includes up to 20 coaching seats.
 
 Scouting Plays and Scouting Reports share one quota and usage count. They are listed together because creating either one consumes the same allowance.
 

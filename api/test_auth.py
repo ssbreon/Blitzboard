@@ -1063,7 +1063,7 @@ class AuthenticationTests(unittest.TestCase):
         for plan, expected_limits in (
             ("free", {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500}),
             ("individual", {"playbooks": 100, "gamePlans": 100, "plays": 5000, "scoutPlays": 5000}),
-            ("team", {"playbooks": 100, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000}),
+            ("team", {"playbooks": None, "gamePlans": None, "plays": None, "scoutPlays": None}),
         ):
             with self.subTest(plan=plan):
                 user_id = f"local-demo-{plan}"
@@ -1117,23 +1117,10 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Replacement 2"}).status_code, 201)
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Over limit again"}).status_code, 409)
 
-    def test_affiliate_recommendations_are_free_only_and_clicks_store_minimal_data(self):
-        with patch.dict(os.environ, {"AFFILIATE_URL_HUDL": "https://partners.example/hudl"}):
-            free_user = response_json(call_api("GET", "me", "free-coach"))
-            free_workspace = free_user["workspaces"][0]
-            self.assertEqual(free_workspace["subscription"]["kind"], "free")
-            team = self.team_fixture()
-            recommendations = response_json(call_api("GET", "affiliate/recommendations", "free-coach"))
-            self.assertEqual(recommendations["items"][0]["href"], "/api/go/hudl")
-            self.assertEqual(call_api("GET", "affiliate/recommendations", "local-coach", workspace_id=team["id"]).status_code, 403)
-
-            redirect = call_api("GET", "go/hudl")
-            self.assertEqual(redirect.status_code, 302)
-            self.assertEqual(redirect.headers["Location"], "https://partners.example/hudl")
-            click = function_app.storage.list("affiliateClicks")[0]
-            self.assertEqual(set(click), {"id", "partnerId", "clickedAt", "entityType", "partitionKey"})
-            self.assertEqual(click["partnerId"], "hudl")
-            self.assertNotIn("userId", click)
+    def test_removed_affiliate_routes_are_not_available(self):
+        for path in ("affiliate/recommendations", "go/hudl"):
+            self.assertEqual(call_api("GET", path, "free-coach").status_code, 404)
+        self.assertNotIn("affiliateClicks", function_app.storage.memory)
 
     def test_switching_workspace_preserves_private_content(self):
         user = response_json(call_api("GET", "me", "local-coach"))
@@ -1390,9 +1377,10 @@ class AuthenticationTests(unittest.TestCase):
             function_app.storage.save("playbooks", {"id": f"quota-{index}", "workspaceId": team["id"], "ownerId": "local-coach", "name": "Book"})
         def create_book(user):
             return call_api("POST", "playbooks", user, {"name": "Last slot"}, team["id"]).status_code
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            results = list(executor.map(create_book, ["local-coach", "coach-b"]))
-        self.assertEqual(sorted(results), [201, 409])
+        with patch.dict(function_app.accounts.TEAM_LIMITS, {"playbooks": 100}):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = list(executor.map(create_book, ["local-coach", "coach-b"]))
+            self.assertEqual(sorted(results), [201, 409])
         self.assertEqual(call_api("POST", "playbooks", "local-coach", {"name": "Private allowance"}).status_code, 201)
 
     def test_caps_apply_to_both_collection_and_play_types(self):
@@ -1405,9 +1393,9 @@ class AuthenticationTests(unittest.TestCase):
                 self.assertEqual(call_api("POST", path, "local-coach", {"name": "First"}).status_code, 201)
                 self.assertEqual(call_api("POST", path, "local-coach", {"name": "Overflow"}).status_code, 409)
 
-    def test_team_quotas_are_higher_and_enforced(self):
+    def test_team_quotas_are_unlimited_and_numeric_overrides_still_enforce(self):
         team = self.team_fixture()
-        self.assertEqual(team["limits"], {"playbooks": 100, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000})
+        self.assertEqual(team["limits"], {"playbooks": None, "gamePlans": None, "plays": None, "scoutPlays": None})
         individual = next(workspace for workspace in response_json(call_api("GET", "me", "local-coach"))["workspaces"] if workspace["kind"] == "individual")
         self.assertEqual(individual["limits"], {"playbooks": 5, "gamePlans": 15, "plays": 500, "scoutPlays": 500})
 

@@ -110,7 +110,7 @@ def load_limits(environ=None):
 
 
 LIMITS = load_limits()
-TEAM_LIMITS = {**LIMITS, "gamePlans": 200, "plays": 10000, "scoutPlays": 10000}
+TEAM_LIMITS = {"playbooks": None, "gamePlans": None, "plays": None, "scoutPlays": None}
 
 
 def limits_for_workspace(workspace):

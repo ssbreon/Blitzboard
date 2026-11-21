@@ -272,19 +272,20 @@ html.is-drilling-through * {
   min-height: 0;
 }
 
-.affiliate-recommendations {
+.free-plan-upgrade {
+  position: relative;
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: minmax(150px, 0.8fr) minmax(0, 3fr) minmax(220px, 1fr);
-  align-items: center;
-  gap: 12px 24px;
+  grid-template-columns: minmax(170px, 0.65fr) minmax(660px, 3fr);
+  align-items: stretch;
+  gap: 12px 20px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--border);
   background: var(--left-pane-bg);
   color: var(--text-h);
 }
 
-.affiliate-recommendations-heading p {
+.free-plan-upgrade-heading p {
   margin: 0 0 2px;
   color: var(--text);
   font-size: 12px;
@@ -292,63 +293,25 @@ html.is-drilling-through * {
   text-transform: uppercase;
 }
 
-.affiliate-recommendations-heading h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.affiliate-recommendations-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.affiliate-recommendations-list a {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-  padding: 4px 0 4px 10px;
-  border-left: 3px solid var(--navy-light);
-  color: var(--text-h);
-  text-decoration: none;
-}
-
-.affiliate-recommendations-list a:hover strong { text-decoration: underline; }
-.affiliate-recommendations-list a > span,
-.affiliate-recommendations-list strong,
-.affiliate-recommendations-list a > span > span { display: block; }
-.affiliate-recommendations-list strong { font-size: 14px; }
-.affiliate-recommendations-list a > span > span { color: var(--text); font-size: 12px; line-height: 1.35; }
-.affiliate-recommendations-empty { font-size: 14px; }
-
-.affiliate-recommendations-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.affiliate-recommendations-actions p {
-  max-width: 190px;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.affiliate-recommendations-actions .dialog-create {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  min-height: 36px;
-  padding: 6px 12px;
-  font-size: 13px;
-}
+ .free-plan-upgrade-heading { position: relative; }
+ .free-plan-upgrade-heading h2 { margin: 0; padding-right: 28px; font-size: 18px; }
+.free-plan-upgrade-close { position: absolute; top: -4px; right: 0; z-index: 2; display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); cursor: pointer; }
+.free-plan-upgrade-close:hover { border-color: var(--border); background: var(--input-bg); color: var(--text-h); }
+.free-plan-upgrade-close:focus-visible { outline: 2px solid var(--navy-light); outline-offset: 2px; }
+.free-plan-upgrade-comparison { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.free-plan-upgrade-comparison section { min-width: 0; }
+.free-plan-upgrade-comparison h3 { margin: 0 0 8px; font-size: 13px; line-height: 1.25; }
+.free-plan-upgrade-comparison h3 span { display: block; margin-top: 3px; color: var(--navy-light); font-size: 12px; }
+.free-plan-upgrade-tier { position: relative; min-width: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); }
+.free-plan-upgrade-card-action { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.free-plan-upgrade-card-action:hover { background: color-mix(in srgb, var(--navy-light) 5%, transparent); }
+.free-plan-upgrade-card-action:focus-visible { outline: 2px solid var(--navy-light); outline-offset: 3px; }
+.free-plan-upgrade-current { background: var(--form-bg); }
+.free-plan-upgrade-individual { border-top: 3px solid var(--green); }
+.free-plan-upgrade-team { border-top: 3px solid var(--gold); }
+.free-plan-team-note { margin: 6px 0 0; color: var(--text); font-size: 10px; line-height: 1.35; }
+.free-plan-upgrade-comparison ul { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.free-plan-upgrade-comparison li::before { content: '✓ '; color: var(--navy-light); font-weight: 700; }
 
  .account-plan-options {
   display: grid;
@@ -370,15 +333,17 @@ html.is-drilling-through * {
 .account-plan-options strong { display: flex; align-items: center; gap: 7px; color: var(--text-h); font-size: 16px; }
 .account-plan-options span { font-size: 13px; }
 
+@media (max-width: 1100px) {
+  .free-plan-upgrade-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 800px) {
-  .affiliate-recommendations {
+  .free-plan-upgrade {
     grid-template-columns: minmax(0, 1fr);
     padding: 12px 16px;
   }
 
-  .affiliate-recommendations-actions {
-    justify-content: space-between;
-  }
+  .free-plan-upgrade-comparison { grid-template-columns: minmax(0, 1fr); }
 }
 
 #root:has(> .play-designer),
