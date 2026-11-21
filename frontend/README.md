@@ -172,6 +172,15 @@ must stay disabled for workspace invitations. Provider setup must not place
 client secrets, credentials, or provider private keys in browser settings or
 source code.
 
+Verify every enabled provider through the Blitzboard app in a non-production
+tenant: complete sign-in, confirm API-backed profile access, sign out and back
+in to check identity stability, then accept an invitation addressed to the
+verified email. The API tests cover `email_verified: true` and `xms_edov: true`
+independently; also check missing, false, malformed, and mismatched-email cases.
+Entra is the broker, so the app verifies its token contract and recipient match,
+not an upstream provider label supplied by the browser. Do not enable invitations
+for a provider whose resulting Entra token lacks a trusted verification claim.
+
 Start the emulators, Functions at port 7071 using the workspace virtual environment,
 and Vite at port 5173. Vite fails if that port is occupied instead of silently
 changing the registered callback. Visit `http://localhost:5173/`, select Continue

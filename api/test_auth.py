@@ -418,7 +418,7 @@ class EntraAuthenticationTests(unittest.TestCase):
         function_app.storage = function_app.Storage()
         policy = function_app.accounts
         owner_claims = {**self.claims, "oid": "66666666-6666-4666-8666-666666666666", "email": "owner@example.com", "email_verified": True}
-        coach_claims = {**self.claims, "email_verified": True, "xms_edov": True}
+        coach_claims = {**self.claims, "email_verified": True}
         owner = self.authenticate(owner_claims)
         coach = self.authenticate(coach_claims)
         def entra_request(method, path, claims, payload=None, workspace_id=None):
@@ -442,6 +442,22 @@ class EntraAuthenticationTests(unittest.TestCase):
             captured = json.loads(policy.outbox_cipher().decrypt(message["payload"].encode()))["acceptUrl"]
             token = parse_qs(urlparse(captured).fragment)["invite"][0]
             accepted = entra_request("POST", "invitations/accept", coach_claims, {"token": token})
+            second_coach_claims = {
+                **self.claims,
+                "oid": "77777777-7777-4777-8777-777777777777",
+                "email": "second-coach@example.com",
+                "xms_edov": True,
+            }
+            second_invitation = entra_request(
+                "POST", "workspace/invitations", owner_claims,
+                {"email": "second-coach@example.com", "role": "coach"}, team["id"]
+            )
+            second_message = function_app.storage.list("outbox")[-1]
+            second_captured = json.loads(policy.outbox_cipher().decrypt(second_message["payload"].encode()))["acceptUrl"]
+            second_token = parse_qs(urlparse(second_captured).fragment)["invite"][0]
+            second_accepted = entra_request(
+                "POST", "invitations/accept", second_coach_claims, {"token": second_token}
+            )
             workspaces = entra_request("GET", "workspaces", coach_claims)
             content_responses = [
                 entra_request("POST", "playbooks", coach_claims, {"name": "Coach Playbook", "year": 2026}, team["id"]),
@@ -457,6 +473,8 @@ class EntraAuthenticationTests(unittest.TestCase):
                                              {"name": "Coach Changed Team"}, team["id"])
         self.assertEqual(created.status_code, 201)
         self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(second_invitation.status_code, 201)
+        self.assertEqual(second_accepted.status_code, 200)
         self.assertEqual(response_json(accepted)["role"], "coach")
         self.assertEqual([item["id"] for item in response_json(workspaces)["items"]], [team["id"]])
         self.assertEqual([response.status_code for response in content_responses], [201, 201, 201])
