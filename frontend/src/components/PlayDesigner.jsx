@@ -3,7 +3,7 @@
  * Copyright (c) 2027 Breon Technologies LLC
  * All Rights Reserved
  */
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { DialogCloseButton } from './DialogCloseButton'
 import { ErrorDialog } from './ErrorDialog'
@@ -2575,20 +2575,28 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               }
             : marker
           return (
-            <button
-              key={marker.id}
-              type="button"
-              data-marker-id={marker.id}
-              className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.shape === 'rectangle' ? ' rectangle' : ''}${marker.color ? ' color-override' : ''}${marker.id === selectedId || multiSelectedIds.includes(marker.id) ? ' selected' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}${themeClass}`}
-              style={markerStyleVars(displayMarker, activeTheme.id)}
-              draggable={false}
-              onDragStart={(event) => event.preventDefault()}
-              onPointerDown={(event) => handleMarkerPointerDown(event, marker.id)}
-              onClick={(event) => handleMarkerClick(event, marker.id)}
-              aria-label="Player marker"
-            >
-              {marker.label}
-            </button>
+            <Fragment key={marker.id}>
+              <button
+                type="button"
+                data-marker-id={marker.id}
+                className={`play-designer-marker ${marker.team || 'offense'} ${marker.decoration || 'solid'}${marker.shape === 'rectangle' ? ' rectangle' : ''}${marker.color ? ' color-override' : ''}${marker.id === selectedId || multiSelectedIds.includes(marker.id) ? ' selected' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}${themeClass}`}
+                style={markerStyleVars(displayMarker, activeTheme.id)}
+                draggable={false}
+                onDragStart={(event) => event.preventDefault()}
+                onPointerDown={(event) => handleMarkerPointerDown(event, marker.id)}
+                onClick={(event) => handleMarkerClick(event, marker.id)}
+                aria-label="Player marker"
+              >
+                {marker.label}
+              </button>
+              <span
+                className={`play-designer-marker-hit${marker.shape === 'rectangle' ? ' rectangle' : ''}${PATH_ANCHOR_TOOLS.has(activeTool) ? ' anchorable' : ''}`}
+                style={{ left: `${displayMarker.x}%`, top: `${displayMarker.y}%` }}
+                onPointerDown={(event) => handleMarkerPointerDown(event, marker.id)}
+                onClick={(event) => handleMarkerClick(event, marker.id)}
+                aria-hidden="true"
+              />
+            </Fragment>
           )
         })}
         {marquee?.active && (

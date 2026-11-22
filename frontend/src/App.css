@@ -1410,7 +1410,8 @@ html.is-drilling-through * {
     transition: transform 0.1s, box-shadow 0.1s;
   }
 
-  &.anchorable:hover {
+  &.anchorable:hover,
+  &.anchorable:has(+ .play-designer-marker-hit:hover) {
     transform: scale(1.15);
     box-shadow: 0 0 0 4px rgba(56, 224, 123, 0.65);
   }
@@ -1421,6 +1422,30 @@ html.is-drilling-through * {
 
   &.anchorable:active {
     cursor: crosshair;
+  }
+}
+
+.play-designer-marker-hit {
+  --marker-size: max(4px, 2.38cqi);
+
+  position: absolute;
+  z-index: 5;
+  width: calc(var(--marker-size) + 8px);
+  height: calc(var(--marker-size) + 8px);
+  transform: translate(-50%, -50%);
+  cursor: grab;
+  touch-action: none;
+
+  &.rectangle {
+    width: calc(var(--marker-size) * 1.1 + 8px);
+  }
+
+  &.anchorable {
+    cursor: crosshair;
+  }
+
+  &:active:not(.anchorable) {
+    cursor: grabbing;
   }
 }
 
