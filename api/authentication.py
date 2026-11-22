@@ -111,6 +111,9 @@ class EntraAuthenticator:
             if not email or len(email) > 254:
                 email = None
         name = claims.get("name")
+        # if (os.getenv("APP_ENVIRONMENT", "").lower() == "local"
+        #         and os.getenv("DEBUG_ENTRA_CLAIMS") == "1"):
+        #     print(json.dumps(claims, indent=2))
         return {
             "userId": "entra-" + hashlib.sha256(identity_key.encode()).hexdigest(),
             "name": name if isinstance(name, str) and name.strip() else "Coach",

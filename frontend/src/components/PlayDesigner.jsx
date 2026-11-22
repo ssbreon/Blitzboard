@@ -1177,11 +1177,21 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   }
 
   // Commit the active path and update drawing undo history.
-  function finishDrawingPath(trimLastPoint = false) {
+  function finishDrawingPath(trimLastPoint = false, endPosition = null) {
     if (activeTool === 'select' || !activeChain) return
-    const points = trimLastPoint && activeChain.points.length > 0
-      ? activeChain.points.slice(0, -1)
-      : activeChain.points
+    const anchor = endPosition ? drawingAnchor(activeChain) : null
+    const finalPoint = anchor && {
+      dx: endPosition.x - anchor.x,
+      dy: endPosition.y - anchor.y,
+    }
+    const previousPoint = activeChain.points.at(-1)
+    const hasDistinctFinalPoint = finalPoint
+      && Math.hypot(finalPoint.dx, finalPoint.dy) > 0.0001
+      && (!previousPoint || Math.hypot(finalPoint.dx - previousPoint.dx, finalPoint.dy - previousPoint.dy) > 0.0001)
+    const completedPath = hasDistinctFinalPoint ? [...activeChain.points, finalPoint] : activeChain.points
+    const points = trimLastPoint && completedPath.length > 0
+      ? completedPath.slice(0, -1)
+      : completedPath
     if (points.length > 0) {
       const newDrawing = activeChain.motionId
         ? { id: crypto.randomUUID(), motionId: activeChain.motionId, points }
@@ -1207,6 +1217,12 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   function handleFieldDoubleClick(event) {
     event.preventDefault()
     finishDrawingPath(true)
+  }
+
+  function handleFieldContextMenu(event) {
+    if (!activeChain) return
+    event.preventDefault()
+    finishDrawingPath(false, positionFromEvent(event))
   }
 
   // Begin a marquee selection when the field is in select mode.
@@ -2162,6 +2178,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         style={fieldWindowStyle(fieldWindow)}
         onClick={handleFieldClick}
         onDoubleClick={handleFieldDoubleClick}
+        onContextMenu={handleFieldContextMenu}
         onPointerDown={handleFieldPointerDown}
         onPointerMove={handleFieldPointerMove}
         onPointerUp={handleFieldPointerUp}
