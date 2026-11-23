@@ -1544,6 +1544,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               key={value}
               type="button"
               role="menuitemradio"
+              className="menu-item-radio"
               aria-checked={selected}
               disabled={readOnly || saving}
               onClick={() => onSelect(value)}
@@ -1815,6 +1816,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   <button
                     type="button"
                     role="menuitemradio"
+                    className="menu-item-radio"
                     aria-checked={record.kind === 'scoutPlay' ? !scoutingTendenciesOpen : !assignmentsOpen}
                     onClick={() => {
                       setAssignmentsOpen(false)
@@ -1829,6 +1831,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   {record.kind === 'scoutPlay' ? <button
                     type="button"
                     role="menuitemradio"
+                    className="menu-item-radio"
                     aria-checked={scoutingTendenciesOpen}
                     onClick={() => {
                       setAssignmentsOpen(false)
@@ -1842,6 +1845,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   </button> : <button
                     type="button"
                     role="menuitemradio"
+                    className="menu-item-radio"
                     aria-checked={assignmentsOpen}
                     onClick={() => {
                       setAssignmentsOpen(true)
@@ -1855,21 +1859,22 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                 </div>
                 <div className="data-grid-menu-actions" role="group" aria-label="Actions">
                   <div className="account-menu-section-label">Actions</div>
-                  <button type="button" role="menuitem" onClick={() => flipPlay('horizontal')}>
+                  <button type="button" role="menuitem" className="menu-item" onClick={() => flipPlay('horizontal')}>
                     <FlipVertical2 className="menu-item-icon" aria-hidden="true" />
                     Flip Horizontal
                   </button>
-                  <button type="button" role="menuitem" onClick={() => flipPlay('vertical')}>
+                  <button type="button" role="menuitem" className="menu-item" onClick={() => flipPlay('vertical')}>
                     <FlipHorizontal2 className="menu-item-icon" aria-hidden="true" />
                     Flip Vertical
                   </button>
-                  <button type="button" role="menuitem" onClick={restartPlay}>
+                  <button type="button" role="menuitem" className="menu-item" onClick={restartPlay}>
                     <RotateCcw className="menu-item-icon" aria-hidden="true" />
                     Restart Play
                   </button>
                   <button
                     type="button"
                     role="menuitem"
+                    className="menu-item"
                     onClick={restartAdjustment}
                     disabled={!activeSlideId || saving || Boolean(removingSlideId)}
                   >
@@ -1879,6 +1884,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
                   <button
                     type="button"
                     role="menuitem"
+                    className="menu-item"
                     onClick={() => {
                       setMenuOpen(false)
                       setPrintOpen(true)

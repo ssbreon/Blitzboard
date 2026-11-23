@@ -290,7 +290,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
     }
     if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
       event.preventDefault()
-      const items = [...menuRef.current.querySelectorAll('[role^="menuitem"]:not(:disabled)')]
+      const items = [...menuRef.current.querySelectorAll(':is(.menu-item, .menu-item-radio):not(:disabled)')]
       const index = items.indexOf(document.activeElement)
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length
       items[next]?.focus()
@@ -352,22 +352,22 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
             <div className="account-menu-panes">
               <div className="account-menu-subscriptions" role="group" aria-label="Workspaces">
                 <div className="account-menu-section-label">WORKSPACES</div>
-                {user.workspaces?.map((item) => <button key={item.id} type="button" role="menuitemradio" aria-checked={workspace?.id === item.id} disabled={busy} onClick={() => { setMenuOpen(false); onWorkspaceChange(item.id) }}>
+                {user.workspaces?.map((item) => <button key={item.id} type="button" role="menuitemradio" className="menu-item-radio" aria-checked={workspace?.id === item.id} disabled={busy} onClick={() => { setMenuOpen(false); onWorkspaceChange(item.id) }}>
                   {item.kind === 'team' ? <Users className="menu-item-icon" aria-hidden="true" /> : <UserRound className="menu-item-icon" aria-hidden="true" />}
                   <span className="workspace-menu-name">{item.kind === 'individual' ? 'Personal' : item.name}</span>{workspace?.id === item.id && <Check size={16} aria-hidden="true" />}
                 </button>)}
               </div>
               <div className="account-menu-actions" role="group" aria-label="Account">
                 <div className="account-menu-section-label">{user.name} (<span className="account-role">{workspace?.role || user.roles.join(', ')}</span>)</div>
-                <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'profile')}><UserRound className="menu-item-icon" aria-hidden="true" />Profile</button>
-                {workspace?.kind === 'team' && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
-                {!workspace?.alphaEnabled && <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
+                <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'profile')}><UserRound className="menu-item-icon" aria-hidden="true" />Profile</button>
+                {workspace?.kind === 'team' && <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
+                {!workspace?.alphaEnabled && <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
                 <div className="account-menu-divider" role="separator" />
-                <button type="button" role="menuitem" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
+                <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 <div className="account-menu-divider" role="separator" />
-                <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onAbout() }}><Info className="menu-item-icon" aria-hidden="true" />About Blitzboard...</button>
+                <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={() => { setMenuOpen(false); onAbout() }}><Info className="menu-item-icon" aria-hidden="true" />About Blitzboard...</button>
                 <div className="account-menu-divider" role="separator" />
-                <button type="button" role="menuitem" disabled={busy} onClick={() => { setMenuOpen(false); onSignOut() }}><LogOut className="menu-item-icon" aria-hidden="true" />Sign Out</button>
+                <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={() => { setMenuOpen(false); onSignOut() }}><LogOut className="menu-item-icon" aria-hidden="true" />Sign Out</button>
               </div>
             </div>
           </div>

@@ -1,13 +1,13 @@
-:where(button:not(:disabled):not([role^='menuitem'])) {
+:where(button:not(:disabled):not(:is(.menu-item, .menu-item-radio))) {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.22), 0 3px 5px rgba(0, 0, 0, 0.12);
 }
 
-button:active:not(:disabled):not([role^='menuitem']) {
+button:active:not(:disabled):not(:is(.menu-item, .menu-item-radio)) {
   box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
   translate: 0 1px;
 }
 
-[role='menuitem'] {
+.menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -16,7 +16,7 @@ button:active:not(:disabled):not([role^='menuitem']) {
   text-wrap: nowrap;
 }
 
-:root button[role='menuitem'] {
+:root button.menu-item {
   font-family: var(--sans);
   font-size: 15px;
   font-weight: 400;
@@ -2482,8 +2482,8 @@ html.is-drilling-through * {
   border-right-color: black;
 
   a,
-  button[role='menuitem'],
-  button[role='menuitemradio'] {
+  button.menu-item,
+  button.menu-item-radio {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -2565,7 +2565,7 @@ html.is-drilling-through * {
   white-space: nowrap;
 }
 
-.account-menu button[role='menuitemradio'] > svg {
+.account-menu button.menu-item-radio > svg {
   flex-shrink: 0;
 }
 
@@ -3056,7 +3056,7 @@ html.is-drilling-through * {
   overflow-y: hidden;
 }
 
-.account-billing-tabs [role='tab'] {
+.account-billing-tabs .account-tab {
   flex: 1;
   min-width: 0;
   padding: 10px 8px;
@@ -3074,15 +3074,15 @@ html.is-drilling-through * {
   border-top-right-radius: 6px;
 }
 
-.account-billing-dialog .account-billing-tabs [role='tab'] {
+.account-billing-dialog .account-billing-tabs .account-tab {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
 }
 
-.account-settings-tabs [role='tab'],
-.account-team-tabs [role='tab'] {
+.account-settings-tabs .account-tab,
+.account-team-tabs .account-tab {
   display: flex;
   flex: 1;
   min-width: 0;
@@ -3092,12 +3092,12 @@ html.is-drilling-through * {
   white-space: nowrap;
 }
 
-.account-billing-tabs [role='tab']:hover {
+.account-billing-tabs .account-tab:hover {
   background: var(--input-bg);
   color: var(--text-h);
 }
 
-.account-billing-tabs [role='tab'][aria-selected='true'] {
+.account-billing-tabs .account-tab[aria-selected='true'] {
   border-bottom-color: var(--accent);
   color: var(--text-h);
 }
@@ -3562,7 +3562,7 @@ html.is-drilling-through * {
   .app-bar-user-name { font-size: 12px; }
   .active-workspace-label { display: none; }
   .account-menu a,
-  .account-menu button[role^='menuitem'] { padding: 8px; font-size: 13px; }
+  .account-menu button:is(.menu-item, .menu-item-radio) { padding: 8px; font-size: 13px; }
   .account-menu-section-label { padding: 6px 8px; }
   .play-layout-dropdown { grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(620px, calc(100vw - 24px)); }
   .account-view { padding: 22px 16px 40px; }

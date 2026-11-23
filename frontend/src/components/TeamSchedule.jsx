@@ -277,7 +277,7 @@ function ScheduleEventContextMenu({ event, position, canEdit, canDelete, onClose
     <div className="toolbar-dropdown row-actions-dropdown" ref={menuRef} role="menu" tabIndex={-1}
       style={{ position: 'fixed', top: position.top, right: position.right }}>
       {actions.map((action) => <button key={action.key} type="button" role="menuitem"
-        className={action.destructive ? 'row-actions-destructive' : undefined}
+        className={`menu-item${action.destructive ? ' row-actions-destructive' : ''}`}
         onClick={() => { onClose(); action.onClick() }}>
         <action.icon className="menu-item-icon" aria-hidden="true" />
         {action.label}
@@ -605,7 +605,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
                       { id: 'calendar', label: 'Calendar View', icon: CalendarDays },
                       { id: 'grid', label: 'Grid View', icon: Table2 },
                     ].map(({ id, label, icon: Icon }) => (
-                      <button key={id} type="button" role="menuitemradio" aria-checked={displayMode === id} onClick={() => { onDisplayModeChange(id); setViewMenuOpen(false) }}>
+                      <button key={id} type="button" role="menuitemradio" className="menu-item-radio" aria-checked={displayMode === id} onClick={() => { onDisplayModeChange(id); setViewMenuOpen(false) }}>
                         <Icon size={16} className="data-grid-option-icon" aria-hidden="true" />
                         <span>{label}</span>
                         <Check size={16} className="data-grid-status-check" aria-hidden="true" />
@@ -614,11 +614,11 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
                   </div>
                   <div className="data-grid-menu-actions" role="group" aria-label="Schedule actions">
                     <div className="account-menu-section-label">Actions</div>
-                    <button type="button" role="menuitem" onClick={() => { api.breadcrumbCache.clear(); setRefresh((value) => value + 1); setViewMenuOpen(false) }}>
+                    <button type="button" role="menuitem" className="menu-item" onClick={() => { api.breadcrumbCache.clear(); setRefresh((value) => value + 1); setViewMenuOpen(false) }}>
                       <RefreshCw className="menu-item-icon" aria-hidden="true" />
                       <span className="data-grid-menu-action-label">Refresh</span>
                     </button>
-                    <button type="button" role="menuitem" onClick={() => { window.print(); setViewMenuOpen(false) }}>
+                    <button type="button" role="menuitem" className="menu-item" onClick={() => { window.print(); setViewMenuOpen(false) }}>
                       <Printer className="menu-item-icon" aria-hidden="true" />
                       <span className="data-grid-menu-action-label">Print</span>
                     </button>

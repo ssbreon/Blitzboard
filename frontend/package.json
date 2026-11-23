@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "test:schedule": "node --test --test-force-exit src/components/TeamSchedule.test.js",
     "test:security": "node --test --test-force-exit src/components/searchSecurity.test.js",
+    "test:account": "node --test --test-force-exit src/components/account/AccountView.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "jsdom": "^29.1.1",
     "oxlint": "^1.81.0",
     "vite": "^8.3.0"
   }

@@ -154,7 +154,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
   }
 
   function selectRow(event, row) {
-    if (event.target.closest?.('button, a, input, select, textarea, [role="button"], [data-grid-no-select]')) return
+    if (event.target.closest?.('button, a, input, select, textarea, [data-grid-no-select]')) return
     const rowIndex = pageRows.findIndex((item) => item.id === row.id)
     const modified = event.ctrlKey || event.metaKey
     if (event.shiftKey) {
@@ -309,6 +309,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
       key={item.label}
       type="button"
       role="menuitem"
+      className="menu-item"
       disabled={item.disabled}
       onClick={() => {
         item.onClick()
@@ -397,7 +398,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                   <div className="data-grid-status-filter" role="group" aria-label={viewMenuItems.length ? 'Grid views' : 'Filter by status'}>
                     <div className="account-menu-section-label">View</div>
                     {viewMenuItems.length ? viewMenuItems.map(({ label, icon: Icon, checked, onClick }) => (
-                      <button key={label} type="button" role="menuitemradio" aria-checked={checked} onClick={() => { onClick(); setMenuOpen(false) }}>
+                      <button key={label} type="button" role="menuitemradio" className="menu-item-radio" aria-checked={checked} onClick={() => { onClick(); setMenuOpen(false) }}>
                         {Icon && <Icon size={16} className="data-grid-option-icon" aria-hidden="true" />}
                         <span>{label}</span>
                         <Check size={16} className="data-grid-status-check" aria-hidden="true" />
@@ -407,6 +408,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                         key={label}
                         type="button"
                         role="menuitemradio"
+                        className="menu-item-radio"
                         aria-checked={selectedStatus === label}
                         onClick={() => {
                           setSelectedStatus(label)
@@ -485,7 +487,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                     }}
                     onClick={(event) => {
                       selectRow(event, row)
-                      if (onRowClick && row.rowType !== 'grouping' && !event.target.closest?.('button, a, input, select, textarea, [role="button"], [data-grid-no-select]')) {
+                      if (onRowClick && row.rowType !== 'grouping' && !event.target.closest?.('button, a, input, select, textarea, [data-grid-no-select]')) {
                         showDrillthroughWaitCursor()
                         onRowClick(row)
                       }
@@ -614,7 +616,7 @@ export function DataGrid({ title, columns, rowIcon: RowIcon, getRowIcon, rowType
                                     type="button"
                                     role="menuitem"
                                     disabled={busy || item.disabled}
-                                    className={item.destructive ? 'row-actions-destructive' : undefined}
+                                    className={`menu-item${item.destructive ? ' row-actions-destructive' : ''}`}
                                     onClick={(event) => {
                                       event.stopPropagation()
                                       closeRowMenu()
