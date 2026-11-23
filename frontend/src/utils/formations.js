@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 // Field coordinates are percentages: x = 0 (left) to 100 (right), y = 0 (top) to 100 (bottom).

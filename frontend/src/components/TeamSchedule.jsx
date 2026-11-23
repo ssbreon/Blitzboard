@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'

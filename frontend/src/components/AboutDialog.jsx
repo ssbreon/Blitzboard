@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 import { useEffect } from 'react'
@@ -22,7 +22,7 @@ export function AboutDialog({ onClose }) {
       <DialogCloseButton onClick={onClose} />
       <div className="about-dialog-content">
         <p>Version 1.0</p>
-        <p>© 2027 Breon Technologies LLC</p>
+        <p>© 2027 Happy Valley Digital LLC</p>
         <p>Football Coaching, Playbook,<br />Scouting and Game Planning Software</p>
       </div>
       <section className="about-support" aria-labelledby="about-support-title">

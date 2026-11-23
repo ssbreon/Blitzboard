@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 import { useState } from 'react'
@@ -73,7 +73,7 @@ export function StartupPage({ development = false, cloudAuth = false, invitation
     </section>}
     <footer className="startup-copyright">
       <button type="button" className="startup-clear-cache" disabled={busy || clearing} onClick={handleClearSiteCache}>{clearing ? 'Clearing site cache...' : 'Clear site cache'}</button>
-      <div>© 2027 Breon Technologies LLC. All Rights Reserved.</div>
+      <div>© 2027 Happy Valley Digital LLC. All Rights Reserved.</div>
     </footer>
   </main>
 }

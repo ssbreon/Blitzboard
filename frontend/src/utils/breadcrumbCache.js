@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 const listPath = /^\/(?:playbooks|game-plans|schedule-events)(?:\/[^/]+\/(?:plays|rows|groupings|scout-plays)(?:\/[^/]+\/slides)?)?$/

@@ -1,6 +1,6 @@
 /*
  * Blitzboard Studio
- * Copyright (c) 2027 Breon Technologies LLC
+ * Copyright (c) 2027 Happy Valley Digital LLC
  * All Rights Reserved
  */
 export const ScheduleView = Object.freeze({ WEEK: 'week', MONTH: 'month', QUARTER: 'quarter', YEAR: 'year' })
