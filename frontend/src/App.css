@@ -3636,6 +3636,7 @@ html.is-drilling-through * {
 
 .loading-indicator.data-grid-loading,
 .loading-indicator.schedule-loading { min-height: 160px; }
+.loading-indicator.play-opening-loading { position: fixed; padding: 0; }
 .loading-indicator-compact { flex-direction: row; justify-content: flex-start; gap: 10px; padding: 12px 0; }
 .loading-indicator-compact .loading-indicator-panel { gap: 8px; padding: 8px 12px; }
 .loading-indicator-compact .loading-football { width: 20px; height: 20px; }

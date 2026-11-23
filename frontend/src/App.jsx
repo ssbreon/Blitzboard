@@ -1875,7 +1875,6 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
               </span>
             )}
           </li>
-          {loadingPlay && <LoadingIndicator label="Loading play..." />}
           {parent && <li>
             {parent.kind === 'gamePlan' && practice?.source === 'game' ? (
               <button type="button" disabled={busy} onClick={() => requestLeave(() => { setDesigner(null); setSlideshow(false); setPractice(null) }, 'Return to Game Plan')}><BreadcrumbLabel icon={CalendarDays}>{gameBreadcrumbLabel(parent)}</BreadcrumbLabel></button>
@@ -1916,6 +1915,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           </li>}
         </ol>
       </nav>
+      {loadingPlay && <LoadingIndicator className="play-opening-loading" label="Loading play..." />}
 
       {!writable && <div className="workspace-read-only" role="status">{workspace.name}: read-only</div>}
       <ErrorDialog error={statusError} message="We couldn't complete that action. Please try again." />
