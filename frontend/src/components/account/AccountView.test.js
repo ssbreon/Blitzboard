@@ -44,7 +44,7 @@ test('account views retain drafts, register guards, and save their own changes',
   }
 
   try {
-    const { AccountViews } = await server.ssrLoadModule('/src/components/AccountViews.jsx')
+    const { AccountViews } = await server.ssrLoadModule('/src/components/account/AccountView.jsx')
     async function render(view) {
       await act(async () => root.render(createElement(AccountViews, {
         key: view, view, user, workspace, api, onUserUpdated: () => {}, onWorkspaceUpdated: () => {},

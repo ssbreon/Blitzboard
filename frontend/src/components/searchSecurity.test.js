@@ -44,7 +44,7 @@ test('production policy forbids inline scripts, external scripts, plugins, and f
 test('account management controls use effective permissions rather than role labels', async () => {
   const server = await createServer({ root, optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
   try {
-    const { AccountViews } = await server.ssrLoadModule('/src/components/AccountViews.jsx')
+    const { AccountViews } = await server.ssrLoadModule('/src/components/account/AccountView.jsx')
     const render = (role, permissions) => renderToStaticMarkup(createElement(AccountViews, {
       view: 'team', user: { userId: 'coach', preferences: {} }, api: {},
       workspace: { name: 'Alpha', kind: 'team', role, permissions, defaults: {}, subscription: { kind: 'team' }, capabilities: { manageTeam: true } },
