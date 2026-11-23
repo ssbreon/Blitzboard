@@ -252,6 +252,9 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const slideDraftsRef = useRef({})
   const fieldRef = useRef(null)
   const menuRef = useRef(null)
+  const layoutButtonRef = useRef(null)
+  const layoutDropdownRef = useRef(null)
+  const [layoutPosition, setLayoutPosition] = useState(null)
   const animationFrameRef = useRef(null)
   const [fieldPxSize, setFieldPxSize] = useState({ width: 100, height: 100 })
   const activeTheme = getTheme(theme)
@@ -309,6 +312,33 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
       cancelled = true
     }
   }, [record.kind, record.parentId, record.id, api])
+
+  useEffect(() => {
+    if (!layoutOpen) return undefined
+
+    function updateLayoutPosition() {
+      const buttonRect = layoutButtonRef.current?.getBoundingClientRect()
+      const dropdownRect = layoutDropdownRef.current?.getBoundingClientRect()
+      if (!buttonRect) return
+
+      const viewportWidth = window.innerWidth
+      const margin = 12
+      const width = dropdownRect?.width || Math.min(900, viewportWidth - 32)
+      const preferredLeft = buttonRect.right - width
+      const left = Math.min(Math.max(margin, preferredLeft), viewportWidth - margin - width)
+      const top = buttonRect.bottom + 8
+
+      setLayoutPosition({ left, top })
+    }
+
+    updateLayoutPosition()
+    window.addEventListener('resize', updateLayoutPosition)
+    window.addEventListener('scroll', updateLayoutPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateLayoutPosition)
+      window.removeEventListener('scroll', updateLayoutPosition, true)
+    }
+  }, [layoutOpen])
 
   useEffect(() => {
     // Close both menus when a pointer press lands outside their shared container.
@@ -1769,6 +1799,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
 
         <div className="toolbar-menu" ref={menuRef}>
           <button
+            ref={layoutButtonRef}
             type="button"
             className="play-layout-button"
             aria-label="Layout"
@@ -1800,7 +1831,13 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
             </svg>
           </button>
           {layoutOpen && (
-            <div className="toolbar-dropdown play-layout-dropdown" role="menu" aria-label="Field layout">
+            <div
+              ref={layoutDropdownRef}
+              className="toolbar-dropdown play-layout-dropdown"
+              role="menu"
+              aria-label="Field layout"
+              style={layoutPosition ? { position: 'fixed', left: layoutPosition.left, top: layoutPosition.top, right: 'auto' } : undefined}
+            >
               {layoutColumn('Field Decoration', FIELD_DECORATIONS.map((value) => ({ value, label: value })), fieldDecoration, setFieldDecoration)}
               {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: value })), fieldZone, setFieldZone)}
               {layoutColumn('Perspective', PLAY_PERSPECTIVES.map((value) => ({ value, label: value })), perspective, setPerspective)}
