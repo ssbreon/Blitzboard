@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "test": "node --test --test-force-exit",
     "test:schedule": "node --test --test-force-exit src/components/TeamSchedule.test.js",
     "test:security": "node --test --test-force-exit src/components/searchSecurity.test.js",
     "test:account": "node --test --test-force-exit src/components/account/AccountView.test.js",
