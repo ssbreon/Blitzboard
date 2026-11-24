@@ -61,6 +61,9 @@ import {
   zoneBoxStyle,
   zoneFillColor,
 } from '../utils/playGeometry'
+import { adjustmentDesign, gameTypeLabel } from './play-designer/playDesignerUtils'
+import { usePlayDesignerDraft } from './play-designer/usePlayDesignerDraft'
+import { usePlayDesignerSlides } from './play-designer/usePlayDesignerSlides'
 
 const TOOL_ICONS = {
   select: <path fill="currentColor" d="M6 3v18l4.6-4.6L13.2 21l2.6-1.4-2.6-4.6L18 13.4z" />,
@@ -122,29 +125,6 @@ const ZONE_HANDLES = [
   { id: 'w', left: 0, top: 50 },
 ]
 
-// Convert a game-type identifier into a readable label.
-function gameTypeLabel(gameType) {
-  return gameType.split('_').map((part, index) => index === 0 ? part : `${part[0].toUpperCase()}${part.slice(1)}`).join(' ')
-}
-
-// Resolve an adjustment's design fields against its base-play defaults.
-function adjustmentDesign(slide, fallback) {
-  return {
-    markers: Array.isArray(slide.markers) ? slide.markers : fallback.markers,
-    drawings: normalizeDrawings(slide.drawings || fallback.drawings),
-    textAnnotations: normalizeTextAnnotations(slide.textAnnotations || fallback.textAnnotations),
-    zones: normalizeZones(slide.zones || fallback.zones),
-    templateId: slide.template || fallback.templateId,
-    category: slide.category || fallback.category,
-    fieldDecoration: slide.fieldDecoration || fallback.fieldDecoration,
-    fieldOrientation: slide.fieldOrientation || fallback.fieldOrientation,
-    fieldZone: slide.fieldZone || fallback.fieldZone,
-    perspective: slide.perspective || fallback.perspective,
-    theme: normalizeThemeId(slide.theme || fallback.theme),
-    showAssignments: true,
-  }
-}
-
 // Render and manage the interactive play-designing workspace.
 export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDelete = true, onGuardChange, onNameSaved, onNameApplied, breadcrumbSettingsTarget, parentSettingsBreadcrumbTarget, parentSettingsLabel, onEditParentSettings }) {
   const textAppearanceRef = useRef(null)
@@ -171,8 +151,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const initialTheme = normalizeThemeId(record.initialTheme)
   const initialScoutingTendencies = Array.isArray(record.initialScoutingTendencies) ? record.initialScoutingTendencies : []
   const [name, setName] = useState(record.name)
-  const [saving, setSaving] = useState(false)
-  const savingRef = useRef(false)
   const etagRef = useRef(record._etag)
   const [error, setError] = useState(null)
   const [markers, setMarkers] = useState(record.initialMarkers || [])
@@ -238,10 +216,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [savedFieldZone, setSavedFieldZone] = useState(initialFieldZone)
   const [savedPerspective, setSavedPerspective] = useState(initialPerspective)
   const [savedTheme, setSavedTheme] = useState(initialTheme)
-  const [slides, setSlides] = useState([])
-  const [slidesLoadError, setSlidesLoadError] = useState(false)
-  const [slideDraftTitles, setSlideDraftTitles] = useState({})
-  const [slidesLoading, setSlidesLoading] = useState(['play', 'scoutPlay'].includes(record.kind))
+  const {
+    slides,
+    setSlides,
+    slidesLoadError,
+    slideDraftTitles,
+    setSlideDraftTitles,
+    slidesLoading,
+  } = usePlayDesignerSlides({ record, api, setError })
   const [activeSlideId, setActiveSlideId] = useState(null)
   const [activeSlideTitle, setActiveSlideTitle] = useState('')
   const [editingSlideId, setEditingSlideId] = useState(null)
@@ -249,7 +231,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const [playerAnimation, setPlayerAnimation] = useState(null)
   const [removingSlideId, setRemovingSlideId] = useState(null)
   const [slideToDelete, setSlideToDelete] = useState(null)
-  const slideDraftsRef = useRef({})
   const fieldRef = useRef(null)
   const menuRef = useRef(null)
   const layoutButtonRef = useRef(null)
@@ -286,32 +267,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   useEffect(() => () => {
     if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
   }, [])
-
-  useEffect(() => {
-    if (!['play', 'scoutPlay'].includes(record.kind)) return undefined
-    // Ignore slide results if this record changes or the designer unmounts before they arrive.
-    let cancelled = false
-    api.listSlides(record.parentId, record.id, false, record.kind)
-      .then((result) => {
-        if (!cancelled) {
-          const items = result.items || []
-          setSlides(items)
-          setSlideDraftTitles(Object.fromEntries(items.map((slide) => [slide.id, slide.title || 'Adjustment'])))
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setSlidesLoadError(true)
-          setError({ ...err, message: `Unable to load adjustments: ${err.message}` })
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setSlidesLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [record.kind, record.parentId, record.id, api])
 
   useEffect(() => {
     if (!layoutOpen) return undefined
@@ -390,6 +345,56 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const isDirty = activeSlideId
     ? designIsDirty || activeSlideTitle !== (activeSlide?.title || 'Adjustment') || scoutingTendenciesDirty
     : name !== savedName || gameType !== savedGameType || designIsDirty || scoutingTendenciesDirty
+
+  const {
+    saving,
+    setSaving,
+    slideDraftsRef,
+    handleSave,
+    saveNavigationDrafts,
+  } = usePlayDesignerDraft({
+    record,
+    api,
+    readOnly,
+    settingsOpen,
+    isDirty,
+    currentDesign,
+    name,
+    gameType,
+    scoutingTendencies,
+    scoutingTendenciesDirty,
+    activeSlideId,
+    activeSlideTitle,
+    activeSlide,
+    slides,
+    savedBaseDesign,
+    savedName,
+    onGuardChange,
+    onNameSaved,
+    onBaseSaved: ({ name: savedNameValue, design, gameType: savedGameTypeValue, scoutingTendencies: savedTendencies }) => {
+      setSavedName(savedNameValue)
+      setSavedMarkers(design.markers)
+      setSavedDrawings(design.drawings)
+      setSavedTextAnnotations(design.textAnnotations)
+      setSavedZones(design.zones)
+      setSavedTemplateId(design.templateId)
+      setSavedGameType(savedGameTypeValue)
+      setSavedCategory(design.category)
+      setSavedFieldDecoration(design.fieldDecoration)
+      setSavedFieldOrientation(design.fieldOrientation)
+      setSavedFieldZone(design.fieldZone)
+      setSavedPerspective(design.perspective)
+      setSavedTheme(design.theme)
+      if (record.kind === 'scoutPlay') setSavedScoutingTendencies(savedTendencies)
+    },
+    onSlideSaved: (slideId, updated, title) => {
+      setSlides((current) => current.map((slide) => slide.id === slideId ? { ...slide, ...updated } : slide))
+      setActiveSlideTitle(title)
+      setSlideDraftTitles((current) => ({ ...current, [slideId]: title }))
+    },
+    onScoutingTendenciesSaved: setSavedScoutingTendencies,
+    setError,
+  })
 
   const canUndoDrawing =
     isDirty && drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
@@ -498,140 +503,6 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     animationFrameRef.current = requestAnimationFrame(animate)
   }
-
-  // Persist the active base-play or adjustment design.
-  async function handleSave() {
-    if (readOnly || savingRef.current) return false
-    savingRef.current = true
-    setSaving(true)
-    setError(null)
-    try {
-      const designPayload = {
-        markers,
-        drawings,
-        textAnnotations,
-        zones,
-        template: templateId,
-        category,
-        fieldDecoration,
-        fieldOrientation,
-        fieldZone,
-        perspective,
-        theme,
-        showAssignments,
-      }
-      // Adjustment slides and the base play use separate endpoints and title fields.
-      if (activeSlideId) {
-        const title = activeSlideTitle.trim() || activeSlide?.title || 'Adjustment'
-        const updated = await api.updateSlide(record.parentId, record.id, activeSlideId, { ...designPayload, title }, record.kind)
-        setSlides((current) => current.map((slide) => (slide.id === activeSlideId ? { ...slide, ...updated } : slide)))
-        setActiveSlideTitle(title)
-        setSlideDraftTitles((current) => ({ ...current, [activeSlideId]: title }))
-      } else {
-        const payload = { ...designPayload, name, gameType, _etag: etagRef.current, ...(record.kind === 'scoutPlay' && { scoutingTendencies }) }
-        if (record.kind === 'play') {
-          const updated = await api.updatePlay(record.parentId, record.id, payload)
-          etagRef.current = updated._etag
-        } else {
-          const updated = await api.updateScoutPlay(record.parentId, record.id, payload)
-          etagRef.current = updated._etag
-        }
-        setSavedName(name)
-        onNameSaved?.(name)
-        setSavedMarkers(markers)
-        setSavedDrawings(drawings)
-        setSavedTextAnnotations(textAnnotations)
-        setSavedZones(zones)
-        setSavedTemplateId(templateId)
-        setSavedGameType(gameType)
-        setSavedCategory(category)
-        setSavedFieldDecoration(fieldDecoration)
-        setSavedFieldOrientation(fieldOrientation)
-        setSavedFieldZone(fieldZone)
-        setSavedPerspective(perspective)
-        setSavedTheme(theme)
-        if (record.kind === 'scoutPlay') setSavedScoutingTendencies(scoutingTendencies)
-      }
-      if (activeSlideId && scoutingTendenciesDirty) {
-        const updated = await api.updateScoutPlay(record.parentId, record.id, { scoutingTendencies, _etag: etagRef.current })
-        etagRef.current = updated._etag
-        setSavedScoutingTendencies(scoutingTendencies)
-      }
-      delete slideDraftsRef.current[activeSlideId || 'base']
-      return true
-    } catch (err) {
-      setError({ ...err, message: `Unable to save: ${err.message}` })
-      return false
-    } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-  }
-
-  // Compare a cached draft with the saved base or adjustment baseline.
-  function draftIsDirty(slideId, draft) {
-    const savedSlide = slides.find((slide) => slide.id === slideId)
-    const baseline = slideId === 'base' ? savedBaseDesign : adjustmentDesign(savedSlide || {}, savedBaseDesign)
-    return Object.keys(currentDesign).some((property) => JSON.stringify(draft[property]) !== JSON.stringify(baseline[property]))
-      || (slideId === 'base' ? draft.name !== savedName : draft.title !== (savedSlide?.title || 'Adjustment'))
-  }
-
-  // Check whether unsaved edits or open settings should block navigation.
-  function navigationIsDirty() {
-    return !readOnly && (isDirty || settingsOpen || Object.entries(slideDraftsRef.current).some(([slideId, draft]) => draftIsDirty(slideId, draft)))
-  }
-
-  // Save every changed base and adjustment draft, processing the base first.
-  async function saveNavigationDrafts() {
-    if (readOnly || settingsOpen || savingRef.current) return false
-    savingRef.current = true
-    setSaving(true)
-    setError(null)
-    const drafts = { ...slideDraftsRef.current, [activeSlideId || 'base']: captureCurrentDraft() }
-    try {
-      for (const [slideId, draft] of Object.entries(drafts).sort(([first], [second]) => first === 'base' ? -1 : second === 'base' ? 1 : 0)) {
-        if (!draftIsDirty(slideId, draft)) continue
-        const { templateId: draftTemplate, name: draftName, title: draftTitle, ...design } = draft
-        const payload = { ...design, template: draftTemplate }
-        if (slideId === 'base') {
-          const versionedPayload = { ...payload, name: draftName, _etag: etagRef.current }
-          const updated = record.kind === 'play'
-            ? await api.updatePlay(record.parentId, record.id, versionedPayload)
-            : await api.updateScoutPlay(record.parentId, record.id, versionedPayload)
-          etagRef.current = updated._etag
-        } else {
-          await api.updateSlide(record.parentId, record.id, slideId, { ...payload, title: draftTitle || 'Adjustment' }, record.kind)
-        }
-      }
-      if (scoutingTendenciesDirty) {
-        const updated = await api.updateScoutPlay(record.parentId, record.id, { scoutingTendencies, _etag: etagRef.current })
-        etagRef.current = updated._etag
-        setSavedScoutingTendencies(scoutingTendencies)
-      }
-      slideDraftsRef.current = {}
-      return true
-    } catch (failure) {
-      setError({ ...failure, message: `Unable to save: ${failure.message}` })
-      return false
-    } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-  }
-
-  useEffect(() => {
-    onGuardChange?.({ dirty: navigationIsDirty(), saving, canSave: !settingsOpen, save: saveNavigationDrafts })
-    return () => onGuardChange?.(null)
-  })
-
-  useEffect(() => {
-    // Warn the browser before leaving while any design draft remains unsaved.
-    function beforeUnload(event) {
-      if (navigationIsDirty()) { event.preventDefault(); event.returnValue = '' }
-    }
-    window.addEventListener('beforeunload', beforeUnload)
-    return () => window.removeEventListener('beforeunload', beforeUnload)
-  })
 
   // Discard the active draft and restore its last saved design.
   function handleCancel() {
