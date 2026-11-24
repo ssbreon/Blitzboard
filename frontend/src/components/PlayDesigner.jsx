@@ -1422,8 +1422,8 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           setCursorPos(null)
         }}
         aria-pressed={tool.id === activeTool}
-        aria-label={tool.id === 'dtb' ? 'Double-team To Backer' : tool.label}
-        title={tool.id === 'dtb' ? 'Double-team To Backer' : tool.label}
+        aria-label={tool.label}
+        title={tool.label}
       >
         <svg viewBox="0 0 24 24" role="presentation" aria-hidden="true">
           {TOOL_ICONS[tool.id]}

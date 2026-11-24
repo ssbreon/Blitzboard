@@ -231,11 +231,11 @@ export function hashMarkYPositionsForWindow(window, perspective = DEFAULT_PLAY_P
 export const DRAWING_TOOLS = [
   { id: 'select', label: 'Select' },
   { id: 'block', label: 'Block', color: '#ef9a00', dash: null, arrow: false, endCap: 'tbar' },
-  { id: 'dtb', label: 'DTB', color: '#ef9a00', dash: '2 4', arrow: false, endCap: 'tbar' },
-  { id: 'route', label: 'Route', color: '#1d4ed8', dash: null, arrow: true },
-  { id: 'blitz', label: 'Blitz', color: '#b91c1c', dash: null, arrow: true },
-  { id: 'coverage', label: 'Coverage', color: '#7c3aed', dash: '2 10', arrow: true },
-  { id: 'motion', label: 'Motion', color: '#374151', dash: null, arrow: false, endCap: 'motion' },
+  { id: 'dtb', label: 'Double-team to Backer', color: '#ef9a00', dash: '2 4', arrow: false, endCap: 'tbar' },
+  { id: 'route', label: 'Run Path or Pass Route', color: '#1d4ed8', dash: null, arrow: true },
+  { id: 'blitz', label: 'Delayed Route or Blitz', color: '#b91c1c', dash: null, arrow: true },
+  { id: 'coverage', label: 'Option Path or Coverage Drop', color: '#7c3aed', dash: '2 10', arrow: true },
+  { id: 'motion', label: 'Motion or Pre-snap movement', color: '#374151', dash: null, arrow: false, endCap: 'motion' },
   { id: 'line', label: 'Line', color: '#ffffff', dash: null, arrow: false },
 ]
 

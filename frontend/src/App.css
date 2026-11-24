@@ -416,6 +416,9 @@ html.is-drilling-through * {
   min-height: 420px;
   border-top:2px solid var(--navy);
   border-bottom:1px solid var(--navy);
+  box-shadow:
+    -8px 0 12px -8px rgb(0 0 0),
+     8px 0 12px -8px rgb(0 0 0);  
   background:
     repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 0, rgba(255, 255, 255, 0.8) 1px, transparent 1px, transparent var(--field-band-size, 12.5%)),
     repeating-linear-gradient(
