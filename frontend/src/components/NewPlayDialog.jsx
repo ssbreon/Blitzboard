@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_GAME_TYPE, gameTypeLabel, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
-import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONE_LABELS, FIELD_ZONES, fieldWindowForPlay, fitMarkersToWindow, isGreenZoneOnlyCategory, PLAY_PERSPECTIVES } from '../utils/playGeometry'
+import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONE_LABELS, FIELD_ZONES, fieldWindowForPlay, fieldZoneForCategory, fieldZoneOptionDisabled, fitMarkersToWindow, KICKING_PLAY_CATEGORIES, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 
@@ -164,7 +164,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                     onChange={(event) => {
                       const nextCategory = event.target.value
                       setCategory(nextCategory)
-                      if (isGreenZoneOnlyCategory(nextCategory)) setFieldZone(DEFAULT_FIELD_ZONE)
+                      setFieldZone((current) => fieldZoneForCategory(nextCategory, current))
                       setTemplateId(getTemplatesForGameType(gameType, nextCategory)[0]?.id || '')
                     }}
                   >
@@ -222,8 +222,9 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                 </label>
                 <label className="dialog-field">
                   <span>Field Zone</span>
-                  <select value={fieldZone} onChange={(event) => setFieldZone(event.target.value)}>
-                    {FIELD_ZONES.map((option) => <option key={option} value={option} disabled={isGreenZoneOnlyCategory(category) && option !== DEFAULT_FIELD_ZONE}>{FIELD_ZONE_LABELS[option]}</option>)}
+                  <select value={KICKING_PLAY_CATEGORIES.includes(category) ? '' : fieldZone} disabled={KICKING_PLAY_CATEGORIES.includes(category)} onChange={(event) => setFieldZone(event.target.value)}>
+                    {KICKING_PLAY_CATEGORIES.includes(category) && <option value="">Kickoff/Punt</option>}
+                    {FIELD_ZONES.map((option) => <option key={option} value={option} disabled={fieldZoneOptionDisabled(category, option)}>{FIELD_ZONE_LABELS[option]}</option>)}
                   </select>
                 </label>
                 <label className="dialog-field">

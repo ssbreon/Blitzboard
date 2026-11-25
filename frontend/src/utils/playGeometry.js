@@ -57,10 +57,17 @@ export const FIELD_ZONE_LABELS = {
   'Gold Zone': 'Gold Zone (Def 10-GL)',
 }
 export const DEFAULT_FIELD_ZONE = 'Green Zone'
-const GREEN_ZONE_ONLY_CATEGORIES = new Set(['Kickoff', 'Kickoff Return', 'Hands Team', 'Onside Kick'])
+const GOLD_ZONE_CATEGORIES = new Set(['PAT/FG', 'PAT/FG Block'])
+export const KICKING_PLAY_CATEGORIES = ['Kickoff', 'Kickoff Return', 'Punt', 'Punt Return', 'Onside Kick', 'Hands Team']
 
-export function isGreenZoneOnlyCategory(category) {
-  return GREEN_ZONE_ONLY_CATEGORIES.has(category)
+export function fieldZoneForCategory(category, fieldZone = DEFAULT_FIELD_ZONE) {
+  if (GOLD_ZONE_CATEGORIES.has(category)) return 'Gold Zone'
+  if (KICKING_PLAY_CATEGORIES.includes(category)) return DEFAULT_FIELD_ZONE
+  return fieldZone || DEFAULT_FIELD_ZONE
+}
+
+export function fieldZoneOptionDisabled(category, fieldZone) {
+  return KICKING_PLAY_CATEGORIES.includes(category) || (GOLD_ZONE_CATEGORIES.has(category) && fieldZone !== 'Gold Zone')
 }
 
 export const PLAY_PERSPECTIVES = ['Offense on Top', 'Offense on bottom']
@@ -83,7 +90,6 @@ const YARD_BAND_YARDS = 5
 const YARD_NUMBER_EDGE_CLEARANCE_YARDS = 2.5
 
 // Kicking plays show from just behind the kicking spot to the receiving team's goal line.
-export const KICKING_PLAY_CATEGORIES = ['Kickoff', 'Kickoff Return', 'Punt', 'Punt Return', 'Onside Kick', 'Hands Team']
 const KICKOFF_PLAY_CATEGORIES = new Set(['Kickoff', 'Kickoff Return', 'Onside Kick', 'Hands Team'])
 // Kicking team's own yard line for the kickoff spot, by level (Field Orientation).
 const KICKOFF_SPOT_YARD_LINE = {
@@ -140,13 +146,14 @@ function buildFieldWindow(top, bottom, los, perspective) {
 // Kicking categories extend the window from behind the kicking spot to the receiving end zone;
 // kickoffs use the level's kickoff spot while punts use the Field Zone line of scrimmage.
 export function fieldWindowForPlay(play = {}, perspective = DEFAULT_PLAY_PERSPECTIVE) {
-  if (!KICKING_PLAY_CATEGORIES.includes(play.category)) return scrimmageWindow(play, perspective)
+  const normalizedPlay = { ...play, fieldZone: fieldZoneForCategory(play.category, play.fieldZone) }
+  if (!KICKING_PLAY_CATEGORIES.includes(play.category)) return scrimmageWindow(normalizedPlay, perspective)
   const los = KICKOFF_PLAY_CATEGORIES.has(play.category)
     ? FIELD_LENGTH_YARDS - (KICKOFF_SPOT_YARD_LINE[play.fieldOrientation] ?? KICKOFF_SPOT_YARD_LINE['High School'])
-    : fieldZoneLosYards(play.fieldZone)
+    : fieldZoneLosYards(normalizedPlay.fieldZone)
   const top = -KICKING_WINDOW_END_ZONE_YARDS
   const bottom = Math.min(los + KICKING_WINDOW_BEHIND_LOS_YARDS, FIELD_LENGTH_YARDS + END_ZONE_YARDS)
-  if (bottom - top <= WINDOW_YARDS) return scrimmageWindow(play, perspective)
+  if (bottom - top <= WINDOW_YARDS) return scrimmageWindow(normalizedPlay, perspective)
   return buildFieldWindow(top, bottom, los, perspective)
 }
 

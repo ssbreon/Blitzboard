@@ -21,7 +21,6 @@ import { assignmentTeam, updatePlayerAlignment, updatePlayerAssignment } from '.
 import {
   BLITZ_FIRST_SEGMENT_DASH,
   DEFAULT_PLAY_PERSPECTIVE,
-  DEFAULT_FIELD_ZONE,
   DRAWING_TOOLS,
   FIELD_ZONE_LABELS,
   FIELD_ZONES,
@@ -35,12 +34,14 @@ import {
   goalLinePositionsForWindow,
   fieldWindowForPlay,
   fieldWindowStyle,
+  fieldZoneForCategory,
+  fieldZoneOptionDisabled,
   fitMarkersToWindow,
   fixedSizeEllipse,
   flattenDrawings,
   hashMarkXPositions,
   hashMarkYPositionsForWindow,
-  isGreenZoneOnlyCategory,
+  KICKING_PLAY_CATEGORIES,
   markerStyleVars,
   normalizeDrawings,
   normalizeTextAnnotations,
@@ -147,7 +148,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const initialCategory = record.category || categoryOptions[0]
   const initialFieldDecoration = record.fieldDecoration || FIELD_DECORATIONS[0]
   const initialFieldOrientation = record.fieldOrientation || FIELD_ORIENTATIONS[0]
-  const initialFieldZone = isGreenZoneOnlyCategory(initialCategory) ? DEFAULT_FIELD_ZONE : record.fieldZone || DEFAULT_FIELD_ZONE
+  const initialFieldZone = fieldZoneForCategory(initialCategory, record.fieldZone)
   const initialPerspective = record.perspective || DEFAULT_PLAY_PERSPECTIVE
   const initialTheme = normalizeThemeId(record.initialTheme)
   const initialScoutingTendencies = Array.isArray(record.initialScoutingTendencies) ? record.initialScoutingTendencies : []
@@ -416,7 +417,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCategory(design.category)
     setFieldDecoration(design.fieldDecoration)
     setFieldOrientation(design.fieldOrientation)
-    setFieldZone(isGreenZoneOnlyCategory(design.category) ? DEFAULT_FIELD_ZONE : design.fieldZone)
+    setFieldZone(fieldZoneForCategory(design.category, design.fieldZone))
     setPerspective(design.perspective)
     setTheme(design.theme)
     setSelectedId(null)
@@ -647,7 +648,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     if (nextTemplateId === templateId) return
     const template = findPlayTemplate(nextTemplateId) || DEFAULT_PLAY_TEMPLATE
     setTemplateId(template.id)
-    setMarkers(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay({ category: nextCategory, fieldZone, fieldOrientation })))
+    setMarkers(fitMarkersToWindow(buildMarkersFromTemplate(template), fieldWindowForPlay({ category: nextCategory, fieldZone: fieldZoneForCategory(nextCategory, fieldZone), fieldOrientation })))
     setDrawings(normalizeDrawings())
     setTextAnnotations([])
     setZones([])
@@ -673,6 +674,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     setGameType(draftGameType)
     setCategory(draftCategory)
+    setFieldZone((current) => fieldZoneForCategory(draftCategory, current))
     applyTemplate(draftTemplateId, draftCategory)
     setSettingsOpen(false)
   }
@@ -1439,7 +1441,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     return (
       <div className="play-layout-column" role="group" aria-label={title} key={title}>
         <div className="account-menu-section-label">{title}</div>
-        {options.map(({ value, label }) => {
+        {options.map(({ value, label, disabled }) => {
           const selected = value === selectedValue
           return (
             <button
@@ -1448,7 +1450,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               role="menuitemradio"
               className="menu-item-radio"
               aria-checked={selected}
-              disabled={readOnly || saving}
+              disabled={readOnly || saving || disabled}
               onClick={() => onSelect(value)}
             >
               {selected ? <Check size={15} aria-hidden="true" /> : <span className="play-layout-check-spacer" aria-hidden="true" />}
@@ -1711,7 +1713,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               style={layoutPosition ? { position: 'fixed', left: layoutPosition.left, top: layoutPosition.top, right: 'auto' } : undefined}
             >
               {layoutColumn('Field Decoration', FIELD_DECORATIONS.map((value) => ({ value, label: value })), fieldDecoration, setFieldDecoration)}
-              {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: FIELD_ZONE_LABELS[value] })), fieldZone, setFieldZone)}
+              {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: FIELD_ZONE_LABELS[value], disabled: fieldZoneOptionDisabled(category, value) })), KICKING_PLAY_CATEGORIES.includes(category) ? null : fieldZone, setFieldZone)}
               {layoutColumn('Perspective', PLAY_PERSPECTIVES.map((value) => ({ value, label: value })), perspective, setPerspective)}
               {layoutColumn('Field Orientation', FIELD_ORIENTATIONS.map((value) => ({ value, label: value })), fieldOrientation, setFieldOrientation)}
               {layoutColumn('Theme', PLAY_THEMES.map(({ id, label }) => ({ value: id, label })), theme, setTheme)}
