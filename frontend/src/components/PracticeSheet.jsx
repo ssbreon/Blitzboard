@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowDown, ArrowUp, BookOpen, BookOpenCheck, CalendarDays, Check, ClipboardList, Clock3, GripVertical, Menu, Paperclip, Pencil, Plus, Printer, RefreshCw, Save, Table2, Trash2 } from 'lucide-react'
 import { ErrorDialog } from './ErrorDialog'
@@ -57,6 +57,9 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   const [dirty, setDirty] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [staffError, setStaffError] = useState(null)
+  const [staffNames, setStaffNames] = useState([])
+  const coachSuggestionsId = useId()
   const [revision, setRevision] = useState(0)
   const [practicePlanView, setPracticePlanView] = useState('planning')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -105,6 +108,19 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     }).catch((failure) => { if (active) setError(failure) })
     return () => { active = false }
   }, [api, eventId, revision, onEventLoaded])
+
+  useEffect(() => {
+    if (!canEdit) return undefined
+    let active = true
+    setStaffNames([])
+    setStaffError(null)
+    api.members()
+      .then(({ items }) => {
+        if (active) setStaffNames([...new Set(items.map((member) => member.name?.trim()).filter(Boolean))])
+      })
+      .catch((failure) => { if (active) setStaffError(failure) })
+    return () => { active = false }
+  }, [api, canEdit])
 
   useEffect(() => {
     // Prefer playbooks supplied by the parent; fetch only when this sheet owns the lookup.
@@ -373,6 +389,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
       <div className="practice-sheet-header-details"><p className="practice-sheet-eyebrow">Practice Sheet</p><h1>{event.name}</h1><div className="practice-sheet-header-meta-overlay"><p className="practice-sheet-meta"><CalendarDays size={16} /><span>{practiceSheetDateLabel(event.eventDate)}</span>{(event.startTime || event.endTime) && <span>{event.startTime && practiceSheetTimeLabel(event.startTime)}{event.startTime && event.endTime && ' - '}{!event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}{event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}</span>}{event.location && <span>at {event.location}</span>}</p>{(event.dress || event.notes) && <div className="practice-sheet-dress-row">{event.dress && <p className="practice-sheet-dress"><strong>Dress</strong><span>{event.dress}</span></p>}{event.notes && <p className="practice-sheet-event-notes" title={event.notes}><strong>Notes</strong><span>{event.notes}</span></p>}</div>}</div></div>
     </header>
     <ErrorDialog error={error} message="We couldn't save the practice sheet. Your changes are still here." />
+    <ErrorDialog error={staffError} message="We couldn't load the team staff suggestions. You can still enter a coach name." />
     {activityToDelete && <DeleteConfirmationDialog
       message={`Are you sure you want to delete activity "${activityToDelete.name || 'Unnamed'}"? This cannot be undone.`}
       onCancel={() => setActivityToDelete(null)}
@@ -385,6 +402,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     <div className="practice-sheet-body">
     <div className="practice-sheet-content">
       <datalist id="practice-period-suggestions">{periodSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
+      <datalist id={coachSuggestionsId}>{staffNames.map((name) => <option key={name} value={name} />)}</datalist>
       <div className="practice-sheet-section-heading practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={addPeriod} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
         <button type="button" className="hamburger-button" aria-label="Practice Plan options" aria-haspopup="true" aria-expanded={menuOpen} title="Practice Plan options" onClick={() => setMenuOpen((open) => !open)}><Menu size={19} aria-hidden="true" /></button>
         {menuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown practice-plan-dropdown" role="menu" aria-label="Practice Plan options"><div className="data-grid-menu-panes">
@@ -409,7 +427,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
         const activityColumns = [
           { key: 'group', header: 'Group', render: (value, row) => <><select aria-label={`Group for period ${periodIndex + 1} activity ${row.activityIndex + 1}`} value={value || 'Team'} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { group: input.target.value })}>{value && !ACTIVITY_GROUPS.includes(value) && <option value={value}>{value}</option>}{ACTIVITY_GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}</select><span className="practice-print-value">{value || 'Team'}</span></> },
           { key: 'name', header: 'Activity', render: (value, row) => <><input aria-label={`Activity for period ${periodIndex + 1} row ${row.activityIndex + 1}`} value={value || ''} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { name: input.target.value })} /><span className="practice-print-value">{value || '-'}</span></> },
-          { key: 'coach', header: 'Coach', render: (value, row) => <><input aria-label={`Coach for period ${periodIndex + 1} activity ${row.activityIndex + 1}`} value={value || ''} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { coach: input.target.value })} /><span className="practice-print-value">{value || '-'}</span></> },
+          { key: 'coach', header: 'Coach', render: (value, row) => <><input aria-label={`Coach for period ${periodIndex + 1} activity ${row.activityIndex + 1}`} list={coachSuggestionsId} value={value || ''} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { coach: input.target.value })} /><span className="practice-print-value">{value || '-'}</span></> },
         ]
         return <section className={`practice-period${periodDropTarget?.id === periodId ? periodDropTarget.after ? ' is-drop-after' : ' is-drop-before' : ''}`} key={periodId} ref={(element) => scrollNewPeriodIntoView(element, periodId)} aria-label={`Period ${periodIndex + 1}`} onDragOver={(event) => dragPeriodOver(event, periodIndex, periodId)} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPeriodDropTarget(null) }} onDrop={(event) => dropPeriod(event, periodIndex)}>
         <div className="practice-period-heading">

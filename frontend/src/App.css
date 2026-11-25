@@ -310,7 +310,7 @@ html.is-drilling-through * {
 .free-plan-upgrade-individual { border-top: 3px solid var(--green); }
 .free-plan-upgrade-team { border-top: 3px solid var(--gold); }
 .free-plan-team-note { margin: 6px 0 0; color: var(--text); font-size: 10px; line-height: 1.35; }
-.free-plan-upgrade-comparison ul { display: grid; grid-template-columns: minmax(0, 1fr); gap: 5px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.free-plan-upgrade-comparison ul { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none; font-size: 12px; }
 .free-plan-upgrade-comparison li::before { content: '✓ '; color: var(--navy-light); font-weight: 700; }
 
  .account-plan-options {

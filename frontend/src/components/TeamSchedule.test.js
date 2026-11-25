@@ -21,7 +21,7 @@ test('practice sheet cancel delegates unsaved changes to the shared guard', asyn
   let loads = 0
   let guard
   let leaveRequest
-  const api = { getScheduleEvent: async () => { loads += 1; return { name: 'Practice', startTime: '15:30', practiceSheet: { periods: [] } } } }
+  const api = { members: async () => ({ items: [{ name: 'Coach Smith-Price' }, { name: 'Coach Heck' }, { name: 'Coach Heck' }] }), getScheduleEvent: async () => { loads += 1; return { name: 'Practice', startTime: '15:30', practiceSheet: { periods: [] } } } }
 
   try {
     const { PracticeSheet } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
@@ -32,6 +32,11 @@ test('practice sheet cancel delegates unsaved changes to the shared guard', asyn
     })))
     await act(async () => document.querySelector('.practice-plan-controls .primary-button').click())
     assert.equal(guard.dirty, true)
+    const coachInput = document.querySelector('input[aria-label="Coach for period 1 activity 1"]')
+    assert.deepEqual([...coachInput.list.options].map((option) => option.value), ['Coach Smith-Price', 'Coach Heck'])
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(coachInput, 'Guest Coach')
+    await act(async () => coachInput.dispatchEvent(new dom.window.Event('input', { bubbles: true })))
+    assert.equal(coachInput.value, 'Guest Coach')
     await act(async () => [...document.querySelectorAll('.practice-plan-controls button')].find((button) => button.textContent === 'Cancel').click())
     assert.equal(leaveRequest.title, 'Refresh Practice Sheet')
     assert.equal(loads, 1)
