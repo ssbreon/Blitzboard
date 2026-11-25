@@ -53,6 +53,7 @@ export function FreePlanUpgradeBanner({ onUpgrade, area = 'unknown' }) {
       <button type="button" className="free-plan-upgrade-close" aria-label="Hide upgrade banner" title="Hide upgrade banner" onClick={dismissBanner}><X size={16} aria-hidden="true" /></button>
       <p>FREE PLAN</p>
       <h2>You're currently using Blitzboard Free.</h2>
+      <p className="free-plan-upgrade-ad-note">This ad is shown because you're on the Free plan.</p>
     </div>
     <div className="free-plan-upgrade-comparison">
       <section className="free-plan-upgrade-tier free-plan-upgrade-current" aria-labelledby="free-plan-current-limits">

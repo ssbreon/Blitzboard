@@ -295,6 +295,7 @@ html.is-drilling-through * {
 
  .free-plan-upgrade-heading { position: relative; }
  .free-plan-upgrade-heading h2 { margin: 0; padding-right: 28px; font-size: 18px; }
+ .free-plan-upgrade-heading .free-plan-upgrade-ad-note { margin: 4px 28px 0 0; color: var(--text); font-size: 11px; font-weight: 400; line-height: 1.35; text-transform: none; }
 .free-plan-upgrade-close { position: absolute; top: -4px; right: 0; z-index: 2; display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; padding: 0; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); cursor: pointer; }
 .free-plan-upgrade-close:hover { border-color: var(--border); background: var(--input-bg); color: var(--text-h); }
 .free-plan-upgrade-close:focus-visible { outline: 2px solid var(--navy-light); outline-offset: 2px; }
