@@ -49,8 +49,14 @@ export function yardNumberXPositions(fieldOrientation) {
 
 // Field Zone determines where the line of scrimmage sits on the full field (yards measured from
 // the defense's goal line at 0 to the offense's goal line at 100) when yard numbers are shown.
-export const FIELD_ZONES = ['Green Zone', 'Yellow Zone', 'Red Zone', 'Gold Zone']
-export const DEFAULT_FIELD_ZONE = FIELD_ZONES[0]
+export const FIELD_ZONES = ['Yellow Zone', 'Green Zone', 'Red Zone', 'Gold Zone']
+export const FIELD_ZONE_LABELS = {
+  'Yellow Zone': 'Yellow Zone (Off 0-20)',
+  'Green Zone': 'Green Zone (Normal)',
+  'Red Zone': 'Red Zone (Def 20-11)',
+  'Gold Zone': 'Gold Zone (Def 10-GL)',
+}
+export const DEFAULT_FIELD_ZONE = 'Green Zone'
 const GREEN_ZONE_ONLY_CATEGORIES = new Set(['Kickoff', 'Kickoff Return', 'Hands Team', 'Onside Kick'])
 
 export function isGreenZoneOnlyCategory(category) {

@@ -23,6 +23,7 @@ import {
   DEFAULT_PLAY_PERSPECTIVE,
   DEFAULT_FIELD_ZONE,
   DRAWING_TOOLS,
+  FIELD_ZONE_LABELS,
   FIELD_ZONES,
   PLAY_PERSPECTIVES,
   TBAR_THICKNESS_PX,
@@ -1710,7 +1711,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
               style={layoutPosition ? { position: 'fixed', left: layoutPosition.left, top: layoutPosition.top, right: 'auto' } : undefined}
             >
               {layoutColumn('Field Decoration', FIELD_DECORATIONS.map((value) => ({ value, label: value })), fieldDecoration, setFieldDecoration)}
-              {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: value })), fieldZone, setFieldZone)}
+              {layoutColumn('Field Zone', FIELD_ZONES.map((value) => ({ value, label: FIELD_ZONE_LABELS[value] })), fieldZone, setFieldZone)}
               {layoutColumn('Perspective', PLAY_PERSPECTIVES.map((value) => ({ value, label: value })), perspective, setPerspective)}
               {layoutColumn('Field Orientation', FIELD_ORIENTATIONS.map((value) => ({ value, label: value })), fieldOrientation, setFieldOrientation)}
               {layoutColumn('Theme', PLAY_THEMES.map(({ id, label }) => ({ value: id, label })), theme, setTheme)}

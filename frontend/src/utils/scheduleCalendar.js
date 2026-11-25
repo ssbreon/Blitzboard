@@ -7,9 +7,9 @@ export const ScheduleView = Object.freeze({ WEEK: 'week', MONTH: 'month', QUARTE
 const pad = (value) => String(value).padStart(2, '0')
 const dateKey = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 
-export function duplicateScheduleEventPayload(event) {
+export function duplicateScheduleEventPayload(event, name) {
   return {
-    name: `${event.name} (Copy)`,
+    name,
     eventType: event.eventType,
     eventDate: event.eventDate,
     startTime: event.startTime || '',

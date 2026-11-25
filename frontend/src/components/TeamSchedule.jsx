@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom'
 import { CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Clock3, Copy, Dumbbell, FolderOpen, GripVertical, Link, LoaderCircle, Menu, Plus, Printer, RefreshCw, Table2, Trash2, Trophy, Users } from 'lucide-react'
 import { renderCategoryBadge } from './CategoryBadge'
 import { DeleteConfirmationDialog } from './DeleteConfirmationDialog'
+import { DuplicateItemDialog } from './DuplicateItemDialog'
 import { DialogCloseButton } from './DialogCloseButton'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
@@ -355,6 +356,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   const [practiceRevision, setPracticeRevision] = useState(0)
   const [eventContextMenu, setEventContextMenu] = useState(null)
   const [eventToDelete, setEventToDelete] = useState(null)
+  const [eventToDuplicate, setEventToDuplicate] = useState(null)
   const [draggedEvent, setDraggedEvent] = useState(null)
   const [dropTargetDate, setDropTargetDate] = useState(null)
   const [movingEventKey, setMovingEventKey] = useState(null)
@@ -511,14 +513,10 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
     onWorkspaceUpdated?.()
   }
 
-  async function duplicateEvent(event) {
-    try {
-      await api.createScheduleEvent(duplicateScheduleEventPayload(event))
-      setRefresh((value) => value + 1)
-      onWorkspaceUpdated?.()
-    } catch (failure) {
-      setError(failure)
-    }
+  async function duplicateEvent(event, name) {
+    await api.createScheduleEvent(duplicateScheduleEventPayload(event, name))
+    setRefresh((value) => value + 1)
+    onWorkspaceUpdated?.()
   }
 
   async function moveEventToDate(event, destinationDate) {
@@ -656,8 +654,12 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
         canDelete={canDelete}
         onClose={() => setEventContextMenu(null)}
         onOpen={openEvent}
-        onDuplicate={duplicateEvent}
+        onDuplicate={setEventToDuplicate}
         onDelete={(event) => setEventToDelete(event)}
+      />}
+      {eventToDuplicate && <DuplicateItemDialog
+        onCancel={() => setEventToDuplicate(null)}
+        onDuplicate={(name) => duplicateEvent(eventToDuplicate, name)}
       />}
       {eventToDelete && <DeleteConfirmationDialog
         message={`Are you sure you want to delete "${eventToDelete.kind === 'game' ? eventToDelete.opponent || eventToDelete.name : eventToDelete.name}"? This cannot be undone.`}

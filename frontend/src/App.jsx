@@ -18,6 +18,7 @@ import { renderCategoryBadge } from './components/CategoryBadge'
 import { DataGrid } from './components/DataGrid'
 import { GlobalSearch } from './components/GlobalSearch'
 import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog'
+import { DuplicateItemDialog } from './components/DuplicateItemDialog'
 import { DialogCloseButton } from './components/DialogCloseButton'
 import { ErrorDialog, ErrorDialogProvider, ErrorDialogScope } from './components/ErrorDialog'
 import { COLLECTION_CATEGORIES, NewCollectionDialog } from './components/NewCollectionDialog'
@@ -1117,6 +1118,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   const [loadingPlay, setLoadingPlay] = useState(false)
   const [searchOpening, setSearchOpening] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState(null)
+  const [duplicateRequest, setDuplicateRequest] = useState(null)
 
   const writable = workspace.capabilities.edit
   const showFreePlanUpgrade = workspace.subscription.kind === 'free' && !parent && !designer && !slideshow && !cardPlaybook
@@ -1165,9 +1167,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     } })
   }
 
-  async function handleDuplicateGameCardItem(item) {
+  async function duplicateGameCardItem(item, name) {
     const duplicate = await api.createPlaybook({
-      name: `${item.name} (Copy)`,
+      name,
       category: item.category,
       year: item.year,
       gamePlanId: item.gamePlanId,
@@ -1206,9 +1208,9 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     onWorkspaceUpdated(await api.workspace())
   }
 
-  async function handleCopyCollection(row) {
+  async function duplicateCollection(row, name) {
     const payload = {
-      name: `${row.name} (Copy)`,
+      name,
       category: row.category,
       year: row.year,
     }
@@ -1437,7 +1439,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
   function collectionRowActions(kind) {
     return (row) => [
       { key: 'open', label: 'Open', icon: FolderOpen, onClick: (item) => { setGameCard(null); setParent({ ...item, kind }) } },
-      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: handleCopyCollection }] : []),
+      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (row) => setDuplicateRequest({ onDuplicate: (name) => duplicateCollection(row, name) }) }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: (item) => handlePrintCollection(kind, item) },
       ...(writable ? [recordStatusAction(kind, row)] : []),
       ...(workspace.capabilities.delete ? [{ key: 'delete', label: 'Delete', icon: Trash2, destructive: true, onClick: handleDeleteCollection }] : []),
@@ -1678,9 +1680,8 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
     }, `Open ${result.name}`)
   }
 
-  async function handleCopyPlay(kind, parentId, row) {
-    row = await loadPlayDetails(kind, parentId, row)
-    if (!row) return
+  async function duplicatePlay(kind, parentId, row, name) {
+    row = kind === 'play' ? await api.getPlay(parentId, row.id) : await api.getScoutPlay(parentId, row.id)
     let groupingId
     if (kind === 'play') {
       const { items } = await api.listPlaybookRows(parentId)
@@ -1688,7 +1689,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
       groupingId = items.slice(0, rowIndex).reverse().find((item) => item.rowType === 'grouping')?.id
     }
     const payload = {
-      name: `${row.name} (Copy)`,
+      name,
       gameType: row.gameType || findPlayTemplate(row.template)?.gameType,
       ...(kind === 'scoutPlay' && { unit: row.unit }),
       template: row.template,
@@ -1798,7 +1799,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         setDesigner(null)
         setSlideshow({ kind: 'scoutPlay', parentId, id: item.id, name: item.name, category: 'Offense' })
       }, 'Open slideshow') }] : []),
-      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (r) => handleCopyPlay(kind, parentId, r) }] : []),
+      ...(writable ? [{ key: 'copy', label: 'Duplicate', icon: Copy, onClick: (row) => setDuplicateRequest({ onDuplicate: (name) => duplicatePlay(kind, parentId, row, name) }) }] : []),
       { key: 'print', label: 'Print...', icon: Printer, onClick: async (r) => {
         const play = await loadPlayDetails(kind, parentId, r)
         if (play) setPrintPlay({
@@ -2095,7 +2096,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           onAddGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks) ? (card, practices, practiceEventId) => setNewDialog({ target: 'gameCardItem', card, practices, practiceEventId }) : undefined}
           onOpenGameCardItem={handleOpenGameCardItem}
           onSlideshow={(card, item) => handleOpenGameCardItem(card, item, true)}
-          onDuplicateGameCardItem={handleDuplicateGameCardItem}
+          onDuplicateGameCardItem={(item) => setDuplicateRequest({ onDuplicate: (name) => duplicateGameCardItem(item, name) })}
           onDeleteGameCardItem={handleDeleteGameCardItem}
           canAddGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks)}
           canDuplicateGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks)}
@@ -2184,6 +2185,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
         onSaved={() => setAccountDialog(null)}
       />}
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+      {duplicateRequest && <DuplicateItemDialog onCancel={() => setDuplicateRequest(null)} onDuplicate={duplicateRequest.onDuplicate} />}
       {deleteConfirmation && <DeleteConfirmationDialog
         message={deleteConfirmation.message}
         onCancel={() => setDeleteConfirmation(null)}

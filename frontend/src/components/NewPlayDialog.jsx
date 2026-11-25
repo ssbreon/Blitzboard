@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { applyPlayerLabelOption, buildMarkersFromTemplate, DEFAULT_GAME_TYPE, gameTypeLabel, getTemplatesForGameType, PLAY_TEMPLATES } from '../utils/formations'
 import { DEFAULT_THEME_ID, PLAY_THEMES } from '../utils/themes'
-import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONES, fieldWindowForPlay, fitMarkersToWindow, isGreenZoneOnlyCategory, PLAY_PERSPECTIVES } from '../utils/playGeometry'
+import { DEFAULT_FIELD_ZONE, defaultPlayPerspective, FIELD_ZONE_LABELS, FIELD_ZONES, fieldWindowForPlay, fitMarkersToWindow, isGreenZoneOnlyCategory, PLAY_PERSPECTIVES } from '../utils/playGeometry'
 import { DialogCloseButton } from './DialogCloseButton'
 import { PlayFieldView } from './PlayFieldView'
 
@@ -223,7 +223,7 @@ export function NewPlayDialog({ open, titleLabel, titleIcon: TitleIcon, onCancel
                 <label className="dialog-field">
                   <span>Field Zone</span>
                   <select value={fieldZone} onChange={(event) => setFieldZone(event.target.value)}>
-                    {FIELD_ZONES.map((option) => <option key={option} value={option} disabled={isGreenZoneOnlyCategory(category) && option !== DEFAULT_FIELD_ZONE}>{option}</option>)}
+                    {FIELD_ZONES.map((option) => <option key={option} value={option} disabled={isGreenZoneOnlyCategory(category) && option !== DEFAULT_FIELD_ZONE}>{FIELD_ZONE_LABELS[option]}</option>)}
                   </select>
                 </label>
                 <label className="dialog-field">

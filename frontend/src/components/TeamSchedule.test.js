@@ -198,11 +198,11 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
     assert.deepEqual(duplicateScheduleEventPayload({
       id: 'event-1', name: 'Film Review', eventType: 'Film Review', eventDate: '2026-11-12',
       startTime: '15:30', endTime: '16:00', location: 'Film Room', notes: 'Third down', gamePlanIds: ['game-1'],
-    }), {
-      name: 'Film Review (Copy)', eventType: 'Film Review', eventDate: '2026-11-12',
+    }, 'Defense Film'), {
+      name: 'Defense Film', eventType: 'Film Review', eventDate: '2026-11-12',
       startTime: '15:30', endTime: '16:00', location: 'Film Room', notes: 'Third down', gamePlanIds: ['game-1'],
     })
-    assert.equal(duplicateScheduleEventPayload({ name: 'Practice', eventType: 'Practice', eventDate: '2026-11-12', dress: 'Uppers' }).dress, 'Uppers')
+    assert.equal(duplicateScheduleEventPayload({ name: 'Practice', eventType: 'Practice', eventDate: '2026-11-12', dress: 'Uppers' }, 'New Practice').dress, 'Uppers')
     const unitFilter = renderToStaticMarkup(createElement(GamePlanUnitFilter, { selectedUnits: ['Offense'], onToggle: () => {} }))
     assert.ok(unitFilter.includes('data-grid-category-filter gp-unit-filter'))
     assert.ok(unitFilter.includes('Offense'))
@@ -320,7 +320,8 @@ test('schedule periods, navigation and shared calendar rendering', async () => {
 
 test('duplicating a practice preserves an independent copy of its sheet', () => {
   const practiceSheet = { periods: [{ name: 'Team', activities: [{ name: 'Install' }] }] }
-  const copy = duplicateScheduleEventPayload({ name: 'Practice', eventType: 'Practice', eventDate: '2026-11-10', practiceSheet })
+  const copy = duplicateScheduleEventPayload({ name: 'Practice', eventType: 'Practice', eventDate: '2026-11-10', practiceSheet }, 'New Practice')
+  assert.equal(copy.name, 'New Practice')
   assert.deepEqual(copy.practiceSheet, practiceSheet)
   copy.practiceSheet.periods[0].activities[0].name = 'Changed'
   assert.equal(practiceSheet.periods[0].activities[0].name, 'Install')
