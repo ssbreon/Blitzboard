@@ -1948,10 +1948,10 @@ html.is-drilling-through * {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--border);
+  padding: 8px;
+  border: 1px solid #333333;
   border-radius: 6px;
-  background: var(--input-bg);
+  background: var(--gray-gutter);
 }
 
 .new-play-preview-field {
@@ -1964,11 +1964,12 @@ html.is-drilling-through * {
 
 .new-play-preview-name {
   overflow: hidden;
-  color: var(--text-h);
-  font-size: 13px;
+  color: whitesmoke;
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: center;
 }
 
 .new-play-actions {
