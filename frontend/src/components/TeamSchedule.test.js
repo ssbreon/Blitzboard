@@ -1,11 +1,55 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { createElement } from 'react'
+import { act, createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
+import { JSDOM } from 'jsdom'
 import { ScheduleView, defaultRelatedGameId, duplicateScheduleEventPayload, practiceGamePlans, practiceGamePlanRange, scheduleMonths, schedulePeriod, scheduleLoadPeriod, shiftScheduleDate, buildCalendarDays } from '../utils/scheduleCalendar.js'
 import { gamePreparation, generatedPracticeScriptPayload, linkableGamePlanActivities, nextPreparationActivity, scoutPlayName } from '../utils/gamePlanWorkspace.js'
+
+test('practice sheet cancel delegates unsaved changes to the shared guard', async () => {
+  const dom = new JSDOM('<!doctype html><div id="root"></div>', { url: 'http://localhost/' })
+  globalThis.window = dom.window
+  globalThis.document = dom.window.document
+  globalThis.MutationObserver = dom.window.MutationObserver
+  dom.window.HTMLElement.prototype.checkVisibility = () => true
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true
+  const { createRoot } = await import('react-dom/client')
+  const server = await createServer({ root: fileURLToPath(new URL('../../', import.meta.url)), optimizeDeps: { noDiscovery: true, include: [] }, server: { middlewareMode: true, watch: null, ws: false }, appType: 'custom' })
+  const root = createRoot(document.getElementById('root'))
+  let loads = 0
+  let guard
+  let leaveRequest
+  const api = { getScheduleEvent: async () => { loads += 1; return { name: 'Practice', startTime: '15:30', practiceSheet: { periods: [] } } } }
+
+  try {
+    const { PracticeSheet } = await server.ssrLoadModule('/src/components/PracticeSheet.jsx')
+    await act(async () => root.render(createElement(PracticeSheet, {
+      api, eventId: 'practice', canEdit: true, playbooks: [],
+      onGuardChange: (value) => { guard = value },
+      requestLeave: (action, title) => { leaveRequest = { action, title } },
+    })))
+    await act(async () => document.querySelector('.practice-plan-controls .primary-button').click())
+    assert.equal(guard.dirty, true)
+    await act(async () => [...document.querySelectorAll('.practice-plan-controls button')].find((button) => button.textContent === 'Cancel').click())
+    assert.equal(leaveRequest.title, 'Refresh Practice Sheet')
+    assert.equal(loads, 1)
+    assert.equal(document.querySelectorAll('.practice-period').length, 1)
+    await act(async () => leaveRequest.action())
+    assert.equal(loads, 2)
+    assert.equal(document.querySelectorAll('.practice-period').length, 0)
+    assert.equal(guard.dirty, false)
+  } finally {
+    await act(async () => root.unmount())
+    await server.close()
+    dom.window.close()
+    delete globalThis.window
+    delete globalThis.document
+    delete globalThis.MutationObserver
+    delete globalThis.IS_REACT_ACT_ENVIRONMENT
+  }
+})
 
 test('game preparation uses explicit activity links and preserves unassigned legacy scripts', () => {
   const events = [

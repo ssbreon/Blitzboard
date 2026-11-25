@@ -470,7 +470,7 @@ function AddPlaysDialog({ api, category, installedPlays, onCancel, onAdd }) {
   </div>
 }
 
-function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showFreePlanUpgrade = false, onFreePlanUpgrade, upgradeBannerArea = 'gamePlan', locationSuggestions = [], suggestionLists = {}, scoutingTendencies = {} }) {
+function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onParentUpdated, updateParent, api, title, rowIcon, rowType, fetchRows, reloadToken, busy, onReorder, onNew, onNewGrouping, onEditGrouping, onDeleteGrouping, newLabel, onOpenPlay, onPrintAll, onSlideshow, rowActions, onGuardChange, requestLeave, readOnly, timezone, breadcrumbSettingsTarget, openSettingsOnMount = false, onSettingsClosed, gameCard, gamePlanUnit, gamePlanTab, onAddGameCardItem, onOpenGameCardItem, onDuplicateGameCardItem, onDeleteGameCardItem, canAddGameCardItem, canDuplicateGameCardItem, canDeleteGameCardItem, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken, showFreePlanUpgrade = false, onFreePlanUpgrade, upgradeBannerArea = 'gamePlan', locationSuggestions = [], suggestionLists = {}, scoutingTendencies = {} }) {
   const isGamePlan = parentRecord.kind === 'gamePlan'
   const installMode = !isGamePlan && Boolean(parentRecord.gameCardId) && gameCard?.tab === 'installs'
   const selectedUnit = isGamePlan ? gamePlanUnit : gameCard?.unit || 'Offense'
@@ -894,7 +894,7 @@ function PlaysDrillthroughView({ active = true, parentRecord, parentLabel, onPar
         onDuplicate={onDuplicateGameCardItem} onDelete={onDeleteGameCardItem}
         onNewReport={onNew} onOpenReport={onOpenPlay} reportActions={rowActions}
         scoutingTendencies={scoutingTendencies}
-        practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onPrintPracticeAttachments={onPrintPracticeAttachments} practiceSheetRevisionToken={practiceSheetRevisionToken}
+        practiceId={practiceId} practiceBreadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onOpenPractice={onOpenPractice} onGuardChange={onGuardChange} requestLeave={requestLeave} onPracticeLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onPrintPracticeAttachments={onPrintPracticeAttachments} practiceSheetRevisionToken={practiceSheetRevisionToken}
         />
       </> : <>
       {isGamePlan && gameCard && <header className="schedule-game-card-page-header"><h2>{gameCard.title}</h2><p>{gameCard.description}</p></header>}
@@ -2102,6 +2102,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
           canDuplicateGameCardItem={writable && hasQuotaCapacity(workspace.usage.playbooks, workspace.limits.playbooks)}
           canDeleteGameCardItem={workspace.capabilities.delete}
           practiceId={practice?.source === 'game' ? practice.id : null}
+          requestLeave={requestLeave}
           practiceBreadcrumbSettingsTarget={practice && !designer && !slideshow && !cardPlaybook ? breadcrumbSettingsTarget : null}
           onOpenPractice={(event) => setPractice({ id: event.id, name: event.name, source: 'game' })}
           onPracticeLoaded={handlePracticeLoaded}
@@ -2131,6 +2132,7 @@ function WorkspaceApp({ authUser, workspace, api, onWorkspaceChange, onUserUpdat
             onOpenGame={(game) => { setGameCard(null); setGamePlanTab('overview'); setParent({ ...game, kind: 'gamePlan' }) }}
             onWorkspaceUpdated={() => api.workspace().then(onWorkspaceUpdated)}
             practiceId={practice?.source === 'schedule' ? practice.id : null}
+            requestLeave={requestLeave}
             practiceBreadcrumbSettingsTarget={practice && !designer && !slideshow && !cardPlaybook ? breadcrumbSettingsTarget : null}
             onOpenPractice={(event) => setPractice({ id: event.id, name: event.name, source: 'schedule' })}
             onClosePractice={() => setPractice(null)}

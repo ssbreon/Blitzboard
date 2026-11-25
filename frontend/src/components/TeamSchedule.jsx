@@ -343,7 +343,7 @@ export function YearCalendar({ date, eventsByDate, onSelectMonth }) {
   </div>
 }
 
-export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, locationSuggestions = [], periodSuggestions = [], practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
+export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, canDelete, canCreateGame, onCreateGame, onOpenGame, onWorkspaceUpdated, locationSuggestions = [], periodSuggestions = [], practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onClosePractice, onGuardChange, requestLeave, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onOpenScript, onCreatePracticeScript, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
   const cacheVersion = useSyncExternalStore(api.breadcrumbCache.subscribe, api.breadcrumbCache.getSnapshot)
   const [calendarDate, setCalendarDate] = useState(() => new Date())
   const [mode, setMode] = useState(savedScheduleView)
@@ -570,7 +570,7 @@ export function TeamSchedule({ api, displayMode, onDisplayModeChange, canEdit, c
   }
 
   if (practiceId) return <main className="team-schedule">
-    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} periodSuggestions={periodSuggestions} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onPrintAttachments={onPrintPracticeAttachments} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={canEdit} periodSuggestions={periodSuggestions} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} requestLeave={requestLeave} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={onCreateScoutPlay} onOpenScoutPlay={onOpenScoutPlay} onOpenScript={onOpenScript} onCreatePracticeScript={onCreatePracticeScript} onPrintAttachments={onPrintPracticeAttachments} onEditEvent={(event) => setDialog({ event: { ...event, kind: 'event' } })} onSaved={() => { setRefresh((value) => value + 1); onWorkspaceUpdated?.() }} />
     {dialog && <ScheduleEventDialog api={api} initialEvent={dialog.event} canEdit={canEdit} canCreateGame={canCreateGame} canDelete={canDelete} locationSuggestions={locationSuggestions} onCancel={() => setDialog(null)} onSave={saveEvent} onDelete={() => setEventToDelete(dialog.event)} />}
     {eventToDelete && <DeleteConfirmationDialog message={`Are you sure you want to delete "${eventToDelete.name}"? This cannot be undone.`} onCancel={() => setEventToDelete(null)} onConfirm={async () => { await removeEvent(eventToDelete); setEventToDelete(null); onClosePractice() }} />}
   </main>

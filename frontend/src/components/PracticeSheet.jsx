@@ -51,7 +51,7 @@ export function practicePeriodGroupBreakdown(period = {}) {
 }
 
 // Render the practice plan and manage its editing, loading, and save lifecycle.
-export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, onEventLoaded, playbooks, playbooksLoading = false, onCreatePracticeScript, onOpenScript, onPrintAttachments }) {
+export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], breadcrumbSettingsTarget, onEditEvent, onSaved, onGuardChange, requestLeave, onEventLoaded, playbooks, playbooksLoading = false, onCreatePracticeScript, onOpenScript, onPrintAttachments }) {
   const [event, setEvent] = useState(null)
   const [sheet, setSheet] = useState({ periods: [] })
   const [dirty, setDirty] = useState(false)
@@ -62,6 +62,8 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
   const [menuOpen, setMenuOpen] = useState(false)
   const [activityToDelete, setActivityToDelete] = useState(null)
   const menuRef = useRef(null)
+  const periodListRef = useRef(null)
+  const pendingPeriodScrollRef = useRef(null)
   const [schedulePlaybooks, setSchedulePlaybooks] = useState([])
   const [loadingPlaybooks, setLoadingPlaybooks] = useState(false)
   const [attachmentDialogOpen, setAttachmentDialogOpen] = useState(false)
@@ -160,6 +162,20 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     setDirty(true)
   }
 
+  function addPeriod() {
+    const period = periods.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')
+    pendingPeriodScrollRef.current = period.id
+    changePeriods((current) => [...current, period])
+  }
+
+  function scrollNewPeriodIntoView(element, periodId) {
+    if (!element || pendingPeriodScrollRef.current !== periodId || !periodListRef.current) return
+    const list = periodListRef.current
+    const overflow = element.getBoundingClientRect().bottom - list.getBoundingClientRect().bottom
+    if (overflow > 0) list.scrollTop += overflow
+    pendingPeriodScrollRef.current = null
+  }
+
   function changePeriod(index, patch) {
     changePeriods((periods) => {
       const next = periods.map((period, current) => current === index ? { ...period, ...patch } : period)
@@ -229,14 +245,9 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     return false
   }
 
-  function leave(action) {
-    // Refresh and event editing both replace the current view, so guard them when edits are pending.
-    if (!dirty || window.confirm('Discard unsaved practice sheet changes?')) action()
-  }
-
   function refreshPractice() {
     setMenuOpen(false)
-    leave(() => setRevision((value) => value + 1))
+    requestLeave(() => setRevision((value) => value + 1), 'Refresh Practice Sheet')
   }
 
   if (!event) return <section className="practice-sheet"><ErrorDialog error={error} message="We couldn't load this practice." />{error ? <button type="button" className="secondary-button" onClick={() => setRevision((value) => value + 1)}>Retry</button> : <LoadingIndicator label="Loading practice..." />}</section>
@@ -357,7 +368,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     finally { setBusy(false) }
   }
   return <section className="practice-sheet" aria-label="Practice sheet" aria-busy={busy}>
-    {canEdit && breadcrumbSettingsTarget && createPortal(<button type="button" className="breadcrumb-settings breadcrumb-settings-icon-only" onClick={() => leave(() => onEditEvent(event))} disabled={busy} title="Edit Event" aria-label="Edit Event"><Pencil size={18} aria-hidden="true" /></button>, breadcrumbSettingsTarget)}
+    {canEdit && breadcrumbSettingsTarget && createPortal(<button type="button" className="breadcrumb-settings breadcrumb-settings-icon-only" onClick={() => requestLeave(() => onEditEvent(event), 'Edit Event')} disabled={busy} title="Edit Event" aria-label="Edit Event"><Pencil size={18} aria-hidden="true" /></button>, breadcrumbSettingsTarget)}
     <header className="practice-sheet-header">
       <div className="practice-sheet-header-details"><p className="practice-sheet-eyebrow">Practice Sheet</p><h1>{event.name}</h1><div className="practice-sheet-header-meta-overlay"><p className="practice-sheet-meta"><CalendarDays size={16} /><span>{practiceSheetDateLabel(event.eventDate)}</span>{(event.startTime || event.endTime) && <span>{event.startTime && practiceSheetTimeLabel(event.startTime)}{event.startTime && event.endTime && ' - '}{!event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}{event.startTime && event.endTime && practiceSheetTimeLabel(event.endTime)}</span>}{event.location && <span>at {event.location}</span>}</p>{(event.dress || event.notes) && <div className="practice-sheet-dress-row">{event.dress && <p className="practice-sheet-dress"><strong>Dress</strong><span>{event.dress}</span></p>}{event.notes && <p className="practice-sheet-event-notes" title={event.notes}><strong>Notes</strong><span>{event.notes}</span></p>}</div>}</div></div>
     </header>
@@ -374,14 +385,14 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
     <div className="practice-sheet-body">
     <div className="practice-sheet-content">
       <datalist id="practice-period-suggestions">{periodSuggestions.map((value) => <option key={value} value={value} />)}</datalist>
-      <div className="practice-sheet-section-heading practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={() => changePeriods((current) => [...current, current.length ? newPeriod(practicePeriodEndTime(lastPeriod?.startTime, lastPeriod?.duration)) : newPeriod(defaultPracticePeriodStart(event.startTime), '15', 'STRETCH')])} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
+      <div className="practice-sheet-section-heading practice-plan-controls">{canEdit && practicePlanView === 'planning' && <button type="button" className="primary-button" title={canAddPeriod ? 'Add period' : 'Set the previous period Start and Minutes first'} onClick={addPeriod} disabled={busy || !canAddPeriod}><Plus size={16} />Add Period</button>}<div className="toolbar-menu practice-plan-menu" ref={menuRef}>
         <button type="button" className="hamburger-button" aria-label="Practice Plan options" aria-haspopup="true" aria-expanded={menuOpen} title="Practice Plan options" onClick={() => setMenuOpen((open) => !open)}><Menu size={19} aria-hidden="true" /></button>
         {menuOpen && <div className="toolbar-dropdown data-grid-toolbar-dropdown practice-plan-dropdown" role="menu" aria-label="Practice Plan options"><div className="data-grid-menu-panes">
           <div className="data-grid-status-filter" role="group" aria-label="Practice Plan view"><div className="account-menu-section-label">View</div>{[{ id: 'planning', label: 'Planning View', icon: ClipboardList }, { id: 'grid', label: 'Grid View', icon: Table2 }].map(({ id, label, icon: Icon }) => <button key={id} type="button" role="menuitemradio" className="menu-item-radio" aria-checked={practicePlanView === id} onClick={() => { setPracticePlanView(id); setMenuOpen(false) }}><Icon size={16} className="data-grid-option-icon" aria-hidden="true" /><span>{label}</span><Check size={16} className="data-grid-status-check" aria-hidden="true" /></button>)}</div>
           <div className="data-grid-menu-actions" role="group" aria-label="Practice Plan actions"><div className="account-menu-section-label">Actions</div><button type="button" role="menuitem" className="menu-item" onClick={refreshPractice}><RefreshCw className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Refresh</span></button><button type="button" role="menuitem" className="menu-item" onClick={requestPrintSheet}><Printer className="menu-item-icon" aria-hidden="true" /><span className="data-grid-menu-action-label">Print Sheet...</span></button></div>
         </div></div>}
       </div>{canEdit && <button type="button" className="secondary-button" onClick={refreshPractice} disabled={!dirty || busy}>Cancel</button>}{canEdit && <button type="button" className="primary-button" onClick={save} disabled={!dirty || busy}><Save size={16} />{busy ? 'Saving...' : 'Save Sheet'}</button>}</div>
-      {practicePlanView === 'grid' ? <DataGrid title="Practice Plan" rowIcon={Clock3} rowType="Period" columns={gridColumns} items={gridRows} compact hideToolbar hidePager /> : <>
+      {practicePlanView === 'grid' ? <DataGrid title="Practice Plan" rowIcon={Clock3} rowType="Period" columns={gridColumns} items={gridRows} compact hideToolbar hidePager /> : <div className="practice-period-list" ref={periodListRef}>
       {!periods.length && <p className="practice-sheet-empty">No periods added.</p>}
       {periods.map((period, periodIndex) => {
         const periodId = period.id || String(periodIndex)
@@ -400,7 +411,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
           { key: 'name', header: 'Activity', render: (value, row) => <><input aria-label={`Activity for period ${periodIndex + 1} row ${row.activityIndex + 1}`} value={value || ''} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { name: input.target.value })} /><span className="practice-print-value">{value || '-'}</span></> },
           { key: 'coach', header: 'Coach', render: (value, row) => <><input aria-label={`Coach for period ${periodIndex + 1} activity ${row.activityIndex + 1}`} value={value || ''} disabled={!canEdit || busy} onChange={(input) => changeActivity(periodIndex, row.activityIndex, { coach: input.target.value })} /><span className="practice-print-value">{value || '-'}</span></> },
         ]
-        return <section className={`practice-period${periodDropTarget?.id === periodId ? periodDropTarget.after ? ' is-drop-after' : ' is-drop-before' : ''}`} key={periodId} aria-label={`Period ${periodIndex + 1}`} onDragOver={(event) => dragPeriodOver(event, periodIndex, periodId)} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPeriodDropTarget(null) }} onDrop={(event) => dropPeriod(event, periodIndex)}>
+        return <section className={`practice-period${periodDropTarget?.id === periodId ? periodDropTarget.after ? ' is-drop-after' : ' is-drop-before' : ''}`} key={periodId} ref={(element) => scrollNewPeriodIntoView(element, periodId)} aria-label={`Period ${periodIndex + 1}`} onDragOver={(event) => dragPeriodOver(event, periodIndex, periodId)} onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setPeriodDropTarget(null) }} onDrop={(event) => dropPeriod(event, periodIndex)}>
         <div className="practice-period-heading">
           <span className="practice-period-number">{String(periodIndex + 1).padStart(2, '0')}</span>
           <button type="button" className="practice-period-drag-handle" aria-label={`Drag period ${periodIndex + 1}`} title="Drag to reorder period" draggable={canEdit && !busy} disabled={!canEdit || busy} onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', periodId); setDraggingPeriodId(periodId); setPeriodDropTarget(null) }} onDragEnd={finishPeriodDrag}><GripVertical size={17} aria-hidden="true" /></button>
@@ -425,7 +436,7 @@ export function PracticeSheet({ api, eventId, canEdit, periodSuggestions = [], b
         </div>
         </div>
       </section>})}
-      </>}
+      </div>}
     </div>
     <aside className="gp-overview-sidebar practice-sheet-sidebar" aria-label="Attachments">
       <section className="gp-section practice-attachments-section"><header><p className="gp-eyebrow">ATTACHMENTS</p>{canEdit && <button type="button" className="secondary-button practice-sheet-attach-button" onClick={openAttachmentDialog} disabled={busy || loadingPlaybooks || playbooksLoading}><Paperclip size={16} />Attach Script or Install</button>}</header>

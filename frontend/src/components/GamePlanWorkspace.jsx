@@ -42,7 +42,7 @@ export function GamePlanUnitFilter({ selectedUnits, onToggle }) {
   })}</div>
 }
 
-export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, scoutingTendencies = {}, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
+export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate, canDuplicate, canDelete, cards, onAdd, onOpen, onSlideshow, onDuplicate, onDelete, onNewReport, onOpenReport, reportActions, scoutingTendencies = {}, practiceId, practiceBreadcrumbSettingsTarget, onOpenPractice, onGuardChange, requestLeave, onPracticeLoaded, onCreateScoutPlay, onOpenScoutPlay, onPrintPracticeAttachments, practiceSheetRevisionToken }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
   const [revision, setRevision] = useState(0)
@@ -180,7 +180,7 @@ export function GamePlanWorkspace({ api, game, reloadToken, readOnly, canCreate,
   }
 
   if (practiceId) return <section className="gp-workspace">
-    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={!readOnly} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={(request) => onCreateScoutPlay?.({ ...request, gamePlanId: game.id })} onCreatePracticeScript={canCreate ? (practiceEventId) => addItem('scout', practiceEventId) : undefined} onOpenScoutPlay={onOpenScoutPlay} onEditEvent={setActivityDialog} onSaved={() => setRevision((value) => value + 1)} playbooks={practicePlaybooks} playbooksLoading={!data} onOpenScript={(item) => onOpen(cardFor(item), item)} onPrintAttachments={onPrintPracticeAttachments} />
+    <PracticeSheet key={`${practiceId}-${practiceRevision}-${practiceSheetRevisionToken}`} api={api} eventId={practiceId} canEdit={!readOnly} breadcrumbSettingsTarget={practiceBreadcrumbSettingsTarget} onGuardChange={onGuardChange} requestLeave={requestLeave} onEventLoaded={onPracticeLoaded} onCreateScoutPlay={(request) => onCreateScoutPlay?.({ ...request, gamePlanId: game.id })} onCreatePracticeScript={canCreate ? (practiceEventId) => addItem('scout', practiceEventId) : undefined} onOpenScoutPlay={onOpenScoutPlay} onEditEvent={setActivityDialog} onSaved={() => setRevision((value) => value + 1)} playbooks={practicePlaybooks} playbooksLoading={!data} onOpenScript={(item) => onOpen(cardFor(item), item)} onPrintAttachments={onPrintPracticeAttachments} />
     {activityDialog && <ScheduleEventDialog api={api} initialEvent={activityDialog} canEdit={!readOnly} canCreateGame={false} canDelete={false} onCancel={() => setActivityDialog(null)} onSave={async (payload) => {
       await api.updateScheduleEvent(activityDialog.id, payload)
       setActivityDialog(null)

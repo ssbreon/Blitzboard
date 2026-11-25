@@ -9,8 +9,8 @@
 .practice-sheet-dress { display: flex; flex: none; align-items: baseline; gap: 8px; margin: 0; color: #e5edf5; font-size: 14px; }
 .practice-sheet-dress strong { color: #fff; }
 @media (max-width: 700px) { .practice-sheet-header { grid-template-columns: minmax(0, 1fr); } }
-.practice-sheet-content { flex: 1; min-width: 0; min-height: 0; width: 100%; padding: 6px; overflow: auto; box-sizing: border-box; background:var(--form-bg) }
-.practice-sheet-content:has(> .data-grid-compact) { display: flex; flex-direction: column; }
+.practice-sheet-content { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; width: 100%; padding: 6px; overflow: hidden; box-sizing: border-box; background:var(--form-bg) }
+.practice-period-list { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
 .practice-sheet-event-notes { display: flex; flex: 0 1 auto; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; margin: 0; overflow: hidden; color: #e5edf5; font-size: 14px; white-space: nowrap; }
 .practice-sheet-event-notes strong { flex: none; color: #fff; }
 .practice-sheet-event-notes span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -58,7 +58,7 @@
 .practice-grid-activity-coach { color: var(--text); font-size: 12px; }
 .practice-grid-activity-empty { color: var(--text); }
 .practice-sheet-content > .data-grid-compact .data-grid-table td:nth-child(4) { vertical-align: top; }
-@media (max-width: 700px) { .practice-sheet-body { flex-direction: column; overflow-y: auto; } .practice-sheet-body > .practice-sheet-content { flex: none; overflow: visible; } .practice-sheet-sidebar { flex: none; width: auto; overflow: visible; border-left: 0; border-top: 4px solid var(--navy-light); padding: 16px; } }
+@media (max-width: 700px) { .practice-sheet-body { flex-direction: column; } .practice-sheet-sidebar { flex: 0 1 auto; box-sizing: border-box; width: auto; max-height: 35%; overflow: auto; border-left: 0; border-top: 4px solid var(--navy-light); padding: 16px; } }
 .practice-activities-grid { min-width: 0; }
 .practice-activities-grid-toolbar { padding: 6px 8px; }
 .practice-activities-grid > .data-grid { min-width: 0; flex: 0 0 auto; }
@@ -102,6 +102,7 @@
 	.practice-sheet-header { flex: none; }
 	.practice-sheet-body { display: block; }
 	.practice-sheet-content { display: block; width: auto; max-width: none; min-height: 0; overflow: visible; margin: 0 auto; }
+	.practice-period-list { overflow: visible; }
 	.practice-sheet-sidebar, .practice-plan-menu, .practice-period-tools, .practice-period-drag-handle, .practice-activity-tools, .practice-add-activity, .practice-sheet-section-heading button, .practice-sheet input, .practice-sheet select, .practice-sheet textarea { display: none !important; }
 	.practice-period-content[hidden] { display: block !important; }
 	.practice-print-value { display: block; color: black; font-size: 14px; font-weight: 400; white-space: pre-wrap; overflow-wrap: anywhere; }
