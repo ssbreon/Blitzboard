@@ -313,7 +313,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
                 className={`app-bar-link${activeView === 'playbooks' ? ' active' : ''}`}
                 onClick={(event) => navigate(event, 'playbooks')}
               >
-                <LibraryBig size={17} strokeWidth={1.8} aria-hidden="true" />
+                <LibraryBig size={20} strokeWidth={1.8} aria-hidden="true" />
                 Playbooks
               </a>
               <a
@@ -321,7 +321,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
                 className={`app-bar-link${activeView === 'teamSchedule' ? ' active' : ''}`}
                 onClick={(event) => navigate(event, 'teamSchedule')}
               >
-                <CalendarDays size={17} strokeWidth={1.8} aria-hidden="true" />
+                <CalendarDays size={20} strokeWidth={1.8} aria-hidden="true" />
                 Schedule
               </a>
             </>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BookOpen, BookOpenCheck, CalendarDays, ClipboardList, ScanSearch, Search, X } from 'lucide-react'
 import { DataGrid } from './DataGrid'
 import { ErrorDialog } from './ErrorDialog'
@@ -20,12 +20,31 @@ export function GlobalSearch({ api, onOpen, disabled }) {
   const [result, setResult] = useState({ query: '', items: [], loading: false, error: null })
   const containerRef = useRef(null)
   const inputRef = useRef(null)
+  const resultsRef = useRef(null)
   const term = query.trim()
   const searchKey = term
   const waitingForDebounce = Boolean(term) && result.query !== searchKey
   const loading = Boolean(term) && result.query === searchKey && result.loading
   const showResults = open && Boolean(term) && !waitingForDebounce && !loading && !result.error
     && (result.items.length > 0 || result.truncated)
+
+  useLayoutEffect(() => {
+    if (!showResults) return undefined
+    const results = resultsRef.current
+    function resizeResults() {
+      results.style.width = window.innerWidth > 1100
+        ? `${document.documentElement.clientWidth - results.getBoundingClientRect().left}px`
+        : ''
+    }
+    resizeResults()
+    window.addEventListener('resize', resizeResults)
+    const observer = new ResizeObserver(resizeResults)
+    observer.observe(containerRef.current)
+    return () => {
+      window.removeEventListener('resize', resizeResults)
+      observer.disconnect()
+    }
+  }, [showResults])
 
   useEffect(() => {
     if (!term || !open) return undefined
@@ -74,7 +93,7 @@ export function GlobalSearch({ api, onOpen, disabled }) {
     </div>
     <ErrorDialog error={result.error} message="We couldn't search right now. Please try again." />
     {open && term && loading && !result.error && <LoadingIndicator compact label="Searching..." className="global-search-loading-anchor" />}
-    {showResults && <div id="global-search-results" className="global-search-results" role="dialog" aria-label="Search results" tabIndex={-1}>
+    {showResults && <div id="global-search-results" ref={resultsRef} className="global-search-results" role="dialog" aria-label="Search results" tabIndex={-1}>
       <p className="sr-only" role="status">{result.items.length} results</p>
       {result.truncated && <p className="data-grid-status" role="status">Showing the first {result.limit} of {result.total} matches. Refine your search.</p>}
       <DataGrid key={searchKey} title="Search results" columns={COLUMNS} items={result.items} compact suppressOpenHint getRowIcon={(row) => ICONS[row.type] || BookOpen} onRowClick={openRow} busy={disabled} />

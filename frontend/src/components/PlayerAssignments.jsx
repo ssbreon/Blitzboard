@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ClipboardList, ExternalLink, GripVertical, PanelBottom } from 'lucide-react'
+import { ClipboardList, ExternalLink, GripVertical, PanelBottom, X } from 'lucide-react'
 import { assignmentPanelPosition, assignmentPlayers, assignmentTeam } from '../utils/playerAssignments'
 
 export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open, markers, selectedMarkerId, parentCategory, readOnly, saving, undocked, onUndockedChange, onOpenChange, onSelectMarker, onChange, onAlignmentChange }) {
@@ -171,6 +171,9 @@ export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open
           <button type="button" aria-label="Pop out player assignments" title="Open assignments as a movable panel" aria-pressed={undocked} onClick={undock}>
             <ExternalLink size={16} aria-hidden="true" />
             <span>Pop out</span>
+          </button>
+          <button className="play-assignments-close" type="button" aria-label="Close player assignments" title="Close assignments" onClick={() => anchorRef.current?.click()}>
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
       </header>
