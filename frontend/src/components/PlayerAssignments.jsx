@@ -3,12 +3,12 @@ import { createPortal } from 'react-dom'
 import { ClipboardList, ExternalLink, GripVertical, PanelBottom, X } from 'lucide-react'
 import { assignmentPanelPosition, assignmentPlayers, assignmentTeam } from '../utils/playerAssignments'
 
-export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open, markers, selectedMarkerId, parentCategory, readOnly, saving, undocked, onUndockedChange, onOpenChange, onSelectMarker, onChange, onAlignmentChange }) {
+export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open, markers, selectedMarkerId, parentCategory, perspective, readOnly, saving, undocked, onUndockedChange, onOpenChange, onSelectMarker, onChange, onAlignmentChange }) {
   const [position, setPosition] = useState({ x: 12, y: 12 })
   const [popoverPosition, setPopoverPosition] = useState({ left: 12, top: 12, pointerX: 32, pointerSide: 'bottom' })
   const dragRef = useRef(null)
   const wasUndockedRef = useRef(false)
-  const rows = assignmentPlayers(markers, parentCategory)
+  const rows = assignmentPlayers(markers, parentCategory, perspective)
 
   useLayoutEffect(() => {
     if (!open || !selectedMarkerId) return
@@ -214,7 +214,7 @@ export function PlayerAssignments({ id, sectionRef, anchorRef, fieldHeight, open
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={3}>No {assignmentTeam(parentCategory)} players on this play.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={3}>No {assignmentTeam(parentCategory, perspective)} players on this play.</td></tr>}
           </tbody>
         </table>
       </div>

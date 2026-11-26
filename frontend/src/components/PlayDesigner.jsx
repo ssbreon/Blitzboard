@@ -1389,7 +1389,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   const selectedZone = zones.find((zone) => zone.id === selectedZoneId)
   const zoneAppearanceVisible = Boolean(selectedZone && activeTool === 'select')
   const isEmpty = markers.length === 0 && allDrawings.length === 0 && textAnnotations.length === 0 && zones.length === 0
-  const assignmentsAvailable = record.kind === 'play' && Boolean(assignmentTeam(record.parentCategory))
+  const assignmentsAvailable = record.kind === 'play' && Boolean(assignmentTeam(record.parentCategory, perspective))
 
   function changeScoutingTendency(index, key, value) {
     setScoutingTendencies((current) => current.map((row, rowIndex) => rowIndex === index ? { ...row, [key]: value } : row))
@@ -2660,6 +2660,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
           selectedMarkerId={selectedId}
           onSelectMarker={selectAssignmentMarker}
           parentCategory={record.parentCategory}
+          perspective={perspective}
           readOnly={readOnly}
           saving={saving}
           undocked={assignmentsUndocked}

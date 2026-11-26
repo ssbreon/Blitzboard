@@ -1,11 +1,15 @@
-export function assignmentTeam(parentCategory) {
+import { PLAY_PERSPECTIVES } from './playGeometry.js'
+
+export function assignmentTeam(parentCategory, perspective) {
   if (parentCategory === 'Offense') return 'offense'
   if (parentCategory === 'Defense') return 'defense'
+  if (parentCategory === 'Special Teams' && perspective === PLAY_PERSPECTIVES[0]) return 'defense'
+  if (parentCategory === 'Special Teams' && perspective === PLAY_PERSPECTIVES[1]) return 'offense'
   return null
 }
 
-export function assignmentPlayers(markers, parentCategory) {
-  const team = assignmentTeam(parentCategory)
+export function assignmentPlayers(markers, parentCategory, perspective) {
+  const team = assignmentTeam(parentCategory, perspective)
   if (!team) return []
   return (markers || []).filter((marker) => (marker.team || 'offense') === team)
 }
