@@ -399,7 +399,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
   })
 
   const canUndoDrawing =
-    isDirty && drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
+    drawHistory.some((entry) => (drawings[entry.type] || []).some((drawing) => drawing.id === entry.id))
   const canRedoDrawing = redoHistory.length > 0
 
   // Snapshot the active design and its current name or adjustment title.
