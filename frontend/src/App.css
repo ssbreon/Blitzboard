@@ -1310,8 +1310,8 @@ html.is-drilling-through * {
 }
 
 .play-designer-marker {
-  --marker-size: max(4px, 2.38cqi);
-  --marker-font-size: max(3px, 1.4cqi);
+  --marker-size: max(12px, 2.38cqi);
+  --marker-font-size: max(8px, 1.4cqi);
 
   position: absolute;
   z-index: 2;
@@ -1959,7 +1959,6 @@ html.is-drilling-through * {
   flex: none;
   min-height: 0;
   margin-inline: auto;
-  border-radius: 4px;
 }
 
 .new-play-preview-name {

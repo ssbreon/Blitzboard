@@ -206,7 +206,10 @@ class Storage:
 
     def delete(self, entity_type, item_id):
         workspace = request_workspace.get()
-        counted = workspace and entity_type in accounts.LIMITS and self.get(entity_type, item_id) is not None
+        record = self.get(entity_type, item_id)
+        counted = workspace and entity_type in accounts.LIMITS and record is not None
+        if entity_type == "playbooks":
+            counted = counted and not record.get("gameCardId")
         if counted:
             self.usage_counts(workspace)
         if self.container:
@@ -218,14 +221,18 @@ class Storage:
 
     def usage_counts(self, workspace):
         workspace_id = workspace["id"]
+        counts = accounts.count_usage(self, workspace)
         if self.container:
             try:
-                return self.container.read_item(item="usage", partition_key=workspace_id)
+                ledger = self.container.read_item(item="usage", partition_key=workspace_id)
+                if ledger["counts"] != counts:
+                    ledger["counts"] = counts
+                    return self.container.replace_item(item="usage", body=ledger, etag=ledger["_etag"], match_condition=MatchConditions.IfNotModified)
+                return ledger
             except ResourceNotFoundError:
-                counts = {entity: len(self.list(entity, workspace_id=workspace_id)) for entity in accounts.LIMITS}
                 return self.container.create_item({"id": "usage", "entityType": "workspaceUsage", "partitionKey": workspace_id, "counts": counts})
         if workspace_id not in self.usage:
-            self.usage[workspace_id] = {"counts": {entity: len(self.list(entity, workspace_id=workspace_id)) for entity in accounts.LIMITS}}
+            self.usage[workspace_id] = {"counts": counts}
         return self.usage[workspace_id]
 
     def adjust_usage(self, workspace, entity_type, delta):
@@ -536,7 +543,8 @@ def create_record(entity_type, payload, owner_id, parent_id=None):
         siblings = renumber_pages(entity_type, paged_siblings(entity_type, parent_id))
         payload["page"] = len(siblings) + 1
     workspace = request_workspace.get()
-    if workspace and entity_type in accounts.LIMITS:
+    counted_playbook = entity_type != "playbooks" or not payload.get("gameCardId")
+    if workspace and entity_type in accounts.LIMITS and counted_playbook:
         storage.adjust_usage(workspace, entity_type, 1)
     item_id = str(uuid4())
     record = {**payload, "id": item_id, "ownerId": owner_id, "createdAt": now(), "updatedAt": now()}
@@ -563,10 +571,16 @@ def update_record(entity_type, item_id, payload):
         if expected_etag != record.get("_etag"):
             raise accounts.AccountError("RECORD_CHANGED", "This record has been changed by another person or process. Your changes have not been saved. Reopen the record to load the latest version before trying again.", 412)
         record["_etag"] = expected_etag
+    was_counted = entity_type == "playbooks" and not record.get("gameCardId")
     immutable_fields = {"id", "ownerId", "workspaceId", "createdBy", "parentId", "entityType", "partitionKey", "createdAt", "page", "_etag", "_rid", "_self", "_ts", "_attachments"}
     record.update({key: value for key, value in payload.items()
                    if key not in immutable_fields and not (entity_type in {"playbooks", "scoutPlays"} and key == "workflowStatus")})
     record["updatedAt"] = now()
+    workspace = request_workspace.get()
+    if workspace and entity_type == "playbooks":
+        is_counted = not record.get("gameCardId")
+        if was_counted != is_counted:
+            storage.adjust_usage(workspace, entity_type, 1 if is_counted else -1)
     return response(storage.save(entity_type, record))
 
 

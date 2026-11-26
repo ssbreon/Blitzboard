@@ -120,6 +120,17 @@ def limits_for_workspace(workspace):
     return TEAM_LIMITS if plan == "team" else LIMITS
 
 
+def count_usage(storage, workspace):
+    workspace_id = workspace["id"]
+    return {
+        entity: len([
+            record for record in storage.list(entity, workspace_id=workspace_id)
+            if entity != "playbooks" or not record.get("gameCardId")
+        ])
+        for entity in limits_for_workspace(workspace)
+    }
+
+
 class AccountError(Exception):
     def __init__(self, code, message, status=400):
         super().__init__(message)
@@ -461,7 +472,7 @@ def summary(storage, workspace, role):
                                "manageTeam": workspace["kind"] == "team" and Permission.WORKSPACE_SETTINGS in permissions,
                                "billing": has_permission(role, Permission.WORKSPACE_SETTINGS)}}
     limits = limits_for_workspace(workspace)
-    public["usage"] = {entity: len(storage.list(entity, workspace_id=workspace["id"])) for entity in limits}
+    public["usage"] = count_usage(storage, workspace)
     public["limits"] = dict(limits)
     public["seatLimit"] = TEAM_SEAT_LIMIT if workspace["kind"] == "team" else 1
     public["seatsUsed"] = sum(member["workspaceId"] == workspace["id"] for member in storage.list("memberships")) + len(pending_invites(storage, workspace["id"]))

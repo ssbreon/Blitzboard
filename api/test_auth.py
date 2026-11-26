@@ -1114,6 +1114,32 @@ class AuthenticationTests(unittest.TestCase):
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "First"}).status_code, 201)
             self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Over limit"}).status_code, 409)
 
+    def test_installs_and_practice_scripts_do_not_count_as_playbooks(self):
+        with patch.dict(function_app.accounts.FREE_LIMITS, {"playbooks": 1}):
+            book = response_json(call_api("POST", "playbooks", "free-coach", {"name": "Real Playbook"}))
+            for index, game_card_id in enumerate(("offense-installs", "defense-scout")):
+                result = call_api("POST", "playbooks", "free-coach", {
+                    "name": f"Preparation Item {index}", "gameCardId": game_card_id,
+                })
+                self.assertEqual(result.status_code, 201)
+
+            usage = response_json(call_api("GET", "workspace", "free-coach"))["usage"]
+            self.assertEqual(usage["playbooks"], 1)
+
+            converted = call_api("PATCH", f"playbooks/{book['id']}", "free-coach", {"gameCardId": "offense-installs"})
+            self.assertEqual(converted.status_code, 200)
+            usage = response_json(call_api("GET", "workspace", "free-coach"))["usage"]
+            self.assertEqual(usage["playbooks"], 0)
+
+            restored = call_api("PATCH", f"playbooks/{book['id']}", "free-coach", {"gameCardId": ""})
+            self.assertEqual(restored.status_code, 200)
+            usage = response_json(call_api("GET", "workspace", "free-coach"))["usage"]
+            self.assertEqual(usage["playbooks"], 1)
+
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Second real playbook"}).status_code, 409)
+            self.assertEqual(call_api("DELETE", f"playbooks/{book['id']}", "free-coach").status_code, 204)
+            self.assertEqual(call_api("POST", "playbooks", "free-coach", {"name": "Replacement playbook"}).status_code, 201)
+
     def test_archived_records_count_toward_limits_and_permanent_deletion_frees_capacity(self):
         with patch.dict(function_app.accounts.FREE_LIMITS, {"playbooks": 5}):
             books = [

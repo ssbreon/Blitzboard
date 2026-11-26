@@ -362,7 +362,7 @@ function AppBar({ activeView, onNavigate, user, workspace, onWorkspaceChange, on
                 <div className="account-menu-section-label">{user.name} (<span className="account-role">{workspace?.role || user.roles.join(', ')}</span>)</div>
                 <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'profile')}><UserRound className="menu-item-icon" aria-hidden="true" />Profile</button>
                 {workspace?.kind === 'team' && <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'team')}><Users className="menu-item-icon" aria-hidden="true" />Team</button>}
-                {!workspace?.alphaEnabled && <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>}
+                <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'billing')}><CreditCard className="menu-item-icon" aria-hidden="true" />Membership &amp; Billing</button>
                 <div className="account-menu-divider" role="separator" />
                 <button type="button" role="menuitem" className="menu-item" disabled={busy} onClick={(event) => navigate(event, 'settings')}><Settings className="menu-item-icon" aria-hidden="true" />Settings</button>
                 <div className="account-menu-divider" role="separator" />

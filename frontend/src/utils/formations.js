@@ -1731,38 +1731,37 @@ const SPECIAL_TEAMS_OFFENSE_FORMATIONS = {
     ]),
   },
   shieldPunt: {
-    positionLabels: ['LE', 'LT', 'LG', 'LS', 'RG', 'RT', 'RE', 'W', 'W', 'PP', 'P'],
+    positionLabels: ['X', 'LT', 'LG', 'C', 'RG', 'RT', 'Z', 'LU', 'PP', 'RU', 'P'],
     positions: positionsFromRows([
-      { y: 48, xPositions: [20, 30, 40, 50, 60, 70, 80] },
-      { y: 55, xPositions: [8, 92] },
-      { y: 62, xPositions: [50] },
-      { y: 76, xPositions: [50] },
+      { y: 48, xPositions: [35, 40, 45, 50, 55, 60, 65] },  // X, LT, LG, C, RG, RT, Z positions
+      { y: 62, xPositions: [42, 58] },    // LU and RU positions
+      { y: 62, xPositions: [49] },        // PP position
+      { y: 76, xPositions: [50] },        // P position
     ]),
   },
   spreadPunt: {
-    positionLabels: ['LT', 'LG', 'LS', 'RG', 'RT', 'G', 'G', 'W', 'W', 'PP', 'P'],
+    positionLabels: ['X', 'LT', 'LG', 'C', 'RG', 'RT', 'Z', 'LU', 'PP', 'RU', 'P'],
     positions: positionsFromRows([
-      { y: 48, xPositions: [30, 40, 50, 60, 70] },
-      { y: 43, xPositions: [8, 92] },
-      { y: 56, xPositions: [20, 80] },
-      { y: 64, xPositions: [50] },
-      { y: 77, xPositions: [50] },
+      { y: 48, xPositions: [18, 40, 45, 50, 55, 60, 82] },  // X, LT, LG, C, RG, RT, Z positions
+      { y: 54, xPositions: [36, 64] },    // LU and RU positions
+      { y: 62, xPositions: [49] },        // PP position
+      { y: 76, xPositions: [50] },        // P position
     ]),
   },
   patProtection: {
-    positionLabels: ['TE', 'LT', 'LG', 'C', 'RG', 'RT', 'TE', 'W', 'W', 'H', 'K'],
+    positionLabels: ['Y', 'LT', 'LG', 'C', 'RG', 'RT', 'Y', 'F', 'F', 'H', 'K'],
     positions: positionsFromRows([
-      { y: 50, xPositions: [20, 30, 40, 50, 60, 70, 80] },
-      { y: 49, xPositions: [8, 92] },
-      { y: 63, xPositions: [50] },
-      { y: 74, xPositions: [52] },
+      { y: 50, xPositions: [41, 44, 47, 50, 53, 56, 59] },
+      { y: 55, xPositions: [38, 62] },
+      { y: 62, xPositions: [51] },
+      { y: 69, xPositions: [46] },
     ]),
   },
   onsideKick: {
-    positionLabels: ['C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'K'],
+    positionLabels: ['L1', 'L2', 'L3', 'L4', 'R6', 'R5', 'R4', 'R3', 'R2', 'R1', 'K'],
     positions: positionsFromRows([
-      { y: 46, xPositions: [5, 15, 24, 33, 42, 58, 67, 76, 85, 95] },
-      { y: 70, xPositions: [50] },
+      { y: kickingRowY(1, 'offense'), xPositions: [5, 15, 24, 33, 52, 60, 68, 76, 84, 92] },
+      { y: kickingRowY(5, 'offense'), xPositions: [42] },
     ]),
   },
 }
@@ -1772,58 +1771,60 @@ const SPECIAL_TEAMS_DEFENSE_FORMATIONS = {
     positionLabels: ['T', 'G', 'C', 'G', 'T', 'E', 'E', 'FB', 'FB', 'R1', 'R2'],
     positions: positionsFromRows([
       { y: kickingRowY(-12, 'defense'), xPositions: [18, 34, 50, 66, 82] },
-      { y: kickingRowY(-22, 'defense'), xPositions: [35, 65] },
-      { y: kickingRowY(-34, 'defense'), xPositions: [40, 60] },
-      { y: kickingRowY(-48, 'defense'), xPositions: [35, 65] },
+      { y: kickingRowY(-26, 'defense'), xPositions: [29, 71] },
+      { y: kickingRowY(-37, 'defense'), xPositions: [31, 69] },
+      { y: kickingRowY(-52, 'defense'), xPositions: [35, 65] },
     ]),
   },
   return5321: {
     positionLabels: ['T', 'G', 'C', 'G', 'T', 'E', 'M', 'E', 'FB', 'FB', 'RB'],
     positions: positionsFromRows([
       { y: kickingRowY(-12, 'defense'), xPositions: [18, 34, 50, 66, 82] },
-      { y: kickingRowY(-22, 'defense'), xPositions: [30, 50, 70] },
-      { y: kickingRowY(-34, 'defense'), xPositions: [40, 60] },
-      { y: kickingRowY(-48, 'defense'), xPositions: [50] },
+      { y: kickingRowY(-26, 'defense'), xPositions: [26, 50, 74] },
+      { y: kickingRowY(-37, 'defense'), xPositions: [31, 69] },
+      { y: kickingRowY(-52, 'defense'), xPositions: [50] },
     ]),
   },
   puntReturn: {
-    positionLabels: ['G', 'G', 'B', 'B', 'B', 'B', 'B', 'B', 'B', 'R', 'R'],
+    positionLabels: ['E', 'T', 'T', 'E', 'C', 'B', 'B', 'B', 'C', 'SS', 'R'],
     positions: positionsFromRows([
-      { y: 38, xPositions: [24, 40, 60, 76] },
-      { y: 50, xPositions: [18, 40, 60, 82] },
-      { y: 62, xPositions: [35] },
-      { y: 74, xPositions: [42, 58] },
+      { y: 42, xPositions: [40, 45, 55, 60] },
+      { y: 44, xPositions: [19, 35, 50, 65, 81] },
+      { y: 70, xPositions: [50,] },
+      { y: 120, xPositions: [50] },
     ]),
   },
   puntBlock: {
-    positionLabels: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'B', 'B', 'B', 'B'],
+    positionLabels: ['B', 'E', 'T', 'T', 'E', 'B', 'B','C', 'C', 'SS', 'R'],
     positions: positionsFromRows([
-      { y: 35, xPositions: [10, 23, 36, 50, 64, 77, 90] },
-      { y: 48, xPositions: [35, 65] },
-      { y: 62, xPositions: [35, 65] },
+      { y: 42, xPositions: [35, 40, 45, 55, 60, 65, 70] },
+      { y: 44, xPositions: [19, 81] },
+      { y: 47, xPositions: [50,] },
+      { y: 120, xPositions: [50] },
     ]),
   },
   baseBlock: {
-    positionLabels: ['E', 'T', 'T', 'E', 'E', 'S', 'M', 'W', 'C', 'FS', 'C'],
+    positionLabels: ['C', 'B', 'E', 'T', 'T', 'E', 'B', 'C', 'B', 'FS', 'SS' ],
     positions: positionsFromRows([
-      { y: 36, xPositions: [20, 35, 50, 65, 80] },
-      { y: 49, xPositions: [30, 50, 70] },
-      { y: 65, xPositions: [25, 50, 75] },
+      { y: 38, xPositions: [37, 40, 43, 47, 53, 56, 60, 63] },
+      { y: 45, xPositions: [50] },
+      { y: 47, xPositions: [35, 65] },
     ]),
   },
   heavyBlock: {
-    positionLabels: ['R', 'R', 'R', 'R', 'R', 'R', 'R', 'B', 'B', 'B', 'B'],
+    positionLabels: ['C', 'FS', 'B', 'E', 'T', 'T', 'E', 'B', 'SS', 'C', 'B' ],
     positions: positionsFromRows([
-      { y: 35, xPositions: [12, 25, 37, 50, 63, 75, 88] },
-      { y: 50, xPositions: [32, 44, 56, 68] },
+      { y: 38, xPositions: [36, 39, 42, 45, 48, 52, 55, 58, 61, 64] },
+      { y: 45, xPositions: [50] },
     ]),
   },
   handsTeam: {
-    positionLabels: ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+    positionLabels: ['T', 'G', 'C', 'G', 'T', 'E', 'E', 'FB', 'FB', 'R1', 'R2'],
     positions: positionsFromRows([
-      { y: 40, xPositions: [25, 40, 60, 75] },
-      { y: 53, xPositions: [20, 40, 60, 80] },
-      { y: 68, xPositions: [35, 50, 65] },
+      { y: kickingRowY(-12, 'defense'), xPositions: [18, 34, 50, 66, 82] },
+      { y: kickingRowY(-18, 'defense'), xPositions: [27, 73] },
+      { y: kickingRowY(-18, 'defense'), xPositions: [42, 58] },
+      { y: kickingRowY(-32, 'defense'), xPositions: [35, 65] },
     ]),
   },
 }
