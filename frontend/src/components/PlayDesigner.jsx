@@ -1035,6 +1035,14 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     setCursorPos(null)
   }
 
+  function clearSelection() {
+    setSelectedId(null)
+    setMultiSelectedIds([])
+    setSelectedDrawing(null)
+    setSelectedTextId(null)
+    setSelectedZoneId(null)
+  }
+
   // Deselect, place an object, or extend the active drawing path.
   function handleFieldClick(event) {
     if (suppressFieldClickRef.current) {
@@ -1043,11 +1051,7 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
     }
     if (activeTool === 'select') {
       // Marker/drawing clicks stop propagation, so reaching here means empty field was clicked.
-      setSelectedId(null)
-      setMultiSelectedIds([])
-      setSelectedDrawing(null)
-      setSelectedTextId(null)
-      setSelectedZoneId(null)
+      clearSelection()
       return
     }
     if (!activeChain) {
@@ -2087,7 +2091,9 @@ export function PlayDesigner({ record, api = defaultApi, readOnly = false, canDe
         </div>
       </div>
       )}
-      <div className="play-designer-field-frame">
+      <div className="play-designer-field-frame" onClick={(event) => {
+        if (activeTool === 'select' && event.target === event.currentTarget) clearSelection()
+      }}>
       <div
         ref={fieldRef}
         id="play-designer-field"

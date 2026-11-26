@@ -58,6 +58,18 @@ test('drawing history controls follow undoable and redoable paths after saving',
     await click(undo)
     assert.equal(undo.disabled, true)
     assert.equal(redo.disabled, false)
+
+    await click(document.querySelector('button[aria-label="Add Line"]'))
+    await fieldEvent('click', 20, 20)
+    await fieldEvent('contextmenu', 40, 40)
+    assert.ok(document.querySelector('[aria-label="Appearance for Line path"]'))
+    await click(document.querySelector('.play-designer-field-frame'))
+    assert.equal(document.querySelector('[aria-label="Appearance for Line path"]'), null)
+    assert.equal(document.querySelector('button[aria-label="Select"]').getAttribute('aria-pressed'), 'true')
+
+    await click(document.querySelector('button[aria-label="Add Line"]'))
+    await click(document.querySelector('.play-designer-field-frame'))
+    assert.equal(document.querySelector('button[aria-label="Add Line"]').getAttribute('aria-pressed'), 'true')
   } finally {
     await act(async () => root.unmount())
     await server.close()
